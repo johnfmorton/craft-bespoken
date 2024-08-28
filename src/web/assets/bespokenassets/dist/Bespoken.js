@@ -173,6 +173,10 @@ function getInputValue(selector) {
 function logError(message) {
   console.error(`WellRead plugin: ${message}`);
 }
+function handleError(message, progressComponent) {
+  updateProgress(0, message, progressComponent);
+  logError(message);
+}
 function generateText(text, actionUrl, voiceId, entryTitle, fileNamePrefix, elementId, progressComponent, button) {
   if (!text) return handleError("Text is empty. There is no audio to generate.", progressComponent);
   if (!actionUrl) return handleError("The actionUrl is empty. There is no action to call.", progressComponent);
@@ -184,15 +188,18 @@ function generateText(text, actionUrl, voiceId, entryTitle, fileNamePrefix, elem
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   }).then((response) => response.json()).then((data2) => {
+    if (data2.success === false) {
+      const errorMessage = data2.message || "Error during API request.";
+      handleError(errorMessage, progressComponent);
+      return;
+    }
     const { filename, jobId } = data2;
     startJobMonitor(jobId, progressComponent, filename, button);
   }).catch((error) => {
+    debugger;
+    handleError("Error during API request.", progressComponent);
     logError(`Error during API request: ${error}`);
   });
-}
-function handleError(message, progressComponent) {
-  updateProgress(0, message, progressComponent);
-  logError(message);
 }
 function startJobMonitor(jobId, progressComponent, filename, button) {
   if (!jobId) return logError("The jobId is empty. There is no job to monitor.");
@@ -205,13 +212,16 @@ function jobMonitor(jobId, progressComponent, filename, button, interval) {
   fetch(`/actions/bespoken/bespoken/job-status?jobId=${jobId}`).then((response) => response.json()).then((data) => {
     const { status, progress, progressLabel } = data;
     if (status === "waiting") {
-      updateProgress(0.2, "Job is waiting...", progressComponent);
+      updateProgress(0.1, "Job is waiting...", progressComponent);
     } else if (status === "reserved") {
       const message = progressLabel || "Job is reserved...";
       updateProgress(progress * 0.01, message, progressComponent);
-    } else if (status === "done" || status === "unknown") {
+    } else if (status === "done" && filename) {
       updateProgress(1, `Job is complete: ${filename}`, progressComponent);
       button.classList.remove("disabled");
+      clearInterval(interval);
+    } else {
+      updateProgress(0, "Job failed. Please check logs.", progressComponent);
       clearInterval(interval);
     }
   });

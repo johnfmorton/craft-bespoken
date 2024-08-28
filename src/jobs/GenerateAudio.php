@@ -19,10 +19,13 @@ class GenerateAudio extends BaseJob
     public ?string $entryTitle = '';
     public ?string $filename = '';
      // for debugging purposes to mimic a long-running process
-    private ?int $sleepValue = 0;
+    private ?int $sleepValue = 2;
 
     protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
 
+    /**
+     * @throws \JsonException
+     */
     function execute($queue): void
     {
         // The element ID of the entry
@@ -40,8 +43,50 @@ class GenerateAudio extends BaseJob
         Bespoken::info('Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
 
         // Call the Eleven Labs API
-        $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
+//        $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
+        $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
     }
+
+
+    protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle): void
+    {
+        $this->setProgress($queue, 0.25,
+            'Downloading a test file with CURL')
+        ;
+        // add a pause to simulate a long-running process
+        sleep($this->sleepValue);
+
+        // download a test file with CURL
+        $url = 'https://wellreadtest.ddev.site/test.mp3';
+        $tempDir = $this->getTempDirectory();
+        $timestamp = time();
+        $tempFilePath = $tempDir . '/test'. $timestamp .'.mp3';
+        $fp = fopen($tempFilePath, 'wb+');
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        // set curl timeout to 5 minutes
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3000);
+        $data = curl_exec($ch);
+        curl_close($ch);
+        fclose($fp);
+        // add a pause to simulate a long-running process
+        sleep($this->sleepValue);
+
+        $this->setProgress($queue, 0.5,
+            'Downloaded the test file correctly');
+
+        $this->setProgress($queue, 1,
+            'FAKE ERROR: Error saving the audio file to the assets.');
+
+        // add a pause to simulate a long-running process
+        sleep($this->sleepValue * 2);
+        $this->setProgress($queue, 0.7,
+            'post sleep');
+        $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle);
+
+    }
+
 
     /**
      * @throws \JsonException
@@ -213,5 +258,20 @@ class GenerateAudio extends BaseJob
     protected function defaultDescription(): ?string
     {
         return Craft::t('app', 'Generate audio file');
+    }
+
+     private function getTempDirectory(): string
+    {
+        // Get the tmp directory for file uploads
+        $tmp_dir = Craft::$app->path->getTempPath(). '/bespoken';
+
+        Bespoken::info('tmp_dir for audio file: ' . $tmp_dir);
+
+        // Create the tmp directory if it doesn't exist
+        if (!file_exists($tmp_dir) && !mkdir($tmp_dir, 0777, true) && !is_dir($tmp_dir)) {
+            throw new \RuntimeException(sprintf('Directory "%s" was not created', $tmp_dir));
+        }
+
+        return $tmp_dir;
     }
 }

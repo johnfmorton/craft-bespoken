@@ -38,19 +38,17 @@ function handleButtonClick(event: MouseEvent) {
   const voiceId = voiceSelect?.value || '';
 
   // Get all hidden input fields within the element with id 'my-fields'
-const hiddenInputFields = fieldsGroup.querySelectorAll('input[type="hidden"]');
+  const hiddenInputFields = fieldsGroup.querySelectorAll('input[type="hidden"]');
 
 
-// Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
-// let targetInput: HTMLInputElement | null = null;
-let fileNamePrefix: string | null = null;
-hiddenInputFields.forEach((input: HTMLInputElement) => {
-  if (input.name.includes('fileNamePrefix')) {
-    fileNamePrefix = input.value;
-  }
-});
-
-
+  // Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
+  // let targetInput: HTMLInputElement | null = null;
+  let fileNamePrefix: string | null = null;
+  hiddenInputFields.forEach((input: HTMLInputElement) => {
+    if (input.name.includes('fileNamePrefix')) {
+      fileNamePrefix = input.value;
+    }
+  });
 
   if (!voiceId) return logError('The voice is empty. Please select a voice.');
 
@@ -81,6 +79,10 @@ function getInputValue(selector: string): string {
 function logError(message: string): void {
   console.error(`WellRead plugin: ${message}`);
 }
+function handleError(message: string, progressComponent: HTMLElement): void {
+  updateProgress(0, message, progressComponent);
+  logError(message);
+}
 
 function generateText(
   text: string,
@@ -107,18 +109,27 @@ function generateText(
   })
     .then(response => response.json())
     .then(data => {
+      // check for success
+      if (data.success === false) {
+        const errorMessage = data.message || 'Error during API request.';
+
+        // debugger;
+        handleError(errorMessage, progressComponent);
+        // logError(`Error during API request: ${data.message}`);
+        return;
+      }
+
       const { filename, jobId } = data;
       startJobMonitor(jobId, progressComponent, filename, button);
     })
     .catch(error => {
+      debugger;
+        handleError('Error during API request.', progressComponent);
       logError(`Error during API request: ${error}`);
     });
 }
 
-function handleError(message: string, progressComponent: HTMLElement): void {
-  updateProgress(0, message, progressComponent);
-  logError(message);
-}
+
 
 function startJobMonitor(jobId: number, progressComponent: HTMLElement, filename: string, button:HTMLElement): void {
   if (!jobId) return logError('The jobId is empty. There is no job to monitor.');
@@ -137,14 +148,17 @@ function jobMonitor(jobId: number, progressComponent: HTMLElement, filename: str
       const { status, progress, progressLabel } = data;
 
       if (status === 'waiting') {
-        updateProgress(0.2, 'Job is waiting...', progressComponent);
+        updateProgress(0.1, 'Job is waiting...', progressComponent);
       } else if (status === 'reserved') {
         // if progressLabel is empty, use the default message of "waiting..."
         const message = progressLabel || 'Job is reserved...';
         updateProgress(progress * 0.01, message, progressComponent);
-      } else if (status === 'done' || status === 'unknown') {
+      } else if (status === 'done' && filename) {
         updateProgress(1, `Job is complete: ${filename}`, progressComponent);
         button.classList.remove('disabled');
+        clearInterval(interval);
+      } else {
+        updateProgress(0, 'Job failed. Please check logs.', progressComponent);
         clearInterval(interval);
       }
     });

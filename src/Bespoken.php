@@ -61,27 +61,27 @@ class Bespoken extends Plugin
     }
 
     /*
-     * Log an informal message to the well-read log target
+     * Log an informal message to the bespoken log target
      */
     public static function info(string $message): void
     {
-        Craft::getLogger()->log($message, Logger::LEVEL_INFO, 'well-read');
+        Craft::getLogger()->log($message, Logger::LEVEL_INFO, 'bespoken');
     }
 
     /*
-     * Log a warning message to the well-read log target
+     * Log a warning message to the bespoken log target
      */
     public static function warning(string $message): void
     {
-        Craft::getLogger()->log($message, Logger::LEVEL_WARNING, 'well-read');
+        Craft::getLogger()->log($message, Logger::LEVEL_WARNING, 'bespoken');
     }
 
     /*
-     * Log an error message to the well-read log target
+     * Log an error message to the bespoken log target
      */
     public static function error(string $message): void
     {
-        Craft::getLogger()->log($message, Logger::LEVEL_ERROR, 'well-read');
+        Craft::getLogger()->log($message, Logger::LEVEL_ERROR, 'bespoken');
     }
 
     /**
@@ -121,8 +121,8 @@ class Bespoken extends Plugin
     private function _registerLogTarget(): void
     {
         Craft::getLogger()->dispatcher->targets[] = new MonologTarget([
-            'name' => 'well-read',
-            'categories' => ['well-read'],
+            'name' => 'bespoken',
+            'categories' => ['bespoken'],
             'level' => LogLevel::INFO,
             'logContext' => false,
             'allowLineBreaks' => false,

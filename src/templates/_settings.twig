@@ -13,7 +13,7 @@
 
 {{  forms.autosuggestField({
     label: 'ElevenLabs API Key',
-    instructions: 'Eleven Labs API Key instructions' | t('well-read'),
+    instructions: 'Eleven Labs API Key instructions' | t('bespoken'),
     id: 'elevenlabs-api-key',
     suggestEnvVars: true,
     name: 'elevenlabsApiKey',
@@ -41,7 +41,7 @@
 {{ forms.field(
     {
         label: 'Voice Model',
-        instructions: 'Voice model instructions' | t('well-read'),
+        instructions: 'Voice model instructions' | t('bespoken'),
         name: 'voiceModel',
         id: 'voiceModel',
         errors: settings.getErrors('voiceModel')
@@ -62,20 +62,20 @@
     name: 'voices',
     static: false,
     staticRows: false,
-    addRowLabel: 'Add Voice'|t('well-read'),
+    addRowLabel: 'Add Voice'|t('bespoken'),
     allowAdd: true,
     allowReorder: true,
     allowDelete: true,
     cols: {
         voice: {
-            heading: 'Voice Name' | t('well-read'),
+            heading: 'Voice Name' | t('bespoken'),
             type: 'singleline',
             width: '50%',
             handle: 'voice',
             class: 'code'
         },
         voiceId: {
-            heading: 'Voice ID' | t('well-read'),
+            heading: 'Voice ID' | t('bespoken'),
             type: 'singleline',
             width: '50%',
             handle: 'voiceId',
@@ -91,7 +91,7 @@
 {{ forms.field(
     {
         label: 'Voices'|t('wellread'),
-        instructions: 'Add voice instructions' | t('well-read'),
+        instructions: 'Add voice instructions' | t('bespoken'),
         name: 'voices',
         id: 'voices',
         errors: settings.errors.voices ?? []
@@ -115,8 +115,8 @@
 
 {{ forms.selectField(
     {
-        label: 'Asset Volume for audio files' | t('well-read'),
-        instructions: 'Asset Volume instructions' | t('well-read'),
+        label: 'Asset Volume for audio files' | t('bespoken'),
+        instructions: 'Asset Volume instructions' | t('bespoken'),
         id: 'volumeHandle',
         name: 'volumeHandle',
         options: craftAssetVolumes,
@@ -134,8 +134,8 @@
 
 {{ forms.textField(
     {
-        label: 'Stability' | t('well-read'),
-        instructions: 'Stability instructions' | t('well-read'),
+        label: 'Stability' | t('bespoken'),
+        instructions: 'Stability instructions' | t('bespoken'),
         id: 'stability',
         name: 'stability',
         type: 'number',
@@ -147,8 +147,8 @@
 
 {{ forms.textField(
     {
-        label: 'Similarity Boost' | t('well-read'),
-        instructions: 'Similarity boost instructions' | t('well-read'),
+        label: 'Similarity Boost' | t('bespoken'),
+        instructions: 'Similarity boost instructions' | t('bespoken'),
         id: 'similarity_boost',
         name: 'similarity_boost',
         type: 'number',
@@ -160,8 +160,8 @@
 
 {{ forms.textField(
     {
-        label: 'Style' | t('well-read'),
-        instructions: 'Style instructions' | t('well-read'),
+        label: 'Style' | t('bespoken'),
+        instructions: 'Style instructions' | t('bespoken'),
         id: 'style',
         name: 'style',
         type: 'number',
@@ -172,8 +172,8 @@
 
 {{ forms.lightSwitchField(
     {
-        label: 'Use Speaker Boost' | t('well-read'),
-        instructions: 'Use speaker boost instructions' | t('well-read'),
+        label: 'Use Speaker Boost' | t('bespoken'),
+        instructions: 'Use speaker boost instructions' | t('bespoken'),
         id: 'use_speaker_boost',
         name: 'use_speaker_boost',
         on: settings['use_speaker_boost'],

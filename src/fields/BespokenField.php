@@ -33,6 +33,8 @@ class BespokenField extends Field
      */
     public string $fileNamePrefix = '';
 
+    public array $voiceOptions = [];
+
     public static function displayName(): string
     {
         return Craft::t('bespoken', 'Bespoken Field Name');

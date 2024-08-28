@@ -13,6 +13,6 @@ class BespokenAssetsAsset extends AssetBundle
 {
     public $sourcePath = __DIR__ . '/dist';
     public $depends = [CpAsset::class];
-    public $js = [];
-    public $css = [];
+    public $js = ['Bespoken.js'];
+    public $css = ['Bespoken.css'];
 }

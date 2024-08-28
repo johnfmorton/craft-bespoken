@@ -1,7 +1,10 @@
 {% import "_includes/forms" as forms %}
 
 {# Register the CSS and JS Asset bundles #}
-{% do view.registerAssetBundle('johnfmorton\\bespoken\\web\\assets\\bespokenassets') %}
+{#{% do view.registerAssetBundle('johnfmorton\\bespoken\\web\\assets\\bespokenassets') %}#}
+{% do view.registerAssetBundle('johnfmorton\\bespoken\\web\\assets\\bespokenassets\\BespokenAssetsAsset') %}
+
+{# Get the settings for the plugin #}
 
 {% set bespokenSettings = craft.app.plugins.plugin('bespoken').getSettings() %}
 {% set fieldSettings = field.settings %}

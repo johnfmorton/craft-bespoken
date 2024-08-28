@@ -1,27 +1,82 @@
-
 import { ProgressComponent } from "./progress-component";
-
 import './Bespoken.css';
-
 import {checkBespokeJobStatus} from "./checkBespokeJobStatus";
 
-import { handleButtonClick } from "./handleButtonClick";
 
+if (!customElements.get('progress-component')) {
+    customElements.define('progress-component', ProgressComponent);
+}
+
+// These are the tags that are allowed to be sent to the API for text-to-speech conversion
+const allowedTags: string[] = ['phoneme', 'break'];
 // Used to track the progress of the audio generation every x milliseconds
 const pollingInterval = 1000; // 1 second
 
+document.addEventListener('click', handleButtonClick);
 
-function init() {
-  // If the custom element has not been defined, define it
-  if (!customElements.get('progress-component')) {
-      customElements.define('progress-component', ProgressComponent);
+function handleButtonClick(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+
+  const button = target.closest('.bespoken-generate') as HTMLElement;
+
+  if (!button || !target.closest('.bespoken-button')) return;
+
+  const fieldsGroup = getClosestElement(button, '.bespoken-fields');
+  if (!fieldsGroup) return logError('Could not find the fields group.');
+
+
+
+  const progressComponent = fieldsGroup.querySelector('progress-component') as HTMLElement | null;
+  updateProgress(0.01, 'Generating audio...', progressComponent);
+
+  button.classList.add('disabled');
+  const elementId = getInputValue('input[name="elementId"]');
+
+
+  const title = cleanTitle(getInputValue('#title') || elementId);
+
+  const voiceSelect = fieldsGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
+  const voiceId = voiceSelect?.value || '';
+
+  // Get all hidden input fields within the element with id 'my-fields'
+  const hiddenInputFields = fieldsGroup.querySelectorAll('input[type="hidden"]');
+
+
+  // Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
+  // let targetInput: HTMLInputElement | null = null;
+  let fileNamePrefix: string | null = null;
+  hiddenInputFields.forEach((input: HTMLInputElement) => {
+    if (input.name.includes('fileNamePrefix')) {
+      fileNamePrefix = input.value;
+    }
+  });
+
+  if (!voiceId) return logError('The voice is empty. Please select a voice.');
+
+  const targetField = button.dataset.targetField;
+  const actionUrlBase = button.dataset.actionUrl;
+  const actionUrlProcessText = actionUrlBase + '/process-text';
+
+  if (targetField && actionUrlProcessText && voiceId) {
+    const field = document.getElementById(`fields-${targetField}-field`) as HTMLElement | null;
+    if (field) {
+      const text = getFieldText(field);
+      const textToSendToAPI = stripTagsExceptAllowedTags(text, allowedTags);
+      generateText(textToSendToAPI, actionUrlProcessText, voiceId, title, fileNamePrefix, elementId, progressComponent, button);
+    } else {
+      logError('The field does not exist');
+    }
   }
-  // Add the event listener to the document
-  document.addEventListener('click', handleButtonClick);
-
 }
 
-init();
+function getClosestElement(element: HTMLElement, selector: string): HTMLElement | null {
+  return element.closest(selector) as HTMLElement | null;
+}
+
+function getInputValue(selector: string): string {
+  const input = document.querySelector(selector) as HTMLInputElement | null;
+  return input?.value || '';
+}
 
 function logError(message: string): void {
   console.error(`WellRead plugin: ${message}`);
@@ -48,6 +103,8 @@ function generateText(
   // Generate a random number from 0 to 1000000 to be used in the queue system for status updates
   let jobId: number;
   jobId = Math.floor(Math.random * 1000000);
+
+
 
   const data = { text, voiceId, entryTitle: cleanTitle(entryTitle), fileNamePrefix, elementId };
 
@@ -95,10 +152,7 @@ function startJobMonitor(jobId: number, progressComponent: HTMLElement, filename
         actionUrl: '/actions/bespoken/bespoken/job-status'
     }
 
-    const resultOfJobCheck = await checkBespokeJobStatus(data);
-
-    newUpdateProgress(resultOfJobCheck);
-
+    checkBespokeJobStatus(data);
     // jobMonitor(jobId, progressComponent, filename, button, interval);
   }, pollingInterval);
 
@@ -132,8 +186,30 @@ function jobMonitor(jobId: number, progressComponent: HTMLElement, filename: str
     });
 }
 
-function newUpdateProgress(data): void {
+function getFieldText(field: HTMLElement): string {
 
+  let text = '';
+  if (field.getAttribute('data-type') === 'craft\\ckeditor\\Field') {
+
+    text = field.querySelector('textarea')?.value || '';
+
+  } else if (field.getAttribute('data-type') === 'craft\\fields\\PlainText') {
+
+    // this checks for an input field or a textarea field but only if the name attribute starts with 'fields['
+    // this is to accommodate how Craft CMS shows the field handles when a developer
+    // has their account set to show field handles instead of field labels
+    const inputOrTextarea = field.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+    'input[type="text"][name^="fields["], textarea[name^="fields["]'
+  );
+      if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
+        text = inputOrTextarea.value;
+      }
+
+    // text = field.querySelector('input')?.value || field.querySelector('textarea')?.value || '';
+
+
+  }
+  return text;
 }
 
 function updateProgress(progress: number, message: string, progressComponent: HTMLElement): void {
@@ -148,13 +224,13 @@ function updateProgress(progress: number, message: string, progressComponent: HT
   progressComponent.setAttribute('message', message);
 }
 
-// function stripTagsExceptAllowedTags(text: string, allowedTags: string[]): string {
-//   const allowedTagsPattern = new RegExp(`<(\/?(${allowedTags.join('|')}))\\b[^>]*>`, 'gi');
-//   let strippedText = text.replace(/<\/p>/g, ' </p>').replace(/<\/?[^>]+(>|$)/g, match => allowedTagsPattern.test(match) ? match : '');
-//   return strippedText.replace(/\s+/g, ' ').trim();
-// }
+function stripTagsExceptAllowedTags(text: string, allowedTags: string[]): string {
+  const allowedTagsPattern = new RegExp(`<(\/?(${allowedTags.join('|')}))\\b[^>]*>`, 'gi');
+  let strippedText = text.replace(/<\/p>/g, ' </p>').replace(/<\/?[^>]+(>|$)/g, match => allowedTagsPattern.test(match) ? match : '');
+  return strippedText.replace(/\s+/g, ' ').trim();
+}
 
-// function cleanTitle(text: string): string {
-//   const cleanText = text.replace(/[^\w\s]/gi, '').trim();
-//   return cleanText;
-// }
+function cleanTitle(text: string): string {
+  const cleanText = text.replace(/[^\w\s]/gi, '').trim();
+  return cleanText;
+}

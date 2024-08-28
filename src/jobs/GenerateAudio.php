@@ -23,7 +23,8 @@ class GenerateAudio extends BaseJob
 
     protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
 
-    public int $bespokeJobId = 0;
+    public string $bespokenJobId;
+    public int $cacheExpire = 1800; // 30 minutes
 
     /**
      * @throws \JsonException
@@ -41,26 +42,26 @@ class GenerateAudio extends BaseJob
         // The filename to use for the audio file
         $filename = $this->filename;
 
-        $bespokeJobId = 12345;
+        $bespokenJobId = $this->bespokenJobId;
 
         // Log that the job has started
         Bespoken::info('Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
         try {
             // Update job status in cache as 'running'
-            Craft::$app->cache->set("jobStatus-{$bespokeJobId}", 'running');
-            Craft::$app->cache->set("jobMessage-{$bespokeJobId}", 'The process has started');
+            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'running', $this->cacheExpire); // Expires in 1 hour
+            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has started', $this->cacheExpire); // Expires in 1 hour
             Bespoken::info('Job status updated to running');
 
             // Call the Eleven Labs API
             // $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
             $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
-            Craft::$app->cache->set("jobStatus-{$bespokeJobId}", 'completed');
-            Craft::$app->cache->set("jobMessage-{$bespokeJobId}", 'The process has completed');
+            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'completed', $this->cacheExpire);
+            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has completed', $this->cacheExpire);
             Bespoken::info('Job status updated to completed');
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
-            Craft::$app->cache->set("jobStatus-{$bespokeJobId}", 'error');
-            Craft::$app->cache->set("jobMessage-{$bespokeJobId}", 'The process has errored out.');
+            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'error', $this->cacheExpire);
+            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has errored out.', $this->cacheExpire);
             Bespoken::info('Job status updated to error');
         }
     }

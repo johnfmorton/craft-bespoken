@@ -5,6 +5,7 @@ namespace johnfmorton\bespoken\services;
 use Craft;
 use DateTime;
 use johnfmorton\bespoken\jobs\GenerateAudio;
+use Ramsey\Uuid\Uuid;
 use yii\base\Component;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
 
@@ -37,6 +38,8 @@ class BespokenService extends Component
             ];
         }
 
+        // Generate a unique job ID with ramsey/uuid library
+        $bespokenJobId = Uuid::uuid4()->toString();
 
 
         // Enqueue the job
@@ -58,6 +61,7 @@ class BespokenService extends Component
                 'voiceId' => $voiceId,
                 'entryTitle' => $entryTitle,
                 'filename' => $filename,
+                'bespokenJobId' => $bespokenJobId,
             ]
         ));
 
@@ -71,6 +75,7 @@ class BespokenService extends Component
             'voiceId' => $voiceId,
             'success' => true,
             'filename' => $filename,
+            'bespokenJobId' => $bespokenJobId,
         ];
     }
 

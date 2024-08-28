@@ -18,10 +18,12 @@ class GenerateAudio extends BaseJob
     public ?string $voiceId = '';
     public ?string $entryTitle = '';
     public ?string $filename = '';
-     // for debugging purposes to mimic a long-running process
+    // for debugging purposes to mimic a long-running process
     private ?int $sleepValue = 2;
 
     protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
+
+    public int $bespokeJobId = 0;
 
     /**
      * @throws \JsonException
@@ -39,20 +41,35 @@ class GenerateAudio extends BaseJob
         // The filename to use for the audio file
         $filename = $this->filename;
 
+        $bespokeJobId = 12345;
+
         // Log that the job has started
         Bespoken::info('Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
+        try {
+            // Update job status in cache as 'running'
+            Craft::$app->cache->set("jobStatus-{$bespokeJobId}", 'running');
+            Craft::$app->cache->set("jobMessage-{$bespokeJobId}", 'The process has started');
+            Bespoken::info('Job status updated to running');
 
-        // Call the Eleven Labs API
-//        $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
-        $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
+            // Call the Eleven Labs API
+            // $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
+            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
+            Craft::$app->cache->set("jobStatus-{$bespokeJobId}", 'completed');
+            Craft::$app->cache->set("jobMessage-{$bespokeJobId}", 'The process has completed');
+            Bespoken::info('Job status updated to completed');
+        } catch (\Throwable $e) {
+            Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
+            Craft::$app->cache->set("jobStatus-{$bespokeJobId}", 'error');
+            Craft::$app->cache->set("jobMessage-{$bespokeJobId}", 'The process has errored out.');
+            Bespoken::info('Job status updated to error');
+        }
     }
 
 
     protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle): void
     {
         $this->setProgress($queue, 0.25,
-            'Downloading a test file with CURL')
-        ;
+            'Downloading a test file with CURL');
         // add a pause to simulate a long-running process
         sleep($this->sleepValue);
 
@@ -60,7 +77,7 @@ class GenerateAudio extends BaseJob
         $url = 'https://wellreadtest.ddev.site/test.mp3';
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
-        $tempFilePath = $tempDir . '/test'. $timestamp .'.mp3';
+        $tempFilePath = $tempDir . '/test' . $timestamp . '.mp3';
         $fp = fopen($tempFilePath, 'wb+');
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_FILE, $fp);
@@ -84,7 +101,6 @@ class GenerateAudio extends BaseJob
         $this->setProgress($queue, 0.7,
             'post sleep');
         $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle);
-
     }
 
 
@@ -154,14 +170,14 @@ class GenerateAudio extends BaseJob
 
             // is response a JSON string? Don't throw an erorr
             try {
-            $response = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
-            // If json_decode doesn't throw an error, then it is a JSON response
-            if ($response) {
-                Bespoken::info('Response from ElevenLabs API: ' . print_r($response, true));
-                $this->setProgress($queue, 1,
-                    'Error in response from ElevenLabs API. Details: ' . print_r($response, true));
-                return;
-            }
+                $response = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+                // If json_decode doesn't throw an error, then it is a JSON response
+                if ($response) {
+                    Bespoken::info('Response from ElevenLabs API: ' . print_r($response, true));
+                    $this->setProgress($queue, 1,
+                        'Error in response from ElevenLabs API. Details: ' . print_r($response, true));
+                    return;
+                }
             } catch (\JsonException $e) {
                 // If a JsonException is thrown, it means the response is not valid JSON,
                 // which is expected if it's a binary MP3 file, so we continue processing
@@ -186,7 +202,7 @@ class GenerateAudio extends BaseJob
 
     private function saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle): void
     {
-        $this->setProgress($queue, 0.75,'Saving the file to the assets');
+        $this->setProgress($queue, 0.75, 'Saving the file to the assets');
 
         // Get the Bespoken plugin settings
         $settings = Bespoken::getInstance()->getSettings();
@@ -260,10 +276,10 @@ class GenerateAudio extends BaseJob
         return Craft::t('app', 'Generate audio file');
     }
 
-     private function getTempDirectory(): string
+    private function getTempDirectory(): string
     {
         // Get the tmp directory for file uploads
-        $tmp_dir = Craft::$app->path->getTempPath(). '/bespoken';
+        $tmp_dir = Craft::$app->path->getTempPath() . '/bespoken';
 
         Bespoken::info('tmp_dir for audio file: ' . $tmp_dir);
 

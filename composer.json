@@ -1,0 +1,48 @@
+{
+  "name": "johnfmorton/craft-bespoken",
+  "description": "Text-to-speech generation with ElevenLabs for Craft CMS",
+  "type": "craft-plugin",
+  "license": "proprietary",
+  "support": {
+    "email": "john+bespoken@johnfmorton.com",
+    "issues": "https://github.com/johnfmorton/craft-bespoken/issues?state=open",
+    "source": "https://github.com/johnfmorton/craft-bespoken",
+    "docs": "https://github.com/johnfmorton/craft-bespoken",
+    "rss": "https://github.com/johnfmorton/craft-bespoken/releases.atom"
+  },
+  "require": {
+    "php": ">=8.2",
+    "craftcms/cms": "^5.3.0"
+  },
+  "require-dev": {
+    "craftcms/ecs": "dev-main",
+    "craftcms/phpstan": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "johnfmorton\\bespoken\\": "src/"
+    }
+  },
+  "extra": {
+    "handle": "bespoken",
+    "name": "Bespoken",
+    "developer": "johnfmorton",
+    "documentationUrl": "https://github.com/johnfmorton/craft-bespoken",
+    "class": "johnfmorton\\bespoken\\Bespoken"
+  },
+  "scripts": {
+    "check-cs": "ecs check --ansi",
+    "fix-cs": "ecs check --ansi --fix",
+    "phpstan": "phpstan --memory-limit=1G"
+  },
+  "config": {
+    "sort-packages": true,
+    "platform": {
+      "php": "8.2"
+    },
+    "allow-plugins": {
+      "yiisoft/yii2-composer": true,
+      "craftcms/plugin-installer": true
+    }
+  }
+}

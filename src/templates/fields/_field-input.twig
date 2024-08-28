@@ -1,0 +1,74 @@
+{% import "_includes/forms" as forms %}
+
+{# Register the CSS and JS Asset bundles #}
+{% do view.registerAssetBundle('johnfmorton\\bespoken\\web\\assets\\bespokenassets') %}
+
+{% set bespokenSettings = craft.app.plugins.plugin('bespoken').getSettings() %}
+{% set fieldSettings = field.settings %}
+{% set subsetOfVoiceIdsForField = field.settings.voiceOptions %}
+{% set allVoiceOptionsForWellReadPlugin = bespokenSettings.voices %}
+
+{% set fieldId = field.getInputId() %}
+
+{% set voiceIdNameOptionsForField = {} %}
+
+{% for key in subsetOfVoiceIdsForField %}
+    {% for voiceOption in allVoiceOptionsForWellReadPlugin %}
+        {% if voiceOption.voiceId == key %}
+            {% set voiceIdNameOptionsForField = voiceIdNameOptionsForField|merge({ (voiceOption.voiceId): voiceOption.voice }) %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+
+{% set environment = craft.app.config.env %}
+<div class="bespoken-fields">
+
+    {% if voiceIdNameOptionsForField|length == 0 or fieldSettings.sourceField| length == 0 %}
+
+        {% if voiceIdNameOptionsForField|length == 0 %}
+        <div class="bespoken-error">{{ 'No voice options available for field'|t('bespoken') }}</div>
+        {% endif %}
+
+        {% if fieldSettings.sourceField| length == 0 %}
+        <div class="bespoken-error">{{ 'No source set for this field'|t('bespoken') }}</div>
+        {% endif %}
+    {% else %}
+        <div class="mt-m">
+
+            {{ forms.selectField({
+                id: fieldId ~ '-voice',
+                label: 'Voice field select label'|t('bespoken'),
+                instructions: 'Voice field select instructions'|t('bespoken'),
+                name: name ~ "[voice]",
+                class: 'bespoken-voice-select',
+                options: voiceIdNameOptionsForField,
+                value:  value['voice'] ?? '',
+            }) }}
+
+            {{ forms.hidden({
+                id: fieldId ~ '-fileNamePrefix',
+                name: name ~ "[fileNamePrefix]",
+                value:  fieldSettings.fileNamePrefix ?? '',
+            }) }}
+
+            <div class=" group flex flex-row">
+                {{ forms.button({
+                    label: 'Start Audio Job' | t('bespoken'),
+                    class: [
+                        'btn',
+                        'bespoken-button',
+                        'bespoken-generate',
+                    ],
+                    attributes: {
+                        data: {
+                            'target-field': field.sourceField,
+                            'action-url': actionUrl('bespoken/bespoken/process-text')
+                        }
+                    }
+                }) }}
+                <progress-component progress="0.0" message="" svg-height="14" class="bespoken-progress-component"></progress-component>
+            </div>
+        </div>
+    {% endif %}
+
+</div>

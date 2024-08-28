@@ -1,0 +1,78 @@
+
+{% set wellReadSettings = craft.app.plugins.plugin('bespoken').getSettings() %}
+{% set voiceOptionsAll = wellReadSettings.voices %}
+
+{% set voiceOptionsTransformed = [] %}
+{% for item in voiceOptionsAll %}
+    {% set transformedItem = {
+        value: item.voiceId,
+        label: item.voice
+    } %}
+    {% set voiceOptionsTransformed = voiceOptionsTransformed | merge([transformedItem]) %}
+{% endfor %}
+
+{% import "_includes/forms" as forms %}
+
+{#{{ dump(wellReadSettings) }}#}
+
+{#{{  dump(field) }}#}
+
+
+{# get the source field name #}
+
+{#{% set sourceField = field.sourceField %}#}
+{#{% set sourceFieldSettings = craft.app.fields.getFieldByUid(sourceField) %}#}
+
+{{ forms.textField({
+    label: 'Source Field Handle' | t('bespoken'),
+    instructions: 'The field handle of the field that will be read aloud.' | t('bespoken'),
+    id: 'sourceField',
+    name: 'sourceField',
+    value: field['sourceField'],
+    readonly: false,
+}) }}
+
+
+
+{{ forms.textField({
+    label: 'File Name Prefix'| t('bespoken'),
+    instructions: 'A prefix that will be added to the audio file name. Useful when there are multiple Bespoken fields in a single entry.' | t('bespoken'),
+    id: 'fileNamePrefix',
+    name: 'fileNamePrefix',
+    value: field['fileNamePrefix'],
+}) }}
+
+{#{{ forms.multiSelectField({#}
+{#    label: 'Voice Options',#}
+{#    instructions: 'The voice that will be used to read the source field aloud.',#}
+{#    id: 'voiceOptions',#}
+{#    name: 'voiceOptions',#}
+{#    options: voiceOptionsTransformed,#}
+{#    values: field['voiceOptions']#}
+{#}) }}#}
+
+{% if voiceOptionsTransformed | length  == 0 %}
+<div class="bespoken-error">{{ 'No voice options available for plugin'|t('bespoken') }}</div>
+{% else %}
+{% set input %}
+{{ forms.checkboxGroup({
+    label: 'Voice Options' | t('bespoken'),
+    instructions: 'The voice that will be used to read the source field aloud.'| t('bespoken'),
+    id: 'voiceOptions',
+    name: 'voiceOptions',
+    options: voiceOptionsTransformed,
+    values: field['voiceOptions']
+}) }}
+{% endset %}
+
+{{ forms.field(
+    {
+        label: 'Voice options' | t('bespoken'),
+        instructions: 'Voice options instructions' | t('bespoken'),
+        name: 'voices',
+        id: 'voices',
+    },
+    input
+) }}
+
+{% endif %}

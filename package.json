@@ -1,0 +1,16 @@
+{
+  "name": "bespoken",
+  "version": "1.0.0",
+  "description": "Build system for assets related to the Bespoken Craft CMS plugin",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild ./src/web/assets/bespokenassets/src/Bespoken.ts --bundle --platform=node --outfile=./src/web/assets/bespokenassets/dist/Bespoken.js",
+    "watch": "esbuild ./src/web/assets/bespokenassets/src/Bespoken.ts --bundle --platform=node --outfile=./src/web/assets/bespokenassets/dist/Bespoken.js --watch"
+  },
+  "author": "John F Morton",
+  "license": "ISC",
+  "dependencies": {
+    "esbuild": "^0.23.1"
+  }
+}

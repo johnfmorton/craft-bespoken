@@ -1,3 +1,20 @@
+/*
+1. Find the target of the click.
+    1. Action URL
+    2. Source field(s)
+    3. Title of entry
+    4. Voice chosen (ID, not name)
+    5. File prefix
+    6. Entry ID
+2. Text needs to be cleaned of tags, except pronunciation tags. (Clean text)
+3. Send data to action URL “process-text”.
+4. Disable the button
+5. Find the “status” display and update to “Sending data to Craft…”
+6. Wait for initial response. This will be an error about inadequate data or a job number.
+7. If error, display error, and enable the button. - what happens if the action URL is wrong? Check this situation.
+8. Else, start a “check job status” interval to poll server for updates
+ */
+
 import { ClickHandlerResult}  from "./interfaces";
 
 // These are the tags that are allowed to be sent to the API for text-to-speech conversion

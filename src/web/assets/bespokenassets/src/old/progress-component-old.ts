@@ -1,7 +1,7 @@
 export class ProgressComponent extends HTMLElement {
   // Observed attributes for this component
   static get observedAttributes(): string[] {
-    return ['progress', 'message', 'svg-height', 'success'];
+    return ['progress', 'message', 'svg-height'];
   }
 
   // Private members
@@ -9,7 +9,6 @@ export class ProgressComponent extends HTMLElement {
   private svg: SVGSVGElement;
   private circleBackground: SVGCircleElement;
   private circleProgress: SVGCircleElement;
-  private warningIcon: SVGSVGElement;
   private messageElement: HTMLSpanElement;
   private size: number; // Default size based on text height or svg-height attribute
   private radius: number; // Radius of the circle for progress calculation
@@ -19,12 +18,13 @@ export class ProgressComponent extends HTMLElement {
 
     // Initialize Shadow DOM
     const shadow = this.attachShadow({ mode: 'open' });
-
-     // create a container element
+    // create a container element
     this.container = document.createElement('div');
     this.container.classList.add('progress-container');
     // Append the container to the shadow DOM
     shadow.appendChild(this.container);
+
+
 
     // Set initial size either from attribute or based on message height
     this.size = this.calculateSize();
@@ -55,23 +55,12 @@ export class ProgressComponent extends HTMLElement {
     this.circleProgress.setAttribute("transform", `rotate(-90 ${this.size / 2} ${this.size / 2})`);
     this.circleProgress.style.transition = "stroke-dashoffset 0.3s ease";
 
-    // Create warning icon SVG
-    this.warningIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    this.warningIcon.setAttribute("viewBox", "0 0 24 24");
-    this.warningIcon.setAttribute("width", `${this.size}`);
-    this.warningIcon.setAttribute("height", `${this.size}`);
-    this.warningIcon.innerHTML = `
-      <path fill="#ca3a31" d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-    `;
-    this.warningIcon.style.display = 'none'; // Initially hidden
-
     // Append elements to SVG
     this.svg.appendChild(this.circleBackground);
     this.svg.appendChild(this.circleProgress);
 
-    // Append SVG and warning icon to the shadow DOM
+    // Append SVG to the shadow DOM
     this.container.appendChild(this.svg);
-    this.container.appendChild(this.warningIcon);
 
     // Create the message element first to determine its computed height
     this.messageElement = document.createElement('span');
@@ -85,7 +74,6 @@ export class ProgressComponent extends HTMLElement {
     const style = document.createElement('style');
     style.textContent = `
       .progress-container {
-            background-color: var(--progress-background-color, transparent);
             display: flex;
             flex-direction: row;
             gap: 0.25rem;
@@ -97,17 +85,12 @@ export class ProgressComponent extends HTMLElement {
             border-radius: 0.25rem;
             border: 1px solid var(--progress-fill-color);
         }
-    
-      :host(.progress-large) .progress-svg {
-        --progress-fill-color: blue;
-        --progress-background-color: lightblue;
-      }
       
       .progress-message {
-        color: var(--progress-text-color, black);
+        color: var(--progress-text-color, rgb(89, 102, 115));
       }
     `;
-    this.container.appendChild(style);
+    shadow.appendChild(style);
   }
 
   // Calculate the size of the SVG based on text height or svg-height attribute
@@ -138,8 +121,6 @@ export class ProgressComponent extends HTMLElement {
     } else if (name === 'svg-height') {
       this.size = this.calculateSize();
       this.updateComponentSize();
-    } else if (name === 'success') {
-      this.updateSuccess(newValue === 'true' || newValue === '1');
     }
   }
 
@@ -152,24 +133,13 @@ export class ProgressComponent extends HTMLElement {
 
     // Change text color based on progress
     if (progressValue === 0) {
-      this.messageElement.style.setProperty('--progress-text-color', 'lightgray');
+      this.messageElement.style.setProperty('--progress-text-color', '#767676');
     } else {
       this.messageElement.style.removeProperty('--progress-text-color');
     }
   }
 
-  // Update display based on success value
-  private updateSuccess(success: boolean): void {
-    if (success) {
-      this.svg.style.display = 'block';
-      this.warningIcon.style.display = 'none';
-    } else {
-      this.svg.style.display = 'none';
-      this.warningIcon.style.display = 'block';
-    }
-  }
-
-  // Recalculate the size when message, svg-height, or success changes
+  // Recalculate the size when message or svg-height changes
   private updateComponentSize(): void {
     this.size = this.calculateSize();
     this.radius = this.calculateRadius();
@@ -189,10 +159,6 @@ export class ProgressComponent extends HTMLElement {
 
     // Update progress display to match new size
     this.updateProgress(parseFloat(this.getAttribute('progress') || '0'));
-
-    // Adjust warning icon size
-    this.warningIcon.setAttribute("width", `${this.size}`);
-    this.warningIcon.setAttribute("height", `${this.size}`);
   }
 }
 

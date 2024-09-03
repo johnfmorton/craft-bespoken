@@ -2,7 +2,7 @@
 var ProgressComponent = class extends HTMLElement {
   // Observed attributes for this component
   static get observedAttributes() {
-    return ["progress", "message", "svg-height"];
+    return ["progress", "message", "svg-height", "success"];
   }
   // Radius of the circle for progress calculation
   constructor() {
@@ -34,9 +34,18 @@ var ProgressComponent = class extends HTMLElement {
     this.circleProgress.setAttribute("stroke-dashoffset", (2 * Math.PI * this.radius).toString());
     this.circleProgress.setAttribute("transform", `rotate(-90 ${this.size / 2} ${this.size / 2})`);
     this.circleProgress.style.transition = "stroke-dashoffset 0.3s ease";
+    this.warningIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    this.warningIcon.setAttribute("viewBox", "0 0 24 24");
+    this.warningIcon.setAttribute("width", `${this.size}`);
+    this.warningIcon.setAttribute("height", `${this.size}`);
+    this.warningIcon.innerHTML = `
+      <path fill="#ca3a31" d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+    `;
+    this.warningIcon.style.display = "none";
     this.svg.appendChild(this.circleBackground);
     this.svg.appendChild(this.circleProgress);
     this.container.appendChild(this.svg);
+    this.container.appendChild(this.warningIcon);
     this.messageElement = document.createElement("span");
     this.messageElement.classList.add("progress-message");
     this.messageElement.textContent = this.getAttribute("message") || "";
@@ -44,6 +53,7 @@ var ProgressComponent = class extends HTMLElement {
     const style = document.createElement("style");
     style.textContent = `
       .progress-container {
+            background-color: var(--progress-background-color, transparent);
             display: flex;
             flex-direction: row;
             gap: 0.25rem;
@@ -55,12 +65,17 @@ var ProgressComponent = class extends HTMLElement {
             border-radius: 0.25rem;
             border: 1px solid var(--progress-fill-color);
         }
+    
+      :host(.progress-large) .progress-svg {
+        --progress-fill-color: blue;
+        --progress-background-color: lightblue;
+      }
       
       .progress-message {
-        color: var(--progress-text-color, rgb(89, 102, 115));
+        color: var(--progress-text-color, black);
       }
     `;
-    shadow.appendChild(style);
+    this.container.appendChild(style);
   }
   // Calculate the size of the SVG based on text height or svg-height attribute
   calculateSize() {
@@ -87,6 +102,8 @@ var ProgressComponent = class extends HTMLElement {
     } else if (name === "svg-height") {
       this.size = this.calculateSize();
       this.updateComponentSize();
+    } else if (name === "success") {
+      this.updateSuccess(newValue === "true" || newValue === "1");
     }
   }
   // Update the progress indicator based on the provided value
@@ -96,12 +113,22 @@ var ProgressComponent = class extends HTMLElement {
     const offset = circumference * (1 - progressValue);
     this.circleProgress.setAttribute("stroke-dashoffset", offset.toString());
     if (progressValue === 0) {
-      this.messageElement.style.setProperty("--progress-text-color", "#767676");
+      this.messageElement.style.setProperty("--progress-text-color", "lightgray");
     } else {
       this.messageElement.style.removeProperty("--progress-text-color");
     }
   }
-  // Recalculate the size when message or svg-height changes
+  // Update display based on success value
+  updateSuccess(success) {
+    if (success) {
+      this.svg.style.display = "block";
+      this.warningIcon.style.display = "none";
+    } else {
+      this.svg.style.display = "none";
+      this.warningIcon.style.display = "block";
+    }
+  }
+  // Recalculate the size when message, svg-height, or success changes
   updateComponentSize() {
     this.size = this.calculateSize();
     this.radius = this.calculateRadius();
@@ -116,8 +143,91 @@ var ProgressComponent = class extends HTMLElement {
     this.circleBackground.setAttribute("stroke-width", strokeWidth);
     this.circleProgress.setAttribute("stroke-width", strokeWidth);
     this.updateProgress(parseFloat(this.getAttribute("progress") || "0"));
+    this.warningIcon.setAttribute("width", `${this.size}`);
+    this.warningIcon.setAttribute("height", `${this.size}`);
   }
 };
 if (!customElements.get("progress-component")) {
   customElements.define("progress-component", ProgressComponent);
+}
+
+// src/web/assets/bespokenassets/src/updateProgressComponent.ts
+function updateProgressComponent(progressComponent, { progress, success, message, textColor = "rgb(89, 102, 115)" }) {
+  if (!textColor) {
+    textColor = "rgb(89, 102, 115)";
+  }
+  progressComponent.setAttribute("progress", progress.toString());
+  progressComponent.setAttribute("success", success);
+  progressComponent.setAttribute("message", message);
+  progressComponent.style.setProperty("--progress-text-color", textColor);
+}
+
+// src/web/assets/bespokenassets/src/Bespoken.ts
+var allowedTags = ["phoneme", "break"];
+document.addEventListener("DOMContentLoaded", () => {
+  if (!customElements.get("progress-component")) {
+    customElements.define("progress-component", ProgressComponent);
+  }
+  const buttons = document.querySelectorAll(".bespoken-generate");
+  buttons.forEach((button) => {
+    button.addEventListener("click", handleButtonClick);
+  });
+});
+function handleButtonClick(event) {
+  const button = event.target.closest(".bespoken-generate");
+  if (!button) return;
+  button.classList.add("disabled");
+  const fieldGroup = event.target.closest(".bespoken-fields");
+  const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
+  const elementId = _getInputValue('input[name="elementId"]');
+  const title = _cleanTitle(_getInputValue("#title") || elementId);
+  const voiceId = fieldGroup.querySelector(".bespoken-voice-select select").value;
+  let fileNamePrefix = null;
+  fieldGroup.querySelectorAll('input[type="hidden"]').forEach((input) => {
+    if (input.name.includes("fileNamePrefix")) {
+      fileNamePrefix = input.value;
+    }
+  });
+  const targetFieldHandle = button.dataset.targetField;
+  let text;
+  if (targetFieldHandle) {
+    const targetField = document.getElementById(`fields-${targetFieldHandle}-field`);
+    text = _getFieldText(targetField);
+  }
+  debugger;
+  if (text.length === 0) {
+    button.classList.remove("disabled");
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(255, 0, 0)" });
+    return;
+  }
+  const actionUrlBase = button.dataset.actionUrl;
+  const actionUrlProcessText = actionUrlBase + "/process-text";
+  updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Generating audio...", textColor: "rgb(89, 102, 115)" });
+}
+function _getInputValue(selector) {
+  const input = document.querySelector(selector);
+  return input?.value || "";
+}
+function _cleanTitle(text) {
+  const cleanText = text.replace(/[^\w\s]/gi, "").trim();
+  return cleanText;
+}
+function _getFieldText(field) {
+  let text = null;
+  if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
+    text = field.querySelector("textarea")?.value || "";
+  } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
+    const inputOrTextarea = field.querySelector(
+      'input[type="text"][name^="fields["], textarea[name^="fields["]'
+    );
+    if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
+      text = inputOrTextarea.value;
+    }
+  }
+  return _stripTagsExceptAllowedTags(text, allowedTags);
+}
+function _stripTagsExceptAllowedTags(text, allowedTags2) {
+  const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
+  let strippedText = text.replace(/<\/p>/g, " </p>").replace(/<\/?[^>]+(>|$)/g, (match) => allowedTagsPattern.test(match) ? match : "");
+  return strippedText.replace(/\s+/g, " ").trim();
 }

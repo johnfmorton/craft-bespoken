@@ -1,4 +1,5 @@
-/*
+/* the handleButtonClick function is called when a user clicks on a button. The function is responsible for the following:
+
 1. Find the target of the click.
     1. Action URL
     2. Source field(s)
@@ -13,30 +14,39 @@
 6. Wait for initial response. This will be an error about inadequate data or a job number.
 7. If error, display error, and enable the button. - what happens if the action URL is wrong? Check this situation.
 8. Else, start a “check job status” interval to poll server for updates
+
  */
 
 import { ClickHandlerResult}  from "./interfaces";
 
 // These are the tags that are allowed to be sent to the API for text-to-speech conversion
 const allowedTags: string[] = ['phoneme', 'break'];
+
+let progressComponent: HTMLElement | null = null;
+
+
 export function handleButtonClick(event: MouseEvent) : ClickHandlerResult {
-  const target = event.target as HTMLElement;
+  // Get the target of the click event
+  const clickedTarget = event.target as HTMLElement;
 
-  const button = target.closest('.bespoken-generate') as HTMLElement;
+  // look for the closest element with the class 'bespoken-button'
+  const buttonToGenerateText = clickedTarget.closest('.bespoken-generate') as HTMLElement;
 
-  if (!button || !target.closest('.bespoken-button')) return;
+  // if there is no buttonToGenerateText or the buttonToGenerateText is not a child of an element with the class 'bespoken-button', return
+  if (!buttonToGenerateText || !clickedTarget.closest('.bespoken-button')) return;
 
-  const fieldsGroup = _getClosestElement(button, '.bespoken-fields');
-
+  // Get the entire fields group that contains the button
+  const fieldsGroup = _getClosestElement(buttonToGenerateText, '.bespoken-fields');
   // If the fields group does not exist, return an error message
   if (!fieldsGroup) {
     return { success: false, message: 'The fields group does not exist' };
   }
 
-  const progressComponent = fieldsGroup.querySelector('progress-component') as HTMLElement | null;
+  // Get the progress component in the field group
+  progressComponent = fieldsGroup.querySelector('progress-component') as HTMLElement | null;
   // updateProgress(0.01, 'Generating audio...', progressComponent);
 
-  button.classList.add('disabled');
+  buttonToGenerateText.classList.add('disabled');
   const elementId = _getInputValue('input[name="elementId"]');
 
   const title = _cleanTitle(_getInputValue('#title') || elementId);
@@ -61,8 +71,8 @@ export function handleButtonClick(event: MouseEvent) : ClickHandlerResult {
     }
   });
 
-  const targetField = button.dataset.targetField;
-  const actionUrlBase = button.dataset.actionUrl;
+  const targetField = buttonToGenerateText.dataset.targetField;
+  const actionUrlBase = buttonToGenerateText.dataset.actionUrl;
   const actionUrlProcessText = actionUrlBase + '/process-text';
 
   if (targetField && actionUrlProcessText && voiceId) {
@@ -70,7 +80,7 @@ export function handleButtonClick(event: MouseEvent) : ClickHandlerResult {
     if (field) {
       const text = _getFieldText(field);
       const textToSendToAPI = _stripTagsExceptAllowedTags(text, allowedTags);
-      // generateText(textToSendToAPI, actionUrlProcessText, voiceId, title, fileNamePrefix, elementId, progressComponent, button);
+      _generateText(textToSendToAPI, actionUrlProcessText, voiceId, title, fileNamePrefix, elementId, progressComponent, buttonToGenerateText);
         // We have the text, voiceId, and actionUrl, so we can send the data to the API
         if (!textToSendToAPI) {
             return { success: false, message: 'Text is empty. There is no audio to generate.' };
@@ -91,6 +101,8 @@ export function handleButtonClick(event: MouseEvent) : ClickHandlerResult {
   }
 }
 
+// Helper functions
+
 function _getClosestElement(element: HTMLElement, selector: string): HTMLElement | null {
   return element.closest(selector) as HTMLElement | null;
 }
@@ -102,7 +114,7 @@ function _getInputValue(selector: string): string {
 
 function _getFieldText(field: HTMLElement): string {
 
-  let text = '';
+  let text = null;
   if (field.getAttribute('data-type') === 'craft\\ckeditor\\Field') {
 
     text = field.querySelector('textarea')?.value || '';
@@ -135,4 +147,53 @@ function _stripTagsExceptAllowedTags(text: string, allowedTags: string[]): strin
   const allowedTagsPattern = new RegExp(`<(\/?(${allowedTags.join('|')}))\\b[^>]*>`, 'gi');
   let strippedText = text.replace(/<\/p>/g, ' </p>').replace(/<\/?[^>]+(>|$)/g, match => allowedTagsPattern.test(match) ? match : '');
   return strippedText.replace(/\s+/g, ' ').trim();
+}
+
+function _generateText(
+  text: string,
+  actionUrl: RequestInfo | URL,
+  voiceId: string,
+  entryTitle: string,
+    fileNamePrefix: string | null,
+  elementId: string,
+  progressComponent: HTMLElement,
+  button: HTMLElement
+): void {
+  if (!text) return handleError('Text is empty. There is no audio to generate.', progressComponent);
+  if (!actionUrl) return handleError('The actionUrl is empty. There is no action to call.', progressComponent);
+  if (!voiceId) return handleError('The voiceId is empty. There is no voice to send to the API.', progressComponent);
+
+  // Generate a random number from 0 to 1000000 to be used in the queue system for status updates
+  let jobId: number;
+  jobId = Math.floor(Math.random * 1000000);
+
+  const data = { text, voiceId, entryTitle: cleanTitle(entryTitle), fileNamePrefix, elementId };
+
+  updateProgress(0.1, 'Sending text to API...', progressComponent);
+
+  fetch(actionUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+    .then(response => response.json())
+    .then(data => {
+      // check for success
+      if (data.success === false) {
+        const errorMessage = data.message || 'Error during API request.';
+
+        // debugger;
+        handleError(errorMessage, progressComponent);
+        // logError(`Error during API request: ${data.message}`);
+        return;
+      }
+
+      const { filename, jobId } = data;
+      startJobMonitor(jobId, progressComponent, filename, button);
+    })
+    .catch(error => {
+      debugger;
+        handleError('Error during API request.', progressComponent);
+      logError(`Error during API request: ${error}`);
+    });
 }

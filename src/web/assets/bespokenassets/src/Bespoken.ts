@@ -67,7 +67,16 @@ function handleButtonClick(event: Event): void {
   const actionUrlBase: string = button.getAttribute('data-action-url') || '';
   const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
 
+  // Generate the audio by gathering all the required data and sending it to the action URL, process-text
+
+  // this will return the jobId and filename if the request is successful
+
+  // we will then need to start polling the job status to get the progress of the audio generation. Because this is an API call, the work
+  // is done in the background and we need to poll the API to get the progress of the audio generation.
+
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: 'Generating audio...', textColor: 'rgb(89, 102, 115)' });
+
+
 
   // Start polling for progress
   // startPolling(selectValue, progress => {

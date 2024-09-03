@@ -112,11 +112,6 @@ var ProgressComponent = class extends HTMLElement {
     const circumference = 2 * Math.PI * this.radius;
     const offset = circumference * (1 - progressValue);
     this.circleProgress.setAttribute("stroke-dashoffset", offset.toString());
-    if (progressValue === 0) {
-      this.messageElement.style.setProperty("--progress-text-color", "lightgray");
-    } else {
-      this.messageElement.style.removeProperty("--progress-text-color");
-    }
   }
   // Update display based on success value
   updateSuccess(success) {
@@ -162,8 +157,37 @@ function updateProgressComponent(progressComponent, { progress, success, message
   progressComponent.style.setProperty("--progress-text-color", textColor);
 }
 
-// src/web/assets/bespokenassets/src/Bespoken.ts
+// src/web/assets/bespokenassets/src/utils.ts
 var allowedTags = ["phoneme", "break"];
+function _getInputValue(selector) {
+  const input = document.querySelector(selector);
+  return input?.value || "";
+}
+function _cleanTitle(text) {
+  const cleanText = text.replace(/[^\w\s]/gi, "").trim();
+  return cleanText;
+}
+function _getFieldText(field) {
+  let text = "";
+  if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
+    text = field.querySelector("textarea")?.value || "";
+  } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
+    const inputOrTextarea = field.querySelector(
+      'input[type="text"][name^="fields["], textarea[name^="fields["]'
+    );
+    if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
+      text = inputOrTextarea.value;
+    }
+  }
+  return _stripTagsExceptAllowedTags(text, allowedTags);
+}
+function _stripTagsExceptAllowedTags(text, allowedTags2) {
+  const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
+  let strippedText = text.replace(/<\/p>/g, " </p>").replace(/<\/?[^>]+(>|$)/g, (match) => allowedTagsPattern.test(match) ? match : "");
+  return strippedText.replace(/\s+/g, " ").trim();
+}
+
+// src/web/assets/bespokenassets/src/Bespoken.ts
 document.addEventListener("DOMContentLoaded", () => {
   if (!customElements.get("progress-component")) {
     customElements.define("progress-component", ProgressComponent);
@@ -181,53 +205,27 @@ function handleButtonClick(event) {
   const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
   const elementId = _getInputValue('input[name="elementId"]');
   const title = _cleanTitle(_getInputValue("#title") || elementId);
-  const voiceId = fieldGroup.querySelector(".bespoken-voice-select select").value;
+  const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
+  const voiceId = voiceSelect.value;
   let fileNamePrefix = null;
   fieldGroup.querySelectorAll('input[type="hidden"]').forEach((input) => {
     if (input.name.includes("fileNamePrefix")) {
       fileNamePrefix = input.value;
     }
   });
-  const targetFieldHandle = button.dataset.targetField;
-  let text;
+  const targetFieldHandle = button.getAttribute("data-target-field") || void 0;
+  let text = "";
   if (targetFieldHandle) {
+    debugger;
     const targetField = document.getElementById(`fields-${targetFieldHandle}-field`);
     text = _getFieldText(targetField);
   }
-  debugger;
   if (text.length === 0) {
     button.classList.remove("disabled");
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(255, 0, 0)" });
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(126,7,7)" });
     return;
   }
-  const actionUrlBase = button.dataset.actionUrl;
-  const actionUrlProcessText = actionUrlBase + "/process-text";
+  const actionUrlBase = button.getAttribute("data-action-url") || "";
+  const actionUrlProcessText = `${actionUrlBase}/process-text`;
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Generating audio...", textColor: "rgb(89, 102, 115)" });
-}
-function _getInputValue(selector) {
-  const input = document.querySelector(selector);
-  return input?.value || "";
-}
-function _cleanTitle(text) {
-  const cleanText = text.replace(/[^\w\s]/gi, "").trim();
-  return cleanText;
-}
-function _getFieldText(field) {
-  let text = null;
-  if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
-    text = field.querySelector("textarea")?.value || "";
-  } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
-    const inputOrTextarea = field.querySelector(
-      'input[type="text"][name^="fields["], textarea[name^="fields["]'
-    );
-    if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
-      text = inputOrTextarea.value;
-    }
-  }
-  return _stripTagsExceptAllowedTags(text, allowedTags);
-}
-function _stripTagsExceptAllowedTags(text, allowedTags2) {
-  const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
-  let strippedText = text.replace(/<\/p>/g, " </p>").replace(/<\/?[^>]+(>|$)/g, (match) => allowedTagsPattern.test(match) ? match : "");
-  return strippedText.replace(/\s+/g, " ").trim();
 }

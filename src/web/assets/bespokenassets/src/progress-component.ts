@@ -150,12 +150,12 @@ export class ProgressComponent extends HTMLElement {
     const offset = circumference * (1 - progressValue);
     this.circleProgress.setAttribute("stroke-dashoffset", offset.toString());
 
-    // Change text color based on progress
-    if (progressValue === 0) {
-      this.messageElement.style.setProperty('--progress-text-color', 'lightgray');
-    } else {
-      this.messageElement.style.removeProperty('--progress-text-color');
-    }
+    // // Change text color based on progress
+    // if (progressValue === 0) {
+    //   this.messageElement.style.setProperty('--progress-text-color', 'lightgray');
+    // } else {
+    //   this.messageElement.style.removeProperty('--progress-text-color');
+    // }
   }
 
   // Update display based on success value

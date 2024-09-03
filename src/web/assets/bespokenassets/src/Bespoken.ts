@@ -3,44 +3,41 @@ import './Bespoken.css';
 
 // Import the custom element, the progress indicator
 import { ProgressComponent } from "./progress-component";
-
 import { updateProgressComponent } from "./updateProgressComponent";
 
-// These are the tags that are allowed to be sent to the API for text-to-speech conversion because they help with pronunciation
-const allowedTags: string[] = ['phoneme', 'break'];
-document.addEventListener('DOMContentLoaded', () => {
+// Import the helper functions
+import { _getInputValue, _getFieldText, _cleanTitle } from "./utils";
 
-    // If the custom element has not been defined, define it
+document.addEventListener('DOMContentLoaded', () => {
+  // If the custom element has not been defined, define it
   if (!customElements.get('progress-component')) {
-      customElements.define('progress-component', ProgressComponent);
+    customElements.define('progress-component', ProgressComponent);
   }
 
-  const buttons = document.querySelectorAll('.bespoken-generate');
+  const buttons: NodeListOf<Element> = document.querySelectorAll('.bespoken-generate');
   buttons.forEach(button => {
     button.addEventListener('click', handleButtonClick);
   });
 });
 
+function handleButtonClick(event: Event): void {
+  const button = (event.target as HTMLElement).closest('.bespoken-generate');
+  if (!button) return;
+  // Disable the button
+  button.classList.add('disabled');
 
-function handleButtonClick(event) {
-  const button = event.target.closest('.bespoken-generate');
-    if (!button) return;
-    // disable the button
-    button.classList.add('disabled');
+  const fieldGroup = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
+  const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
 
-  const fieldGroup = event.target.closest('.bespoken-fields');
-
-  const progressComponent = fieldGroup.querySelector('.bespoken-progress-component');
-
-  // debugger;
   // Get the Element ID of the Element being edited in the CMS
-  const elementId = _getInputValue('input[name="elementId"]');
+  const elementId: string = _getInputValue('input[name="elementId"]');
 
-    // Get the title of the Element being edited in the CMS
-  const title = _cleanTitle(_getInputValue('#title') || elementId);
+  // Get the title of the Element being edited in the CMS
+  const title: string = _cleanTitle(_getInputValue('#title') || elementId);
 
   // Get the voice ID of the selected voice
-  const voiceId = fieldGroup.querySelector('.bespoken-voice-select select').value;
+  const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement;
+  const voiceId: string = voiceSelect.value;
 
   // Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
   let fileNamePrefix: string | null = null;
@@ -51,30 +48,24 @@ function handleButtonClick(event) {
     }
   });
 
-  const targetFieldHandle = button.dataset.targetField;
-  let text;
-  // now that we have a targetField, we need to get the text from the
+  const targetFieldHandle: string | undefined = button.getAttribute('data-target-field') || undefined;
+  let text: string = '';
   if (targetFieldHandle) {
-     const targetField = document.getElementById(`fields-${targetFieldHandle}-field`) as HTMLElement | null;
-     text = _getFieldText(targetField);
+    debugger;
+    const targetField = document.getElementById(`fields-${targetFieldHandle}-field`) as HTMLElement | null;
+    text = _getFieldText(targetField);
   }
- debugger;
-  if (text.length === 0) {
-    // re-enable the button
-    button.classList.remove('disabled');
-    // show an error message
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: 'No text to generate audio from.', textColor: 'rgb(255, 0, 0)' });
 
+  if (text.length === 0) {
+    // Re-enable the button
+    button.classList.remove('disabled');
+    // Show an error message
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: 'No text to generate audio from.', textColor: 'rgb(126,7,7)' });
     return;
   }
 
-
-  const actionUrlBase = button.dataset.actionUrl;
-  const actionUrlProcessText = actionUrlBase + '/process-text';
-
-
-
-
+  const actionUrlBase: string = button.getAttribute('data-action-url') || '';
+  const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
 
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: 'Generating audio...', textColor: 'rgb(89, 102, 115)' });
 
@@ -82,49 +73,6 @@ function handleButtonClick(event) {
   // startPolling(selectValue, progress => {
   //   updateProgressComponent(progressComponent, progress);
   // });
-}
-
-
-function _getInputValue(selector: string): string {
-  const input = document.querySelector(selector) as HTMLInputElement | null;
-  return input?.value || '';
-}
-
-function _cleanTitle(text: string): string {
-  const cleanText = text.replace(/[^\w\s]/gi, '').trim();
-  return cleanText;
-}
-
-function _getFieldText(field: HTMLElement): string {
-
-  let text = null;
-  if (field.getAttribute('data-type') === 'craft\\ckeditor\\Field') {
-
-    text = field.querySelector('textarea')?.value || '';
-
-  } else if (field.getAttribute('data-type') === 'craft\\fields\\PlainText') {
-
-    // this checks for an input field or a textarea field but only if the name attribute starts with 'fields['
-    // this is to accommodate how Craft CMS shows the field handles when a developer
-    // has their account set to show field handles instead of field labels
-    const inputOrTextarea = field.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-    'input[type="text"][name^="fields["], textarea[name^="fields["]'
-  );
-      if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
-        text = inputOrTextarea.value;
-      }
-
-    // text = field.querySelector('input')?.value || field.querySelector('textarea')?.value || '';
-
-
-  }
-  return _stripTagsExceptAllowedTags(text, allowedTags);
-}
-
-function _stripTagsExceptAllowedTags(text: string, allowedTags: string[]): string {
-  const allowedTagsPattern = new RegExp(`<(\/?(${allowedTags.join('|')}))\\b[^>]*>`, 'gi');
-  let strippedText = text.replace(/<\/p>/g, ' </p>').replace(/<\/?[^>]+(>|$)/g, match => allowedTagsPattern.test(match) ? match : '');
-  return strippedText.replace(/\s+/g, ' ').trim();
 }
 
 

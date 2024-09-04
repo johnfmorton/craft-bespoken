@@ -157,8 +157,33 @@ function updateProgressComponent(progressComponent, { progress, success, message
   progressComponent.style.setProperty("--progress-text-color", textColor);
 }
 
+// src/web/assets/bespokenassets/src/startJobMonitor.ts
+function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase) {
+  console.log("startJobMonitor");
+  const interval = setInterval(() => {
+    const data = {
+      jobId,
+      bespokenJobId,
+      filename,
+      progressComponent,
+      button,
+      interval,
+      actionUrl: actionUrlBase + "/job-status"
+    };
+    console.log("data", data);
+    const resultOfJobCheck = checkBespokenJobStatus(actionUrlBase + "/job-status", bespokenJobId);
+  }, 1e3);
+}
+function checkBespokenJobStatus(url, bespokenJobId) {
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId: bespokenJobId })
+  }).then((response) => response.json());
+}
+
 // src/web/assets/bespokenassets/src/processText.ts
-function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix, progressComponent, button) {
+function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase) {
   updateProgressComponent(progressComponent, { progress: 0.75, success: true, message: "Generating audio...", textColor: "rgb(89, 102, 115)" });
   if (!text) {
     updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(126,7,7)" });
@@ -183,8 +208,10 @@ function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix,
     body: JSON.stringify(data)
   }).then((response) => response.json()).then((data2) => {
     debugger;
-    const { filename, jobId } = data2;
+    const { filename, jobId, bespokenJobId } = data2;
+    startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase);
   }).catch((error) => {
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "Error during API request.", textColor: "rgb(126,7,7)" });
   });
 }
 
@@ -259,5 +286,5 @@ function handleButtonClick(event) {
   const actionUrlProcessText = `${actionUrlBase}/process-text`;
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Preparing data", textColor: "rgb(89, 102, 115)" });
   debugger;
-  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button);
+  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 }

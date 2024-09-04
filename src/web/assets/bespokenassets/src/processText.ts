@@ -1,6 +1,8 @@
 import { updateProgressComponent } from "./updateProgressComponent";
 import { ProgressComponent } from "./progress-component";
 
+import { startJobMonitor } from "./startJobMonitor";
+
 export function processText(
     text: string,
     title: string,
@@ -9,7 +11,8 @@ export function processText(
     elementId: string,
     fileNamePrefix: string,
     progressComponent: ProgressComponent,
-    button: HTMLButtonElement
+    button: HTMLButtonElement,
+    actionUrlBase: string
 ): void {
     updateProgressComponent(progressComponent, { progress: 0.75, success: true, message: 'Generating audio...', textColor: 'rgb(89, 102, 115)' });
 
@@ -46,11 +49,12 @@ export function processText(
     .then(response => response.json())
     .then(data => {
         debugger;
-        const { filename, jobId } = data;
-        // startJobMonitor(jobId, progressComponent, filename, button);
+        const { filename, jobId, bespokenJobId } = data;
+        startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase);
     })
     .catch(error => {
       // logError(`Error during API request: ${error}`);
+        updateProgressComponent(progressComponent, { progress: 0, success: false, message: 'Error during API request.', textColor: 'rgb(126,7,7)' });
     });
   
 }

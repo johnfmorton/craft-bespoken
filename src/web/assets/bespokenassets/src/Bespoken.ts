@@ -81,7 +81,7 @@ function handleButtonClick(event: Event): void {
 
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: 'Preparing data', textColor: 'rgb(89, 102, 115)' });
 debugger;
-  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button);
+  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 
 
 

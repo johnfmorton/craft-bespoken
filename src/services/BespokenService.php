@@ -69,10 +69,10 @@ class BespokenService extends Component
 
 
         return [
-            'text' => $text,
-            'elementId' => $elementId,
+//            'text' => $text,
+//            'elementId' => $elementId,
             'jobId' => $jobId,
-            'voiceId' => $voiceId,
+//            'voiceId' => $voiceId,
             'success' => true,
             'filename' => $filename,
             'bespokenJobId' => $bespokenJobId,

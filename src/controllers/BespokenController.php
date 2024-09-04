@@ -55,6 +55,10 @@ class BespokenController extends Controller
 
 
         $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix);
+
+//        $fakeReturn['success'] = true;
+//        $fakeReturn['message'] = 'This is a fake return message';
+
         return $this->asJson($result);
     }
 

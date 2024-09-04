@@ -53,8 +53,10 @@ class GenerateAudio extends BaseJob
             Bespoken::info('Job status updated to running');
 
             // Call the Eleven Labs API
+
             // $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
             $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
+
             Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'completed', $this->cacheExpire);
             Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has completed', $this->cacheExpire);
             Bespoken::info('Job status updated to completed');
@@ -94,7 +96,7 @@ class GenerateAudio extends BaseJob
         $this->setProgress($queue, 0.5,
             'Downloaded the test file correctly');
 
-        $this->setProgress($queue, 1,
+        $this->setProgress($queue, 0.6,
             'FAKE ERROR: Error saving the audio file to the assets.');
 
         // add a pause to simulate a long-running process
@@ -103,6 +105,13 @@ class GenerateAudio extends BaseJob
             'post sleep');
         $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle);
     }
+
+//    protected function setBespokeProgress($queue, $progress, $message): void
+//    {
+//        $queue->setProgress($progress, $message);
+//        // set the cache for the job status
+//        Craft::$app->cache->set("jobProgress-{$this->bespokenJobId}", $progress, $this->cacheExpire);
+//    }
 
 
     /**

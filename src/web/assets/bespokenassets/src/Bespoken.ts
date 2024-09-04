@@ -5,6 +5,8 @@ import './Bespoken.css';
 import { ProgressComponent } from "./progress-component";
 import { updateProgressComponent } from "./updateProgressComponent";
 
+import { processText } from "./processText";
+
 // Import the helper functions
 import { _getInputValue, _getFieldText, _cleanTitle } from "./utils";
 
@@ -14,14 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
     customElements.define('progress-component', ProgressComponent);
   }
 
-  const buttons: NodeListOf<Element> = document.querySelectorAll('.bespoken-generate');
+  const buttons: NodeListOf<HTMLButtonElement> = document.querySelectorAll('.bespoken-generate');
   buttons.forEach(button => {
     button.addEventListener('click', handleButtonClick);
   });
 });
 
 function handleButtonClick(event: Event): void {
-  const button = (event.target as HTMLElement).closest('.bespoken-generate');
+    const button = (event.target as HTMLElement).closest('.bespoken-generate') as HTMLButtonElement | null;
+
   if (!button) return;
   // Disable the button
   button.classList.add('disabled');
@@ -51,7 +54,7 @@ function handleButtonClick(event: Event): void {
   const targetFieldHandle: string | undefined = button.getAttribute('data-target-field') || undefined;
   let text: string = '';
   if (targetFieldHandle) {
-    debugger;
+    // debugger;
     const targetField = document.getElementById(`fields-${targetFieldHandle}-field`) as HTMLElement | null;
     text = _getFieldText(targetField);
   }
@@ -67,6 +70,8 @@ function handleButtonClick(event: Event): void {
   const actionUrlBase: string = button.getAttribute('data-action-url') || '';
   const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
 
+
+
   // Generate the audio by gathering all the required data and sending it to the action URL, process-text
 
   // this will return the jobId and filename if the request is successful
@@ -74,7 +79,9 @@ function handleButtonClick(event: Event): void {
   // we will then need to start polling the job status to get the progress of the audio generation. Because this is an API call, the work
   // is done in the background and we need to poll the API to get the progress of the audio generation.
 
-  updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: 'Generating audio...', textColor: 'rgb(89, 102, 115)' });
+  updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: 'Preparing data', textColor: 'rgb(89, 102, 115)' });
+debugger;
+  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button);
 
 
 
@@ -85,8 +92,7 @@ function handleButtonClick(event: Event): void {
 }
 
 
-
-import {checkBespokeJobStatus} from "./checkBespokeJobStatus";
+// import {checkBespokeJobStatus} from "./checkBespokeJobStatus";
 
 // import { handleButtonClick } from "./handleButtonClick";
 //

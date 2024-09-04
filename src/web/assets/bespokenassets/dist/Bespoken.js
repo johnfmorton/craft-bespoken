@@ -157,6 +157,37 @@ function updateProgressComponent(progressComponent, { progress, success, message
   progressComponent.style.setProperty("--progress-text-color", textColor);
 }
 
+// src/web/assets/bespokenassets/src/processText.ts
+function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix, progressComponent, button) {
+  updateProgressComponent(progressComponent, { progress: 0.75, success: true, message: "Generating audio...", textColor: "rgb(89, 102, 115)" });
+  if (!text) {
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(126,7,7)" });
+    button.classList.remove("disabled");
+    return;
+  }
+  if (!actionUrl) {
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No action URL to send the text to.", textColor: "rgb(126,7,7)" });
+    button.classList.remove("disabled");
+    return;
+  }
+  if (!voiceId) {
+    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No voice selected.", textColor: "rgb(126,7,7)" });
+    button.classList.remove("disabled");
+    return;
+  }
+  const data = { text, voiceId, entryTitle: title, fileNamePrefix, elementId };
+  console.log("data", data);
+  fetch(actionUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  }).then((response) => response.json()).then((data2) => {
+    debugger;
+    const { filename, jobId } = data2;
+  }).catch((error) => {
+  });
+}
+
 // src/web/assets/bespokenassets/src/utils.ts
 var allowedTags = ["phoneme", "break"];
 function _getInputValue(selector) {
@@ -216,7 +247,6 @@ function handleButtonClick(event) {
   const targetFieldHandle = button.getAttribute("data-target-field") || void 0;
   let text = "";
   if (targetFieldHandle) {
-    debugger;
     const targetField = document.getElementById(`fields-${targetFieldHandle}-field`);
     text = _getFieldText(targetField);
   }
@@ -227,5 +257,7 @@ function handleButtonClick(event) {
   }
   const actionUrlBase = button.getAttribute("data-action-url") || "";
   const actionUrlProcessText = `${actionUrlBase}/process-text`;
-  updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Generating audio...", textColor: "rgb(89, 102, 115)" });
+  updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Preparing data", textColor: "rgb(89, 102, 115)" });
+  debugger;
+  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button);
 }

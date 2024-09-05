@@ -1,25 +1,19 @@
-// import { checkBespokeJobStatus} from "./checkBespokeJobStatus";
 import { ProgressComponent } from "./progress-component";
 import { updateProgressComponent} from "./updateProgressComponent";
 
 const pollingInterval = 1000;
 
-export function startJobMonitor(jobId: string, bespokenJobId: string, progressComponent: ProgressComponent, filename: string, button: HTMLButtonElement, actionUrlBase: string){
+let howManyTimes = 0;
+
+export function startJobMonitor(bespokenJobId: string, progressComponent: ProgressComponent, button: HTMLButtonElement, actionUrlBase: string){
     console.log('startJobMonitor', bespokenJobId);
     const interval = setInterval(async () => {
-        // const data = {
-        //     jobId: jobId,
-        //     bespokenJobId: bespokenJobId,
-        //     filename: filename,
-        //     progressComponent: progressComponent,
-        //     button: button,
-        //     interval: interval,
-        //     actionUrl: actionUrlBase + '/job-status'
-        // };
-        // Removed unused console.log for 'data' as it's not required here.
+        howManyTimes++;
 
+        // the URL provided by Craft with include the ? already, which is why we don't need to include it here
+        // and only use the & to append the jobId, an example URL would be:
+        // https://example.com/index.php?p=admin/actions/bespoken/bespoken/job-status&jobId=fbc11bb5-f5a7-4ed7-a854-ac0bd3188807
         const url = `${actionUrlBase}/job-status&jobId=${bespokenJobId}`;
-        console.log('url', url);
 
         try {
             const result = await fetch(url, {
@@ -35,7 +29,7 @@ export function startJobMonitor(jobId: string, bespokenJobId: string, progressCo
             // Assuming the response is in JSON format
             const responseData = await result.json();
 
-            console.log('result', responseData);
+            console.log('Audio creation status:', responseData);
 
             updateProgressComponent(progressComponent, {
                 progress: responseData.progress,
@@ -47,22 +41,28 @@ export function startJobMonitor(jobId: string, bespokenJobId: string, progressCo
             // if progress is 100, clear the interval
             if (responseData.progress === 1) {
                 clearInterval(interval);
+                // Re-enable the button
+                button.classList.remove('disabled');
             }
 
         } catch (error) {
+            // I don't clear the interval here because I want to keep polling the API
+            // because the first few requests might have failed because processing has not started yet
+            // so the only clear the interval when the howManyTimes is 100
             console.error('Error fetching job status:', error);
-            // Optionally clear interval or take some action if there is an error
+            if (howManyTimes === 100) {
+                clearInterval(interval);
+                // Re-enable the button
+                button.classList.remove('disabled');
+                updateProgressComponent(progressComponent, {
+                    progress: 0,
+                    success: false,
+                    message: 'Error fetching job status. This may be an issue with the job queue.',
+                    textColor: 'rgb(126,7,7)'
+                });
+            }
+
         }
 
     }, pollingInterval);
 }
-
-// THIS IS NOT DONE. I need to check the job status controller and see how it's working. I also don't have the async await syntax down yet.
-// async function checkBespokenJobStatus(url: string, bespokenJobId: string) {
-//     fetch(url, {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify({ jobId: bespokenJobId }),
-//     })
-//     .then(response => response.json())
-// }

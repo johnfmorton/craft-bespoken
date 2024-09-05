@@ -159,11 +159,12 @@ function updateProgressComponent(progressComponent, { progress, success, message
 
 // src/web/assets/bespokenassets/src/startJobMonitor.ts
 var pollingInterval = 1e3;
-function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase) {
+var howManyTimes = 0;
+function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase) {
   console.log("startJobMonitor", bespokenJobId);
   const interval = setInterval(async () => {
+    howManyTimes++;
     const url = `${actionUrlBase}/job-status&jobId=${bespokenJobId}`;
-    console.log("url", url);
     try {
       const result = await fetch(url, {
         method: "GET",
@@ -173,7 +174,7 @@ function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, butt
         throw new Error(`HTTP error! Status: ${result.status}`);
       }
       const responseData = await result.json();
-      console.log("result", responseData);
+      console.log("Audio creation status:", responseData);
       updateProgressComponent(progressComponent, {
         progress: responseData.progress,
         success: responseData.success,
@@ -182,43 +183,83 @@ function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, butt
       });
       if (responseData.progress === 1) {
         clearInterval(interval);
+        button.classList.remove("disabled");
       }
     } catch (error) {
       console.error("Error fetching job status:", error);
+      if (howManyTimes === 100) {
+        clearInterval(interval);
+        button.classList.remove("disabled");
+        updateProgressComponent(progressComponent, {
+          progress: 0,
+          success: false,
+          message: "Error fetching job status. This may be an issue with the job queue.",
+          textColor: "rgb(126,7,7)"
+        });
+      }
     }
   }, pollingInterval);
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
 function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase) {
-  updateProgressComponent(progressComponent, { progress: 0.75, success: true, message: "Generating audio...", textColor: "rgb(89, 102, 115)" });
+  updateProgressComponent(progressComponent, {
+    progress: 0.11,
+    success: true,
+    message: "Generating audio...",
+    textColor: "rgb(89, 102, 115)"
+  });
   if (!text) {
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(126,7,7)" });
+    updateProgressComponent(progressComponent, {
+      progress: 0,
+      success: false,
+      message: "No text to generate audio from.",
+      textColor: "rgb(126,7,7)"
+    });
     button.classList.remove("disabled");
     return;
   }
   if (!actionUrl) {
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No action URL to send the text to.", textColor: "rgb(126,7,7)" });
+    updateProgressComponent(progressComponent, {
+      progress: 0,
+      success: false,
+      message: "No action URL to send the text to.",
+      textColor: "rgb(126,7,7)"
+    });
     button.classList.remove("disabled");
     return;
   }
   if (!voiceId) {
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No voice selected.", textColor: "rgb(126,7,7)" });
+    updateProgressComponent(progressComponent, {
+      progress: 0,
+      success: false,
+      message: "No voice selected.",
+      textColor: "rgb(126,7,7)"
+    });
     button.classList.remove("disabled");
     return;
   }
   const data = { text, voiceId, entryTitle: title, fileNamePrefix, elementId };
-  console.log("data", data);
-  updateProgressComponent(progressComponent, { progress: 0.76, success: true, message: "Sending data to API", textColor: "rgb(89, 102, 115)" });
+  updateProgressComponent(progressComponent, {
+    progress: 0.15,
+    success: true,
+    message: "Sending data to API",
+    textColor: "rgb(89, 102, 115)"
+  });
   fetch(actionUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   }).then((response) => response.json()).then((data2) => {
     const { filename, jobId, bespokenJobId } = data2;
-    startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase);
+    startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase);
   }).catch((error) => {
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "Error during API request.", textColor: "rgb(126,7,7)" });
+    updateProgressComponent(progressComponent, {
+      progress: 0,
+      success: false,
+      message: "Error during API request.",
+      textColor: "rgb(126,7,7)"
+    });
   });
 }
 
@@ -291,6 +332,6 @@ function handleButtonClick(event) {
   }
   const actionUrlBase = button.getAttribute("data-action-url") || "";
   const actionUrlProcessText = `${actionUrlBase}/process-text`;
-  updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Preparing data", textColor: "rgb(89, 102, 115)" });
+  updateProgressComponent(progressComponent, { progress: 0.1, success: true, message: "Preparing data", textColor: "rgb(89, 102, 115)" });
   processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 }

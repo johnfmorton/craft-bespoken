@@ -73,7 +73,19 @@ export function processText(
     })
         .then(response => response.json())
         .then(data => {
-            const {filename, jobId, bespokenJobId} = data;
+            const {filename, jobId, bespokenJobId, success, message} = data;
+
+            if (!success) {
+                updateProgressComponent(progressComponent, {
+                    progress: 0,
+                    success: false,
+                    message: message || 'Error during API request.',
+                    textColor: 'rgb(126,7,7)'
+                });
+                button.classList.remove('disabled');
+                return;
+            }
+
             // look in the startJobMonitor function to see how the progress is updated
             startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase);
         })

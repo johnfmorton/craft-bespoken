@@ -29,7 +29,7 @@ class GenerateAudio extends BaseJob
     /**
      * @throws \JsonException
      */
-    function execute($queue): void
+    public function execute($queue): void
     {
         // The element ID of the entry
         $elementId = $this->elementId;
@@ -53,8 +53,8 @@ class GenerateAudio extends BaseJob
 
             // Call the Eleven Labs API
 
-            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
-//            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+//            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
 
 //            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Audio file generated for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to completed');

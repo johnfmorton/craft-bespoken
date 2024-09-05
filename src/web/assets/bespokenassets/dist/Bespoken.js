@@ -251,7 +251,17 @@ function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   }).then((response) => response.json()).then((data2) => {
-    const { filename, jobId, bespokenJobId } = data2;
+    const { filename, jobId, bespokenJobId, success, message } = data2;
+    if (!success) {
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: message || "Error during API request.",
+        textColor: "rgb(126,7,7)"
+      });
+      button.classList.remove("disabled");
+      return;
+    }
     startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase);
   }).catch((error) => {
     updateProgressComponent(progressComponent, {

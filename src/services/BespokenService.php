@@ -38,9 +38,10 @@ class BespokenService extends Component
             ];
         }
 
+        BespokenPlugin::info('Sending text to Eleven Labs API in ' . __METHOD__ . ' method in ' . __FILE__);
+
         // Generate a unique job ID with ramsey/uuid library
         $bespokenJobId = Uuid::uuid4()->toString();
-
 
         // Enqueue the job
         $queue = Craft::$app->getQueue();
@@ -67,6 +68,14 @@ class BespokenService extends Component
 
         BespokenPlugin::info('Job ID: ' . $jobId . ' - `' . $text . '` in ' . __METHOD__ . ' method in ' . __FILE__);
 
+        // if the job ID is not valid, return an error
+        if (!$jobId) {
+            return [
+                'success' => false,
+                'message' => 'Job ID is not valid',
+            ];
+        }
+
 
         return [
 //            'text' => $text,
@@ -79,6 +88,9 @@ class BespokenService extends Component
         ];
     }
 
+    /**
+     * @throws \JsonException
+     */
     public function jobMonitor($jobId): array
     {
         if (!$jobId) {
@@ -92,9 +104,8 @@ class BespokenService extends Component
 
         if ($status) {
             // the status will be a string, so we need to convert it to an array
-            $status = json_decode($status, true);
-            return $status;
-        }   else {
+            return json_decode($status, true, 512, JSON_THROW_ON_ERROR);
+        } else {
             return [
                 'success' => false,
                 'message' => 'Job ID not found in cache',

@@ -42,6 +42,8 @@ class BespokenController extends Controller
         $this->requirePostRequest();
         $this->requireLogin();
 
+        BespokenPlugin::info('Sending text to Eleven Labs API in ' . __METHOD__ . ' method in ' . __FILE__);
+
         $postData = Craft::$app->request->post();
 
         $text = $postData['text'];
@@ -49,14 +51,11 @@ class BespokenController extends Controller
         $entryTitle = $postData['entryTitle'];
         $fileNamePrefix = $postData['fileNamePrefix'];
         $elementId = $this->_confirmAndCastToInt($postData['elementId']);
-        //die(' in the controller, I am preventing API calls during debugging');
+
+
+
         // call the sendTextToElevenLabsApi service method
-
-
         $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix);
-
-//        $fakeReturn['success'] = true;
-//        $fakeReturn['message'] = 'This is a fake return message';
 
         return $this->asJson($result);
     }

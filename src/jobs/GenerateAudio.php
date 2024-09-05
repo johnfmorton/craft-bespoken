@@ -54,7 +54,7 @@ class GenerateAudio extends BaseJob
             // Call the Eleven Labs API
 
             $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
-            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+//            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
 
 //            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Audio file generated for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to completed');
@@ -211,7 +211,12 @@ class GenerateAudio extends BaseJob
                 if ($response) {
                     Bespoken::info('Response from ElevenLabs API: ' . print_r($response, true));
 //                    $this->setProgress($queue, 1, 'Error in response from ElevenLabs API. Details: ' . print_r($response, true));
-                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API. Details: ' . print_r($response, true), 0);
+                    if (is_array($response) && isset($response['detail']['message'])) {
+                        $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . $response['detail']['message'], 0);
+                        return;
+                    }
+
+                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . print_r($response, true), 0);
                     return;
                 }
             } catch (\JsonException $e) {

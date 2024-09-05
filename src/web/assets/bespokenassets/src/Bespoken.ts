@@ -80,7 +80,7 @@ function handleButtonClick(event: Event): void {
   // is done in the background and we need to poll the API to get the progress of the audio generation.
 
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: 'Preparing data', textColor: 'rgb(89, 102, 115)' });
-debugger;
+// debugger;
   processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 
 

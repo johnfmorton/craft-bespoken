@@ -158,28 +158,31 @@ function updateProgressComponent(progressComponent, { progress, success, message
 }
 
 // src/web/assets/bespokenassets/src/startJobMonitor.ts
+var pollingInterval = 1e3;
 function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase) {
-  console.log("startJobMonitor");
-  const interval = setInterval(() => {
-    const data = {
-      jobId,
-      bespokenJobId,
-      filename,
-      progressComponent,
-      button,
-      interval,
-      actionUrl: actionUrlBase + "/job-status"
-    };
-    console.log("data", data);
-    const resultOfJobCheck = checkBespokenJobStatus(actionUrlBase + "/job-status", bespokenJobId);
-  }, 1e3);
-}
-function checkBespokenJobStatus(url, bespokenJobId) {
-  fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jobId: bespokenJobId })
-  }).then((response) => response.json());
+  console.log("startJobMonitor", bespokenJobId);
+  const interval = setInterval(
+    () => {
+      const data = {
+        jobId,
+        bespokenJobId,
+        filename,
+        progressComponent,
+        button,
+        interval,
+        actionUrl: actionUrlBase + "/job-status"
+      };
+      const url = new URL("/job-status", actionUrlBase);
+      url.search = new URLSearchParams({ jobId: bespokenJobId });
+      const result = fetch(actionUrlBase + "/job-status", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      console.log("result", result);
+    },
+    pollingInterval
+  );
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
@@ -202,12 +205,12 @@ function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix,
   }
   const data = { text, voiceId, entryTitle: title, fileNamePrefix, elementId };
   console.log("data", data);
+  updateProgressComponent(progressComponent, { progress: 0.76, success: true, message: "Sending data to API", textColor: "rgb(89, 102, 115)" });
   fetch(actionUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   }).then((response) => response.json()).then((data2) => {
-    debugger;
     const { filename, jobId, bespokenJobId } = data2;
     startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase);
   }).catch((error) => {
@@ -285,6 +288,5 @@ function handleButtonClick(event) {
   const actionUrlBase = button.getAttribute("data-action-url") || "";
   const actionUrlProcessText = `${actionUrlBase}/process-text`;
   updateProgressComponent(progressComponent, { progress: 0.5, success: true, message: "Preparing data", textColor: "rgb(89, 102, 115)" });
-  debugger;
   processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 }

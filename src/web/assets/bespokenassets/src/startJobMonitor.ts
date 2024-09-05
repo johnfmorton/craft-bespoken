@@ -1,6 +1,11 @@
-export function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase){
-    console.log('startJobMonitor');
-    const interval = setInterval(() => {
+import { checkBespokeJobStatus} from "./checkBespokeJobStatus";
+import { ProgressComponent } from "./progress-component";
+
+const pollingInterval = 1000;
+
+export function startJobMonitor(jobId: string, bespokenJobId: string, progressComponent: ProgressComponent, filename: string, button: HTMLButtonElement, actionUrlBase: string){
+    console.log('startJobMonitor', bespokenJobId);
+    const interval = setInterval(async () => {
         const data = {
             jobId: jobId,
             bespokenJobId: bespokenJobId,
@@ -10,41 +15,31 @@ export function startJobMonitor(jobId, bespokenJobId, progressComponent, filenam
             interval: interval,
             actionUrl: actionUrlBase + '/job-status'
         }
-        console.log('data', data);
+        // console.log('data', data);
 
-        const resultOfJobCheck = checkBespokenJobStatus(actionUrlBase + '/job-status', bespokenJobId);
+        const url = `${actionUrlBase}/job-status?jobId=${bespokenJobId}`;
+        console.log('url', url);
+        debugger;
 
-        // fetch(actionUrlBase + '/job-status', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(data),
-        // })
-        // .then(response => response.json())
-        // .then(data => {
-        //     const { status, progress, progressLabel } = data;
-        //     if (status === 'waiting') {
-        //         updateProgress(0.1, 'Job is waiting...', progressComponent);
-        //     } else if (status === 'reserved') {
-        //         const message = progressLabel || 'Job is reserved...';
-        //         updateProgress(progress * 0.01, message, progressComponent);
-        //     } else if (status === 'done' && filename) {
-        //         updateProgress(1, `Job is complete: ${filename}`, progressComponent);
-        //         button.classList.remove('disabled');
-        //         clearInterval(interval);
-        //     } else {
-        //         updateProgress(0, 'Job failed. Please check logs.', progressComponent);
-        //         clearInterval(interval);
-        //     }
-        // });
-    }, 1000);
+        const result = await fetch(`${actionUrlBase}/job-status?jobId=${bespokenJobId}`, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        })
+
+        // Assuming the response is in JSON format
+        const data = await result.json();
+
+        console.log('result', data);
+
+    }, pollingInterval);
 }
 
 // THIS IS NOT DONE. I need to check the job status controller and see how it's working. I also don't have the async await syntax down yet.
-function checkBespokenJobStatus(url: string, bespokenJobId: string) {
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: bespokenJobId }),
-    })
-    .then(response => response.json())
-}
+// async function checkBespokenJobStatus(url: string, bespokenJobId: string) {
+//     fetch(url, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ jobId: bespokenJobId }),
+//     })
+//     .then(response => response.json())
+// }

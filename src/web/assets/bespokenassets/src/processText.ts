@@ -40,7 +40,7 @@ export function processText(
     const data = { text, voiceId, entryTitle: title, fileNamePrefix, elementId };
 
     console.log('data', data);
-
+updateProgressComponent(progressComponent, { progress: 0.76, success: true, message: 'Sending data to API', textColor: 'rgb(89, 102, 115)' });
     fetch(actionUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -48,7 +48,7 @@ export function processText(
   })
     .then(response => response.json())
     .then(data => {
-        debugger;
+        // debugger;
         const { filename, jobId, bespokenJobId } = data;
         startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase);
     })

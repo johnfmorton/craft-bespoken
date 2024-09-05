@@ -79,11 +79,32 @@ class BespokenService extends Component
         ];
     }
 
+    public function jobMonitor($jobId): array
+    {
+        if (!$jobId) {
+            return [
+                'success' => false,
+                'message' => 'Job ID is required',
+            ];
+        }
+
+        $status = Craft::$app->cache->get($jobId);
+
+        if ($status) {
+            return $status;
+        }   else {
+            return [
+                'success' => false,
+                'message' => 'Job ID not found in cache',
+            ];
+        }
+    }
+
     /**
      * @param $title
      * @return string
      */
-    public function jobMonitor($jobId): array
+    public function jobMonitorOld($jobId): array
     {
         if (!$jobId) {
             return [

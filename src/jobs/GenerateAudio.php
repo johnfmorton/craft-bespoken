@@ -48,17 +48,19 @@ class GenerateAudio extends BaseJob
         Bespoken::info('Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
         try {
             // Update job status in cache as 'running'
-            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'running', $this->cacheExpire); // Expires in 1 hour
-            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has started', $this->cacheExpire); // Expires in 1 hour
-            Bespoken::info('Job status updated to running');
+//            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'running', $this->cacheExpire); // Expires in 1 hour
+//            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has started', $this->cacheExpire); // Expires in 1 hour
+            $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
+            Bespoken::info('Job status updated to running' . __LINE__ . ' ' . __FILE__);
 
             // Call the Eleven Labs API
 
             // $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
             $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
-
-            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'completed', $this->cacheExpire);
-            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has completed', $this->cacheExpire);
+//
+//            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'completed', $this->cacheExpire);
+//            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has completed', $this->cacheExpire);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Audio file generated for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to completed');
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
@@ -68,11 +70,12 @@ class GenerateAudio extends BaseJob
         }
     }
 
-
-    protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle): void
+    protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId): void
     {
-        $this->setProgress($queue, 0.25,
-            'Downloading a test file with CURL');
+//        $this->setProgress($queue, 0.25,
+//            'Downloading a test file with CURL');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.25, 'Downloading a test file with CURL');
+
         // add a pause to simulate a long-running process
         sleep($this->sleepValue);
 
@@ -93,31 +96,55 @@ class GenerateAudio extends BaseJob
         // add a pause to simulate a long-running process
         sleep($this->sleepValue);
 
-        $this->setProgress($queue, 0.5,
-            'Downloaded the test file correctly');
+//        $this->setProgress($queue, 0.5, 'Downloaded the test file correctly');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Downloaded the test file correctly');
 
-        $this->setProgress($queue, 0.6,
-            'FAKE ERROR: Error saving the audio file to the assets.');
+
+//        $this->setProgress($queue, 0.6, 'FAKE ERROR: Error saving the audio file to the assets.');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'FAKE ERROR: Error saving the audio file to the assets.');
 
         // add a pause to simulate a long-running process
         sleep($this->sleepValue * 2);
-        $this->setProgress($queue, 0.7,
-            'post sleep');
-        $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle);
+//        $this->setProgress($queue, 0.7, 'post sleep');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.7, 'post sleep');
+
+        $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId);
     }
 
-//    protected function setBespokeProgress($queue, $progress, $message): void
-//    {
-//        $queue->setProgress($progress, $message);
-//        // set the cache for the job status
-//        Craft::$app->cache->set("jobProgress-{$this->bespokenJobId}", $progress, $this->cacheExpire);
-//    }
+    /*
+     * Set the progress of the job
+     * @param $queue
+     * @param $progress
+     * @param $message
+     *
+     * @description This function simplifies the process of setting the progress of the job
+     * 1. Set the progress of the job for the Craft Job Queue
+     * 2. It also sets the cache using the bespokenJobID for the job status
+     *
+     * @return void
+     */
+    /**
+     * @throws \JsonException
+     */
+    protected function setBespokeProgress($queue, $bespokenJobId, $progress, $message): void
+    {
+        // create a data object to store the job status
+        $data = compact('progress', 'message');
+
+        // stringify the data object and set the cache
+        $data = json_encode($data, JSON_THROW_ON_ERROR);
+
+        Craft::$app->cache->set((string)($bespokenJobId), $data, $this->cacheExpire);
+
+        $queue->setProgress($progress, $message);
+
+    }
 
 
     /**
      * @throws \JsonException
      */
-    protected function elevenLabsApiCall($queue, string $text, string $voiceId, string $filename, string $entryTitle): void
+    protected function elevenLabsApiCall($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId): void
     {
         $settings = Bespoken::getInstance()->getSettings();
 
@@ -206,13 +233,14 @@ class GenerateAudio extends BaseJob
                 'Audio file processed in temporary directory');
 
             // Save the audio file to the Craft CMS assets
-            $this->saveToCraftAssets($queue, $audio_file, $filename, $entryTitle);
+            $this->saveToCraftAssets($queue, $audio_file, $filename, $entryTitle, $bespokenJobId);
         }
     }
 
-    private function saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle): void
+    private function saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId): void
     {
-        $this->setProgress($queue, 0.75, 'Saving the file to the assets');
+//        $this->setProgress($queue, 0.75, 'Saving the file to the assets');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.75, 'Saving the file to the assets');
 
         // Get the Bespoken plugin settings
         $settings = Bespoken::getInstance()->getSettings();
@@ -226,8 +254,8 @@ class GenerateAudio extends BaseJob
         // If the volume is not found, log an error and return
         if (!$volume) {
             Bespoken::error('Volume not found with handle: ' . $volumeHandle);
-            $this->setProgress($queue, 1,
-                'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle);
+//            $this->setProgress($queue, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle);
             return;
         }
 
@@ -238,15 +266,15 @@ class GenerateAudio extends BaseJob
 
         if (!$folder) {
             Bespoken::error('Folder not found with volume ID: ' . $volumeId);
-            $this->setProgress($queue, 1,
-                'Error saving the audio file to the assets. Folder not found with volume ID: ' . $volumeId);
+//            $this->setProgress($queue, 1, 'Error saving the audio file to the assets. Folder not found with volume ID: ' . $volumeId);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Folder not found with volume ID: ' . $volumeId);
             return;
         }
         $folderId = $folder->id;
 
         // Create a new asset
-        $this->setProgress($queue, 0.78,
-            'Preparing Craft asset from the audio file');
+//        $this->setProgress($queue, 0.78, 'Preparing Craft asset from the audio file');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.78, 'Preparing Craft asset from the audio file');
 
         // prepare the asset
         $asset = new Asset();
@@ -258,26 +286,26 @@ class GenerateAudio extends BaseJob
         $asset->avoidFilenameConflicts = false;
         $asset->setScenario(Asset::SCENARIO_CREATE);
 
-        $this->setProgress($queue, 0.79,
-            'Created the asset object');
+//        $this->setProgress($queue, 0.79, 'Created the asset object');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.79, 'Created the asset object');
 
         $asset->validate();
 
-        $this->setProgress($queue, 0.8,
-            'Validated the asset object');
+//        $this->setProgress($queue, 0.8, 'Validated the asset object');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.8, 'Validated the asset object');
 
         // Save the audio file to the volume
         try {
             $result = Craft::$app->getElements()->saveElement(
                 $asset, false
             );
-            $this->setProgress($queue, 0.9,
-                'Asset created with ID: ' . $asset->id);
+//            $this->setProgress($queue, 0.9, 'Asset created with ID: ' . $asset->id);
+            $this->setBespokeProgress($queue, $bespokenJobId, 0.9, 'Asset created with ID: ' . $asset->id);
             Bespoken::info('Asset created with ID: ' . $asset->id);
         } catch (\Throwable $e) {
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());
-            $this->setProgress($queue, 1,
-                'Error saving the audio file to the assets: ' . $e->getMessage());
+//            $this->setProgress($queue, 1, 'Error saving the audio file to the assets: ' . $e->getMessage());
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage());
         }
     }
 

@@ -91,6 +91,8 @@ class BespokenService extends Component
         $status = Craft::$app->cache->get($jobId);
 
         if ($status) {
+            // the status will be a string, so we need to convert it to an array
+            $status = json_decode($status, true);
             return $status;
         }   else {
             return [

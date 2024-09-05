@@ -161,28 +161,23 @@ function updateProgressComponent(progressComponent, { progress, success, message
 var pollingInterval = 1e3;
 function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, button, actionUrlBase) {
   console.log("startJobMonitor", bespokenJobId);
-  const interval = setInterval(
-    () => {
-      const data = {
-        jobId,
-        bespokenJobId,
-        filename,
-        progressComponent,
-        button,
-        interval,
-        actionUrl: actionUrlBase + "/job-status"
-      };
-      const url = new URL("/job-status", actionUrlBase);
-      url.search = new URLSearchParams({ jobId: bespokenJobId });
-      const result = fetch(actionUrlBase + "/job-status", {
+  const interval = setInterval(async () => {
+    const url = `${actionUrlBase}/job-status&jobId=${bespokenJobId}`;
+    console.log("url", url);
+    try {
+      const result = await fetch(url, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
+        headers: { "Content-Type": "application/json" }
       });
-      console.log("result", result);
-    },
-    pollingInterval
-  );
+      if (!result.ok) {
+        throw new Error(`HTTP error! Status: ${result.status}`);
+      }
+      const responseData = await result.json();
+      console.log("result", responseData);
+    } catch (error) {
+      console.error("Error fetching job status:", error);
+    }
+  }, pollingInterval);
 }
 
 // src/web/assets/bespokenassets/src/processText.ts

@@ -6,30 +6,42 @@ const pollingInterval = 1000;
 export function startJobMonitor(jobId: string, bespokenJobId: string, progressComponent: ProgressComponent, filename: string, button: HTMLButtonElement, actionUrlBase: string){
     console.log('startJobMonitor', bespokenJobId);
     const interval = setInterval(async () => {
-        const data = {
-            jobId: jobId,
-            bespokenJobId: bespokenJobId,
-            filename: filename,
-            progressComponent: progressComponent,
-            button: button,
-            interval: interval,
-            actionUrl: actionUrlBase + '/job-status'
-        }
-        // console.log('data', data);
+        // const data = {
+        //     jobId: jobId,
+        //     bespokenJobId: bespokenJobId,
+        //     filename: filename,
+        //     progressComponent: progressComponent,
+        //     button: button,
+        //     interval: interval,
+        //     actionUrl: actionUrlBase + '/job-status'
+        // };
+        // Removed unused console.log for 'data' as it's not required here.
 
-        const url = `${actionUrlBase}/job-status?jobId=${bespokenJobId}`;
+        const url = `${actionUrlBase}/job-status&jobId=${bespokenJobId}`;
         console.log('url', url);
-        debugger;
 
-        const result = await fetch(`${actionUrlBase}/job-status?jobId=${bespokenJobId}`, {
-            method: 'GET',
-            headers: {'Content-Type': 'application/json'},
-        })
+        try {
+            const result = await fetch(url, {
+                method: 'GET',
+                headers: {'Content-Type': 'application/json'}
+            });
 
-        // Assuming the response is in JSON format
-        const data = await result.json();
+            // Check if the response is ok (status code 200-299)
+            if (!result.ok) {
+                throw new Error(`HTTP error! Status: ${result.status}`);
+            }
 
-        console.log('result', data);
+            // Assuming the response is in JSON format
+            const responseData = await result.json();
+
+            console.log('result', responseData);
+
+            // Optionally, handle the response data here to update the UI, progress bar, etc.
+
+        } catch (error) {
+            console.error('Error fetching job status:', error);
+            // Optionally clear interval or take some action if there is an error
+        }
 
     }, pollingInterval);
 }

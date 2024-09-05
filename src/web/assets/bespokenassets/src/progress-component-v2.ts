@@ -137,6 +137,10 @@ class ProgressComponent extends HTMLElement {
           align-items: center;
           gap: 10px;
         }
+        .progressbar {
+            display: flex;
+            align-items: center;
+        }
         circle {
           transition: stroke-dashoffset 0.35s;
           transform: rotate(-90deg);
@@ -165,7 +169,7 @@ class ProgressComponent extends HTMLElement {
       </style>
 
       <div class="first-row">
-        <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator">
+        <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator" class="progressbar">
           <svg width="${this._size}px" height="${this._size}px" viewBox="0 0 ${this._size} ${this._size}">
             <circle cx="${this._size / 2}" cy="${this._size / 2}" r="${radius}" stroke="#b9b9b9" stroke-width="${this.calculatedStrokeWidth}" fill="transparent"></circle>
             <circle cx="${this._size / 2}" cy="${this._size / 2}" r="${radius}" stroke="#3f3f3f" stroke-width="${this.calculatedStrokeWidth}" fill="transparent" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"></circle>

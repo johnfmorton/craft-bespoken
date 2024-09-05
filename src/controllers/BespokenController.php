@@ -5,7 +5,6 @@ namespace johnfmorton\bespoken\controllers;
 use Craft;
 use craft\web\Controller;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
-//use johnfmorton\bespoken\services\BespokenService as BespokenService;
 use yii\web\MethodNotAllowedHttpException;
 use yii\web\Response;
 

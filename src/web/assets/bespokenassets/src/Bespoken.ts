@@ -2,7 +2,7 @@
 import './Bespoken.css';
 
 // Import the custom element, the progress indicator
-import { ProgressComponent } from "./progress-component";
+import { ProgressComponent } from "./progress-component-v2";
 import { updateProgressComponent } from "./updateProgressComponent";
 
 import { processText } from "./processText";

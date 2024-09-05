@@ -1,150 +1,169 @@
-// src/web/assets/bespokenassets/src/progress-component.ts
+// src/web/assets/bespokenassets/src/progress-component-v2.ts
 var ProgressComponent = class extends HTMLElement {
-  // Observed attributes for this component
-  static get observedAttributes() {
-    return ["progress", "message", "svg-height", "success"];
-  }
-  // Radius of the circle for progress calculation
   constructor() {
     super();
-    const shadow = this.attachShadow({ mode: "open" });
-    this.container = document.createElement("div");
-    this.container.classList.add("progress-container");
-    shadow.appendChild(this.container);
-    this.size = this.calculateSize();
-    this.radius = this.calculateRadius();
-    this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    this.svg.setAttribute("class", "progress-svg");
-    this.updateSVGSize();
-    this.circleBackground = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    this.circleBackground.setAttribute("cx", "50%");
-    this.circleBackground.setAttribute("cy", "50%");
-    this.circleBackground.setAttribute("r", this.radius.toString());
-    this.circleBackground.setAttribute("fill", "none");
-    this.circleBackground.setAttribute("stroke", "var(--progress-background-color, #e0e0e0)");
-    this.circleBackground.setAttribute("stroke-width", (this.size * 0.25).toString());
-    this.circleProgress = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    this.circleProgress.setAttribute("cx", "50%");
-    this.circleProgress.setAttribute("cy", "50%");
-    this.circleProgress.setAttribute("r", this.radius.toString());
-    this.circleProgress.setAttribute("fill", "none");
-    this.circleProgress.setAttribute("stroke", "var(--progress-fill-color, #4caf50)");
-    this.circleProgress.setAttribute("stroke-width", (this.size * 0.25).toString());
-    this.circleProgress.setAttribute("stroke-dasharray", (2 * Math.PI * this.radius).toString());
-    this.circleProgress.setAttribute("stroke-dashoffset", (2 * Math.PI * this.radius).toString());
-    this.circleProgress.setAttribute("transform", `rotate(-90 ${this.size / 2} ${this.size / 2})`);
-    this.circleProgress.style.transition = "stroke-dashoffset 0.3s ease";
-    this.warningIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    this.warningIcon.setAttribute("viewBox", "0 0 24 24");
-    this.warningIcon.setAttribute("width", `${this.size}`);
-    this.warningIcon.setAttribute("height", `${this.size}`);
-    this.warningIcon.innerHTML = `
-      <path fill="#ca3a31" d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-    `;
-    this.warningIcon.style.display = "none";
-    this.svg.appendChild(this.circleBackground);
-    this.svg.appendChild(this.circleProgress);
-    this.container.appendChild(this.svg);
-    this.container.appendChild(this.warningIcon);
-    this.messageElement = document.createElement("span");
-    this.messageElement.classList.add("progress-message");
-    this.messageElement.textContent = this.getAttribute("message") || "";
-    this.container.appendChild(this.messageElement);
-    const style = document.createElement("style");
-    style.textContent = `
-      .progress-container {
-            background-color: var(--progress-background-color, transparent);
-            display: flex;
-            flex-direction: row;
-            gap: 0.25rem;
-            align-items: center;
-            justify-content: start;
-            font-family: sans-serif;
-            color: var(--progress-fill-color);
-            padding: 0.5rem 0;
-            border-radius: 0.25rem;
-            border: 1px solid var(--progress-fill-color);
-        }
-    
-      :host(.progress-large) .progress-svg {
-        --progress-fill-color: blue;
-        --progress-background-color: lightblue;
-      }
-      
-      .progress-message {
-        color: var(--progress-text-color, black);
-      }
-    `;
-    this.container.appendChild(style);
+    this.attachShadow({ mode: "open" });
+    this._progress = 0;
+    this._size = 100;
+    this._strokeWidth = 0;
+    this._message = "Idle status";
+    this._success = false;
+    this._count = 0;
+    this._isExpanded = false;
+    this._messageHistory = [];
+    this.render();
   }
-  // Calculate the size of the SVG based on text height or svg-height attribute
-  calculateSize() {
-    const svgHeightAttr = this.getAttribute("svg-height");
-    return svgHeightAttr ? parseFloat(svgHeightAttr) : this.messageElement.clientHeight;
+  // Define the attributes we want to observe
+  static get observedAttributes() {
+    return ["progress", "size", "stroke-width", "message", "success", "count"];
   }
-  // Calculate the radius of the circle based on the current size
-  calculateRadius() {
-    return this.size / 2 - this.size * 0.125;
-  }
-  // Update the SVG size and recalculate properties based on the computed size
-  updateSVGSize() {
-    this.svg.setAttribute("width", `${this.size}`);
-    this.svg.setAttribute("height", `${this.size}`);
-    this.svg.setAttribute("viewBox", `0 0 ${this.size} ${this.size}`);
-  }
-  // Called when the component's attributes change
+  // Handle attribute changes
   attributeChangedCallback(name, oldValue, newValue) {
-    if (name === "progress") {
-      this.updateProgress(parseFloat(newValue || "0"));
-    } else if (name === "message") {
-      this.messageElement.textContent = newValue || "";
-      this.updateComponentSize();
-    } else if (name === "svg-height") {
-      this.size = this.calculateSize();
-      this.updateComponentSize();
-    } else if (name === "success") {
-      this.updateSuccess(newValue === "true" || newValue === "1");
+    switch (name) {
+      case "progress":
+        this._progress = parseFloat(newValue);
+        break;
+      case "size":
+        this._size = parseInt(newValue);
+        break;
+      case "stroke-width":
+        this._strokeWidth = parseInt(newValue);
+        break;
+      case "message":
+        this._message = newValue;
+        this.updateMessageHistory();
+        break;
+      case "success":
+        this._success = newValue === "true";
+        break;
+      case "count":
+        this._count = parseInt(newValue);
+        break;
+    }
+    this.render();
+  }
+  // Custom setters for setting properties directly
+  set progress(value) {
+    this.setAttribute("progress", value);
+  }
+  get progress() {
+    return this._progress;
+  }
+  set size(value) {
+    this.setAttribute("size", value);
+  }
+  get size() {
+    return this._size;
+  }
+  set strokeWidth(value) {
+    this.setAttribute("stroke-width", value);
+  }
+  get strokeWidth() {
+    return this._strokeWidth;
+  }
+  set message(value) {
+    this.setAttribute("message", value);
+  }
+  get message() {
+    return this._message;
+  }
+  set success(value) {
+    this.setAttribute("success", value);
+  }
+  get success() {
+    return this._success;
+  }
+  set count(value) {
+    this.setAttribute("count", value);
+  }
+  get count() {
+    return this._count;
+  }
+  updateMessageHistory() {
+    if (this._message) {
+      this._messageHistory = [...this._messageHistory.slice(-24), this._message];
     }
   }
-  // Update the progress indicator based on the provided value
-  updateProgress(progress) {
-    const progressValue = Math.min(Math.max(progress, 0), 1);
-    const circumference = 2 * Math.PI * this.radius;
-    const offset = circumference * (1 - progressValue);
-    this.circleProgress.setAttribute("stroke-dashoffset", offset.toString());
+  toggleExpand() {
+    this._isExpanded = !this._isExpanded;
+    this.render();
   }
-  // Update display based on success value
-  updateSuccess(success) {
-    if (success) {
-      this.svg.style.display = "block";
-      this.warningIcon.style.display = "none";
-    } else {
-      this.svg.style.display = "none";
-      this.warningIcon.style.display = "block";
-    }
+  get calculatedStrokeWidth() {
+    const defaultStrokeWidth = this._size / 2;
+    return this._strokeWidth > 0 ? Math.min(this._strokeWidth, defaultStrokeWidth) : defaultStrokeWidth;
   }
-  // Recalculate the size when message, svg-height, or success changes
-  updateComponentSize() {
-    this.size = this.calculateSize();
-    this.radius = this.calculateRadius();
-    this.updateSVGSize();
-    const circumference = 2 * Math.PI * this.radius;
-    this.circleBackground.setAttribute("r", this.radius.toString());
-    this.circleProgress.setAttribute("r", this.radius.toString());
-    this.circleProgress.setAttribute("stroke-dasharray", circumference.toString());
-    this.circleProgress.setAttribute("stroke-dashoffset", circumference.toString());
-    this.circleProgress.setAttribute("transform", `rotate(-90 ${this.size / 2} ${this.size / 2})`);
-    const strokeWidth = (this.size * 0.25).toString();
-    this.circleBackground.setAttribute("stroke-width", strokeWidth);
-    this.circleProgress.setAttribute("stroke-width", strokeWidth);
-    this.updateProgress(parseFloat(this.getAttribute("progress") || "0"));
-    this.warningIcon.setAttribute("width", `${this.size}`);
-    this.warningIcon.setAttribute("height", `${this.size}`);
+  render() {
+    const radius = this._size / 2 - this.calculatedStrokeWidth / 2;
+    const circumference = 2 * Math.PI * radius;
+    const progress = Math.min(Math.max(this._progress, 0), 1);
+    const offset = circumference * (1 - progress);
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: flex;
+          flex-direction: column;
+          border-radius: 4px;
+          border: solid 1px rgb(204, 204, 204);
+          padding: 8px 10px;
+          max-width: 100%;
+          overflow: hidden;
+          font-size: 14px;
+          color: rgb(89, 102, 115);
+        }
+        .first-row {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 10px;
+        }
+        circle {
+          transition: stroke-dashoffset 0.35s;
+          transform: rotate(-90deg);
+          transform-origin: 50% 50%;
+        }
+        .message {
+          text-overflow: ellipsis;
+          overflow: hidden;
+          white-space: nowrap;
+          cursor: pointer;
+          outline: none;
+        }
+        .history {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s ease;
+          white-space: normal;
+          font-size: 0.875em;
+        }
+        .history.expanded {
+          max-height: 500px;
+        }
+      </style>
+
+      <div class="first-row">
+        <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator">
+          <svg width="${this._size}px" height="${this._size}px" viewBox="0 0 ${this._size} ${this._size}">
+            <circle cx="${this._size / 2}" cy="${this._size / 2}" r="${radius}" stroke="#b9b9b9" stroke-width="${this.calculatedStrokeWidth}" fill="transparent"></circle>
+            <circle cx="${this._size / 2}" cy="${this._size / 2}" r="${radius}" stroke="#3f3f3f" stroke-width="${this.calculatedStrokeWidth}" fill="transparent" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"></circle>
+          </svg>
+        </div>
+        <div class="message" tabindex="0" role="button">${this._message}</div>
+      </div>
+      <div class="history ${this._isExpanded ? "expanded" : ""}">
+        <div class="intro">Message history:</div>
+        ${this._messageHistory.map((msg) => `<div>${msg}</div>`).join("")}
+      </div>
+    `;
+    this.shadowRoot.querySelector(".message").addEventListener("click", () => this.toggleExpand());
+  }
+  connectedCallback() {
+    this.render();
   }
 };
-if (!customElements.get("progress-component")) {
-  customElements.define("progress-component", ProgressComponent);
-}
+customElements.define("progress-component", ProgressComponent);
 
 // src/web/assets/bespokenassets/src/updateProgressComponent.ts
 function updateProgressComponent(progressComponent, { progress, success, message, textColor = "rgb(89, 102, 115)" }) {
@@ -306,7 +325,7 @@ function _stripTagsExceptAllowedTags(text, allowedTags2) {
 // src/web/assets/bespokenassets/src/Bespoken.ts
 document.addEventListener("DOMContentLoaded", () => {
   if (!customElements.get("progress-component")) {
-    customElements.define("progress-component", ProgressComponent);
+    customElements.define("progress-component", void 0);
   }
   const buttons = document.querySelectorAll(".bespoken-generate");
   buttons.forEach((button) => {

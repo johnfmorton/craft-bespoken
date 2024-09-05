@@ -174,6 +174,15 @@ function startJobMonitor(jobId, bespokenJobId, progressComponent, filename, butt
       }
       const responseData = await result.json();
       console.log("result", responseData);
+      updateProgressComponent(progressComponent, {
+        progress: responseData.progress,
+        success: responseData.success,
+        message: responseData.message,
+        textColor: "rgb(89, 102, 115)"
+      });
+      if (responseData.progress === 1) {
+        clearInterval(interval);
+      }
     } catch (error) {
       console.error("Error fetching job status:", error);
     }

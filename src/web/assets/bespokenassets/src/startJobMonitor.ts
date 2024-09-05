@@ -1,5 +1,6 @@
-import { checkBespokeJobStatus} from "./checkBespokeJobStatus";
+// import { checkBespokeJobStatus} from "./checkBespokeJobStatus";
 import { ProgressComponent } from "./progress-component";
+import { updateProgressComponent} from "./updateProgressComponent";
 
 const pollingInterval = 1000;
 
@@ -36,7 +37,17 @@ export function startJobMonitor(jobId: string, bespokenJobId: string, progressCo
 
             console.log('result', responseData);
 
-            // Optionally, handle the response data here to update the UI, progress bar, etc.
+            updateProgressComponent(progressComponent, {
+                progress: responseData.progress,
+                success: responseData.success,
+                message: responseData.message,
+                textColor: 'rgb(89, 102, 115)'
+            });
+
+            // if progress is 100, clear the interval
+            if (responseData.progress === 1) {
+                clearInterval(interval);
+            }
 
         } catch (error) {
             console.error('Error fetching job status:', error);

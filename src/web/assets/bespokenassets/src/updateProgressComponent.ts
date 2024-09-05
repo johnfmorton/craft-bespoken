@@ -1,6 +1,7 @@
 import {ProgressComponent} from "./progress-component";
 
 export function updateProgressComponent(progressComponent: ProgressComponent, { progress, success, message, textColor = 'rgb(89, 102, 115)' }) {
+
   // if text color is not provided, use the default value
     if (!textColor) {
         textColor = 'rgb(89, 102, 115)';

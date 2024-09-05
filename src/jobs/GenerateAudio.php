@@ -53,10 +53,10 @@ class GenerateAudio extends BaseJob
 
             // Call the Eleven Labs API
 
-            // $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
+            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
             $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
 
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Audio file generated for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
+//            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Audio file generated for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to completed');
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
@@ -299,6 +299,8 @@ class GenerateAudio extends BaseJob
             );
             $this->setBespokeProgress($queue, $bespokenJobId, 0.9, 'Asset created with ID: ' . $asset->id);
             Bespoken::info('Asset created with ID: ' . $asset->id);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Filename: ' . $filename . ' saved to the assets');
+
         } catch (\Throwable $e) {
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage(), 0);

@@ -56,7 +56,7 @@ class GenerateAudio extends BaseJob
             // Call the Eleven Labs API
 
             // $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle);
-            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle);
+            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
 //
 //            Craft::$app->cache->set("jobStatus-{$bespokenJobId}", 'completed', $this->cacheExpire);
 //            Craft::$app->cache->set("jobMessage-{$bespokenJobId}", 'The process has completed', $this->cacheExpire);

@@ -1,4 +1,4 @@
-import { ProgressComponent } from "./progress-component";
+import { ProgressComponent } from "./progress-component-v2";
 import { updateProgressComponent} from "./updateProgressComponent";
 
 const pollingInterval = 1000;

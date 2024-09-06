@@ -1,5 +1,5 @@
 import {updateProgressComponent} from "./updateProgressComponent";
-import {ProgressComponent} from "./progress-component";
+import {ProgressComponent} from "./progress-component-v2";
 
 import {startJobMonitor} from "./startJobMonitor";
 

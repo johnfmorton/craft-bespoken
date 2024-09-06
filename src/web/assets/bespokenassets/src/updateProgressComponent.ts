@@ -1,4 +1,4 @@
-import {ProgressComponent} from "./progress-component";
+import {ProgressComponent} from "./progress-component-v2";
 
 export function updateProgressComponent(progressComponent: ProgressComponent, { progress, success, message, textColor = 'rgb(89, 102, 115)' }) {
 

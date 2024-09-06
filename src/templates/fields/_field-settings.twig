@@ -23,9 +23,10 @@
 {#{% set sourceField = field.sourceField %}#}
 {#{% set sourceFieldSettings = craft.app.fields.getFieldByUid(sourceField) %}#}
 
+
 {{ forms.textField({
-    label: 'Source Field Handle' | t('bespoken'),
-    instructions: 'The field handle of the field that will be read aloud.' | t('bespoken'),
+    label: 'Field handle(s) of text' | t('bespoken'),
+    instructions: 'Source field instructions' | t('bespoken'),
     id: 'sourceField',
     name: 'sourceField',
     value: field['sourceField'],
@@ -33,10 +34,9 @@
 }) }}
 
 
-
 {{ forms.textField({
-    label: 'File Name Prefix'| t('bespoken'),
-    instructions: 'A prefix that will be added to the audio file name. Useful when there are multiple Bespoken fields in a single entry.' | t('bespoken'),
+    label: 'Filename prefix'| t('bespoken'),
+    instructions: 'Prefix instructions' | t('bespoken'),
     id: 'fileNamePrefix',
     name: 'fileNamePrefix',
     value: field['fileNamePrefix'],

@@ -115,9 +115,9 @@ var ProgressComponent = class extends HTMLElement {
           flex-direction: column;
           max-width: 100%;
           overflow: hidden;
-          border-radius: 4px;
+          border-radius: 3px;
           border-style: solid;
-          border-size: 1px;
+          border-width: 1px;
           border-color: var(--border-color, rgba(96, 125, 159, 0.25)); /* Allow overriding border color */
           padding: 8px 10px;
         }
@@ -128,8 +128,8 @@ var ProgressComponent = class extends HTMLElement {
           gap: 10px;
         }
         .progressbar {
-            display: flex;
-            align-items: center;
+          display: flex;
+          align-items: center;
         }
         circle {
           transition: stroke-dashoffset 0.35s;
@@ -161,7 +161,6 @@ var ProgressComponent = class extends HTMLElement {
           max-height: 500px;
         }
       </style>
-
       <div class="outer">
       <div class="first-row">
         <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator" class="progressbar">
@@ -371,19 +370,43 @@ function handleButtonClick(event) {
       fileNamePrefix = input.value;
     }
   });
-  const targetFieldHandle = button.getAttribute("data-target-field") || void 0;
+  const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
   let text = "";
-  if (targetFieldHandle) {
-    const targetField = document.getElementById(`fields-${targetFieldHandle}-field`);
-    text = _getFieldText(targetField);
+  if (targetFieldHandles) {
+    const fieldHandlesArray = targetFieldHandles.split(",").map((handle) => handle.trim());
+    fieldHandlesArray.forEach((handle) => {
+      if (handle === "title") {
+        const titleToAdd = title.endsWith(".") ? title : title + ".";
+        text += titleToAdd + " ";
+      } else {
+        const targetField = document.getElementById(`fields-${handle}-field`);
+        if (targetField) {
+          const textStep1 = _getFieldText(targetField);
+          const textToAdd = textStep1.endsWith(".") ? textStep1 : textStep1 + ".";
+          text += textToAdd + " ";
+        }
+      }
+    });
+    text = text.trim();
   }
+  debugger;
   if (text.length === 0) {
     button.classList.remove("disabled");
-    updateProgressComponent(progressComponent, { progress: 0, success: false, message: "No text to generate audio from.", textColor: "rgb(126,7,7)" });
+    updateProgressComponent(progressComponent, {
+      progress: 0,
+      success: false,
+      message: "No text to generate audio from.",
+      textColor: "rgb(126,7,7)"
+    });
     return;
   }
   const actionUrlBase = button.getAttribute("data-action-url") || "";
   const actionUrlProcessText = `${actionUrlBase}/process-text`;
-  updateProgressComponent(progressComponent, { progress: 0.1, success: true, message: "Preparing data", textColor: "rgb(89, 102, 115)" });
+  updateProgressComponent(progressComponent, {
+    progress: 0.1,
+    success: true,
+    message: "Preparing data",
+    textColor: "rgb(89, 102, 115)"
+  });
   processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 }

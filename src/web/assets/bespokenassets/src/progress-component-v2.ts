@@ -145,9 +145,9 @@ export class ProgressComponent extends HTMLElement {
           flex-direction: column;
           max-width: 100%;
           overflow: hidden;
-          border-radius: 4px;
+          border-radius: 3px;
           border-style: solid;
-          border-size: 1px;
+          border-width: 1px;
           border-color: var(--border-color, rgba(96, 125, 159, 0.25)); /* Allow overriding border color */
           padding: 8px 10px;
         }
@@ -158,8 +158,8 @@ export class ProgressComponent extends HTMLElement {
           gap: 10px;
         }
         .progressbar {
-            display: flex;
-            align-items: center;
+          display: flex;
+          align-items: center;
         }
         circle {
           transition: stroke-dashoffset 0.35s;
@@ -191,7 +191,6 @@ export class ProgressComponent extends HTMLElement {
           max-height: 500px;
         }
       </style>
-
       <div class="outer">
       <div class="first-row">
         <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator" class="progressbar">

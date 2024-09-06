@@ -6,11 +6,11 @@
 
 return [
     'Bespoken Field Name' => 'Bespoken',
-    'Add Voice' => 'Add a voice to the plugin',
+    'Add a new voice instruction' => 'Add a voice to the plugin',
     'Voice ID' => 'Voice ID',
-    'Voice Name' => 'Voice Name',
-    'Eleven Labs API Key instructions' => 'Found in Profile Settings in the ElevenLabs control panel. Can be an environment variable.',
-    'Add voice instructions' => 'Add voices that can be used to create text. See the <a href="https://elevenlabs.io/app/voice-lab">Voice Lab</a> section in the ElevenLabs control panel to configure the voices you\'d like to use. You may use any of the voices in the ElevenLabs library or create your own voice. You will need the <b>Voice ID</b>.',
+    'Voice name' => 'Voice name',
+    'ElevenLabs API Key instructions' => 'Found in Profile Settings in the ElevenLabs control panel. Can be an environment variable.',
+    'Add voices instructions' => 'Add voices that can be used to create text. See the <a href="https://elevenlabs.io/app/voice-lab">Voice Lab</a> section in the ElevenLabs control panel to configure the voices you\'d like to use. You may use any of the voices in the ElevenLabs library or create your own voice. You will need the <b>Voice ID</b>.',
     'Voice options' => 'Choose the voices for this field',
     'No voice options available for plugin' => '🛑 The Bespoken plugin has no voice options available. Add at least one voice to the plugin in the settings page.',
     'No voice options available for field' => '🛑 The Bespoken plugin has no voice options available for this field. Choose at least one voice in the field set up screen.',
@@ -26,8 +26,10 @@ return [
     'Similarity boost instructions' => 'The similarity value dictates how closely the AI should adhere to the original voice when attempting to replicate it. The default value is 0.75.',
     'Style instructions' => 'This setting attempts to amplify the style of the original speaker. The default value is 0. ElevenLabs recommends that you do not alter this value',
     'Use speaker boost instructions' => 'If true, the voice will sound more like the original speaker. The default value is true.',
-    'Asset Volume for audio files' => 'Asset Volume for audio files',
-    'Asset Volume instructions' => 'Choose the volume where the audio files will be saved.',
+    'Asset volume for audio files' => 'Asset volume for audio files',
+    'Asset volume instructions' => 'Choose the volume where the audio files will be saved.',
     'Start Audio Job' => 'Generate Audio',
     'Bespoken field name' => 'Bespoken',
+    'Prefix instructions' => 'An optional prefix to the audio filename.',
+    'Source field instructions' => 'The field handle of the field that will be read aloud. To include multiple handles, separate the handles with a comma.'
 ];

@@ -79,7 +79,7 @@ var ProgressComponent = class extends HTMLElement {
   get count() {
     return this._count;
   }
-  // Update message history, ignore duplicates
+  // Update message history without duplicates
   updateMessageHistory() {
     if (this._message && (this._history.length === 0 || this._history[this._history.length - 1] !== this._message)) {
       this._history = [...this._history.slice(-24), this._message];
@@ -125,11 +125,23 @@ var ProgressComponent = class extends HTMLElement {
           display: flex;
           flex-direction: row;
           align-items: center;
+          justify-content: space-between;
           gap: 10px;
+        }
+        .first-row .left-side {
+                  width: calc(100% - 24px);
+
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: start;
+            flex: 1; /* Allow left side to take available space */
+            gap: 10px;
         }
         .progressbar {
           display: flex;
           align-items: center;
+          flex-shrink: 0; /* Prevent the progress bar from shrinking */
         }
         circle {
           transition: stroke-dashoffset 0.35s;
@@ -137,11 +149,23 @@ var ProgressComponent = class extends HTMLElement {
           transform-origin: 50% 50%;
         }
         .message {
+          flex-grow: 1; /* Allow the message to take up remaining space */
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
           cursor: pointer;
           outline: none;
+        }
+        .arrow {
+          flex-shrink: 0; /* Ensure the arrow does not shrink or get pushed off-screen */
+          cursor: pointer;
+          transition: transform 0.3s ease;
+          /*font-size: 1.25em;*/
+          display: flex;
+          align-content: center;
+        }
+        .arrow.expanded {
+          transform: rotate(180deg); /* Rotate when expanded */
         }
         .history {
           display: flex;
@@ -162,7 +186,8 @@ var ProgressComponent = class extends HTMLElement {
         }
       </style>
       <div class="outer">
-      <div class="first-row">
+      <div class="first-row"> 
+       <div class="left-side">
         <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator" class="progressbar">
           <svg width="${this._size}px" height="${this._size}px" viewBox="0 0 ${this._size} ${this._size}">
             <circle cx="${this._size / 2}" cy="${this._size / 2}" r="${radius}" stroke="#b9b9b9" stroke-width="${this.calculatedStrokeWidth}" fill="transparent"></circle>
@@ -171,13 +196,18 @@ var ProgressComponent = class extends HTMLElement {
         </div>
         <div class="message" tabindex="0" role="button">${this._message}</div>
       </div>
+        <div class="arrow ${this._isExpanded ? "expanded" : ""}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 12" fill="none" stroke="#596570" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 3.4 12 9.4 18 3.4"/>
+</svg></div> <!-- Arrow that toggles -->
+      </div>
       <div class="history ${this._isExpanded ? "expanded" : ""}">
         <div class="intro">Message history:</div>
         ${this._history.map((msg) => `<div>${msg}</div>`).join("")}
       </div>
-</div>
+    </div>
     `;
     this.shadowRoot.querySelector(".message")?.addEventListener("click", () => this.toggleExpand());
+    this.shadowRoot.querySelector(".arrow")?.addEventListener("click", () => this.toggleExpand());
   }
   // When the component is added to the DOM
   connectedCallback() {

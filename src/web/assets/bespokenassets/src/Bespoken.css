@@ -34,7 +34,5 @@
 }
 
 .bespoken-progress-component {
-    display: block;
-    border: #0a73bb 1px solid;
-    width: 100%;
+    margin-top: 0.25rem;
 }

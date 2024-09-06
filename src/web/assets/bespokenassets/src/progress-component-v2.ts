@@ -1,4 +1,13 @@
-class ProgressComponent extends HTMLElement {
+export class ProgressComponent extends HTMLElement {
+  private _progress: number;
+  private _size: number;
+  private _strokeWidth: number;
+  private _message: string;
+  private _success: boolean;
+  private _count: number;
+  private _isExpanded: boolean;
+  private _history: string[];
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -11,125 +20,136 @@ class ProgressComponent extends HTMLElement {
     this._success = false;
     this._count = 0;
     this._isExpanded = false;
-    this._messageHistory = [];
+    this._history = [];
 
     this.render();
   }
 
   // Define the attributes we want to observe
-  static get observedAttributes() {
+  static get observedAttributes(): string[] {
     return ['progress', 'size', 'stroke-width', 'message', 'success', 'count'];
   }
 
   // Handle attribute changes
-  attributeChangedCallback(name, oldValue, newValue) {
+  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
     switch (name) {
       case 'progress':
-        this._progress = parseFloat(newValue);
+        this._progress = parseFloat(newValue || '0');
         break;
       case 'size':
-        this._size = parseInt(newValue);
+        this._size = parseInt(newValue || '100');
         break;
       case 'stroke-width':
-        this._strokeWidth = parseInt(newValue);
+        this._strokeWidth = parseInt(newValue || '0');
         break;
       case 'message':
-        this._message = newValue;
+        this._message = newValue || 'Idle status';
         this.updateMessageHistory();
         break;
       case 'success':
         this._success = newValue === 'true';
         break;
       case 'count':
-        this._count = parseInt(newValue);
+        this._count = parseInt(newValue || '0');
         break;
     }
     this.render(); // Re-render after an attribute change
   }
 
   // Custom setters for setting properties directly
-  set progress(value) {
-    this.setAttribute('progress', value);
+  set progress(value: number) {
+    this.setAttribute('progress', value.toString());
   }
 
-  get progress() {
+  get progress(): number {
     return this._progress;
   }
 
-  set size(value) {
-    this.setAttribute('size', value);
+  set size(value: number) {
+    this.setAttribute('size', value.toString());
   }
 
-  get size() {
+  get size(): number {
     return this._size;
   }
 
-  set strokeWidth(value) {
-    this.setAttribute('stroke-width', value);
+  set strokeWidth(value: number) {
+    this.setAttribute('stroke-width', value.toString());
   }
 
-  get strokeWidth() {
+  get strokeWidth(): number {
     return this._strokeWidth;
   }
 
-  set message(value) {
+  set message(value: string) {
     this.setAttribute('message', value);
   }
 
-  get message() {
+  get message(): string {
     return this._message;
   }
 
-  set success(value) {
-    this.setAttribute('success', value);
+  set success(value: boolean) {
+    this.setAttribute('success', value.toString());
   }
 
-  get success() {
+  get success(): boolean {
     return this._success;
   }
 
-  set count(value) {
-    this.setAttribute('count', value);
+  set count(value: number) {
+    this.setAttribute('count', value.toString());
   }
 
-  get count() {
+  get count(): number {
     return this._count;
   }
 
-  updateMessageHistory() {
+  // Update message history
+  private updateMessageHistory(): void {
     if (this._message) {
-      this._messageHistory = [...this._messageHistory.slice(-24), this._message];
+      this._history = [...this._history.slice(-24), this._message];
     }
   }
 
-  toggleExpand() {
+  // Toggle expand/collapse of the history
+  private toggleExpand(): void {
     this._isExpanded = !this._isExpanded;
     this.render();
   }
 
-  get calculatedStrokeWidth() {
+  // Calculate stroke width
+  private get calculatedStrokeWidth(): number {
     const defaultStrokeWidth = this._size / 2;
     return this._strokeWidth > 0 ? Math.min(this._strokeWidth, defaultStrokeWidth) : defaultStrokeWidth;
   }
 
-  render() {
+  // Render the component
+  private render(): void {
     const radius = this._size / 2 - this.calculatedStrokeWidth / 2;
     const circumference = 2 * Math.PI * radius;
     const progress = Math.min(Math.max(this._progress, 0), 1);
     const offset = circumference * (1 - progress);
 
-    this.shadowRoot.innerHTML = `
+    this.shadowRoot!.innerHTML = `
       <style>
         :host {
+          display: block;
+          max-width: 100%;
+          width: 100%;
+          font-size: 14px;
+          color: var(--color, rgb(89, 102, 115)); /* Allow overriding text color */
+        }
+        .outer {
           display: flex;
           flex-direction: column;
-          border-radius: 4px;
-          border: solid 1px rgb(204, 204, 204);
-          padding: 8px 10px;
           max-width: 100%;
           overflow: hidden;
-          font-size: 14px;
-          color: rgb(89, 102, 115);
+          border-radius: 4px;
+          border-style: solid;
+          border-size: 1px;
+          border-color: var(--border-color, rgba(96, 125, 159, 0.25)); /* Allow overriding border color */
+          padding: 8px 10px;
         }
         .first-row {
           display: flex;
@@ -163,11 +183,16 @@ class ProgressComponent extends HTMLElement {
           white-space: normal;
           font-size: 0.875em;
         }
+        .history .intro{
+          font-style: italic;
+          margin-top: 0.875rem;
+        }
         .history.expanded {
           max-height: 500px;
         }
       </style>
 
+      <div class="outer">
       <div class="first-row">
         <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator" class="progressbar">
           <svg width="${this._size}px" height="${this._size}px" viewBox="0 0 ${this._size} ${this._size}">
@@ -179,14 +204,18 @@ class ProgressComponent extends HTMLElement {
       </div>
       <div class="history ${this._isExpanded ? 'expanded' : ''}">
         <div class="intro">Message history:</div>
-        ${this._messageHistory.map((msg) => `<div>${msg}</div>`).join('')}
+        ${this._history.map((msg) => `<div>${msg}</div>`).join('')}
       </div>
+</div>
+      
     `;
 
-    this.shadowRoot.querySelector('.message').addEventListener('click', () => this.toggleExpand());
+    // Add event listeners for interactivity
+    this.shadowRoot!.querySelector('.message')?.addEventListener('click', () => this.toggleExpand());
   }
 
-  connectedCallback() {
+  // When the component is added to the DOM
+  connectedCallback(): void {
     this.render();
   }
 }

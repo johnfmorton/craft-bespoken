@@ -10,7 +10,7 @@ var ProgressComponent = class extends HTMLElement {
     this._success = false;
     this._count = 0;
     this._isExpanded = false;
-    this._messageHistory = [];
+    this._history = [];
     this.render();
   }
   // Define the attributes we want to observe
@@ -21,42 +21,42 @@ var ProgressComponent = class extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     switch (name) {
       case "progress":
-        this._progress = parseFloat(newValue);
+        this._progress = parseFloat(newValue || "0");
         break;
       case "size":
-        this._size = parseInt(newValue);
+        this._size = parseInt(newValue || "100");
         break;
       case "stroke-width":
-        this._strokeWidth = parseInt(newValue);
+        this._strokeWidth = parseInt(newValue || "0");
         break;
       case "message":
-        this._message = newValue;
+        this._message = newValue || "Idle status";
         this.updateMessageHistory();
         break;
       case "success":
         this._success = newValue === "true";
         break;
       case "count":
-        this._count = parseInt(newValue);
+        this._count = parseInt(newValue || "0");
         break;
     }
     this.render();
   }
   // Custom setters for setting properties directly
   set progress(value) {
-    this.setAttribute("progress", value);
+    this.setAttribute("progress", value.toString());
   }
   get progress() {
     return this._progress;
   }
   set size(value) {
-    this.setAttribute("size", value);
+    this.setAttribute("size", value.toString());
   }
   get size() {
     return this._size;
   }
   set strokeWidth(value) {
-    this.setAttribute("stroke-width", value);
+    this.setAttribute("stroke-width", value.toString());
   }
   get strokeWidth() {
     return this._strokeWidth;
@@ -68,30 +68,34 @@ var ProgressComponent = class extends HTMLElement {
     return this._message;
   }
   set success(value) {
-    this.setAttribute("success", value);
+    this.setAttribute("success", value.toString());
   }
   get success() {
     return this._success;
   }
   set count(value) {
-    this.setAttribute("count", value);
+    this.setAttribute("count", value.toString());
   }
   get count() {
     return this._count;
   }
+  // Update message history
   updateMessageHistory() {
     if (this._message) {
-      this._messageHistory = [...this._messageHistory.slice(-24), this._message];
+      this._history = [...this._history.slice(-24), this._message];
     }
   }
+  // Toggle expand/collapse of the history
   toggleExpand() {
     this._isExpanded = !this._isExpanded;
     this.render();
   }
+  // Calculate stroke width
   get calculatedStrokeWidth() {
     const defaultStrokeWidth = this._size / 2;
     return this._strokeWidth > 0 ? Math.min(this._strokeWidth, defaultStrokeWidth) : defaultStrokeWidth;
   }
+  // Render the component
   render() {
     const radius = this._size / 2 - this.calculatedStrokeWidth / 2;
     const circumference = 2 * Math.PI * radius;
@@ -100,15 +104,22 @@ var ProgressComponent = class extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host {
+          display: block;
+          max-width: 100%;
+          width: 100%;
+          font-size: 14px;
+          color: var(--color, rgb(89, 102, 115)); /* Allow overriding text color */
+        }
+        .outer {
           display: flex;
           flex-direction: column;
-          border-radius: 4px;
-          border: solid 1px rgb(204, 204, 204);
-          padding: 8px 10px;
           max-width: 100%;
           overflow: hidden;
-          font-size: 14px;
-          color: rgb(89, 102, 115);
+          border-radius: 4px;
+          border-style: solid;
+          border-size: 1px;
+          border-color: var(--border-color, rgba(96, 125, 159, 0.25)); /* Allow overriding border color */
+          padding: 8px 10px;
         }
         .first-row {
           display: flex;
@@ -142,11 +153,16 @@ var ProgressComponent = class extends HTMLElement {
           white-space: normal;
           font-size: 0.875em;
         }
+        .history .intro{
+          font-style: italic;
+          margin-top: 0.875rem;
+        }
         .history.expanded {
           max-height: 500px;
         }
       </style>
 
+      <div class="outer">
       <div class="first-row">
         <div role="progressbar" aria-valuenow="${this._progress * 100}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress indicator" class="progressbar">
           <svg width="${this._size}px" height="${this._size}px" viewBox="0 0 ${this._size} ${this._size}">
@@ -158,11 +174,14 @@ var ProgressComponent = class extends HTMLElement {
       </div>
       <div class="history ${this._isExpanded ? "expanded" : ""}">
         <div class="intro">Message history:</div>
-        ${this._messageHistory.map((msg) => `<div>${msg}</div>`).join("")}
+        ${this._history.map((msg) => `<div>${msg}</div>`).join("")}
       </div>
+</div>
+      
     `;
-    this.shadowRoot.querySelector(".message").addEventListener("click", () => this.toggleExpand());
+    this.shadowRoot.querySelector(".message")?.addEventListener("click", () => this.toggleExpand());
   }
+  // When the component is added to the DOM
   connectedCallback() {
     this.render();
   }
@@ -329,7 +348,7 @@ function _stripTagsExceptAllowedTags(text, allowedTags2) {
 // src/web/assets/bespokenassets/src/Bespoken.ts
 document.addEventListener("DOMContentLoaded", () => {
   if (!customElements.get("progress-component")) {
-    customElements.define("progress-component", void 0);
+    customElements.define("progress-component", ProgressComponent);
   }
   const buttons = document.querySelectorAll(".bespoken-generate");
   buttons.forEach((button) => {

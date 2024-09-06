@@ -52,12 +52,9 @@ class GenerateAudio extends BaseJob
             Bespoken::info('Job status updated to running' . __LINE__ . ' ' . __FILE__);
 
             // Call the Eleven Labs API
-
-//            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
-            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
-
-//            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Audio file generated for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
-            Bespoken::info('Job status updated to completed');
+            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            // The following is a debugging process for the file save process
+            // $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
@@ -70,8 +67,7 @@ class GenerateAudio extends BaseJob
      */
     protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId): void
     {
-//        $this->setProgress($queue, 0.25,
-//            'Downloading a test file with CURL');
+
         $this->setBespokeProgress($queue, $bespokenJobId, 0.25, 'Downloading a test file with CURL');
 
         // add a pause to simulate a long-running process
@@ -94,18 +90,13 @@ class GenerateAudio extends BaseJob
         // add a pause to simulate a long-running process
         sleep($this->sleepValue);
 
-//        $this->setProgress($queue, 0.5, 'Downloaded the test file correctly');
         $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Downloaded the test file correctly');
 
-
-//        $this->setProgress($queue, 0.6, 'FAKE ERROR: Error saving the audio file to the assets.');
         $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'FAKE ERROR: Error saving the audio file to the assets.');
 
         // add a pause to simulate a long-running process
         sleep($this->sleepValue * 2);
-//        $this->setProgress($queue, 0.7, 'post sleep');
         $this->setBespokeProgress($queue, $bespokenJobId, 0.7, 'post sleep');
-
         $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId);
     }
 
@@ -155,7 +146,6 @@ class GenerateAudio extends BaseJob
         $use_speaker_boost = $settings->use_speaker_boost;
         $model_id = $settings->voiceModel;
 
-//        $this->setProgress($queue, 0.1, 'Contacting the ElevenLabs API');
         $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Contacting the ElevenLabs API');
 
         // Set up the request headers
@@ -184,7 +174,7 @@ class GenerateAudio extends BaseJob
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
             CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 300, // 300 seconds = 5 mins,  note we're using CURLOPT_TIMEOUT, not CURLOPT_TIMEOUT_MS, which would be in milliseconds
+            CURLOPT_TIMEOUT => 300, // 300 seconds = 5 min,  note we're using CURLOPT_TIMEOUT, not CURLOPT_TIMEOUT_MS, which would be in milliseconds
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "POST",
             CURLOPT_POSTFIELDS => $data,
@@ -198,10 +188,8 @@ class GenerateAudio extends BaseJob
 
         if ($err) {
             Bespoken::error('cURL Error #:' . $err);
-//            $this->setProgress($queue, 1, 'Error contacting the ElevenLabs API. Details: ' . print_r($err, true));
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . print_r($err, true), 0);
         } else {
-//            $this->setProgress($queue, 0.5, 'Processing the audio file');
             $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Processing the audio file');
 
             // is response a JSON string? Don't throw an erorr
@@ -210,7 +198,6 @@ class GenerateAudio extends BaseJob
                 // If json_decode doesn't throw an error, then it is a JSON response
                 if ($response) {
                     Bespoken::info('Response from ElevenLabs API: ' . print_r($response, true));
-//                    $this->setProgress($queue, 1, 'Error in response from ElevenLabs API. Details: ' . print_r($response, true));
                     if (is_array($response) && isset($response['detail']['message'])) {
                         $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . $response['detail']['message'], 0);
                         return;
@@ -233,7 +220,6 @@ class GenerateAudio extends BaseJob
             $audio_file = $this->getTempDirectory() . '/audio-' . $timestamp . '.mp3';
 
             file_put_contents($audio_file, $audio_stream);
-//            $this->setProgress($queue, 0.65, 'Audio file processed in temporary directory');
             $this->setBespokeProgress($queue, $bespokenJobId, 0.65, 'Audio file processed in temporary directory');
 
             // Save the audio file to the Craft CMS assets

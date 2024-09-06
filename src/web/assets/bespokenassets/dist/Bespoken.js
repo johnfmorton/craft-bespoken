@@ -79,9 +79,9 @@ var ProgressComponent = class extends HTMLElement {
   get count() {
     return this._count;
   }
-  // Update message history
+  // Update message history, ignore duplicates
   updateMessageHistory() {
-    if (this._message) {
+    if (this._message && (this._history.length === 0 || this._history[this._history.length - 1] !== this._message)) {
       this._history = [...this._history.slice(-24), this._message];
     }
   }
@@ -176,7 +176,6 @@ var ProgressComponent = class extends HTMLElement {
         ${this._history.map((msg) => `<div>${msg}</div>`).join("")}
       </div>
 </div>
-      
     `;
     this.shadowRoot.querySelector(".message")?.addEventListener("click", () => this.toggleExpand());
   }
@@ -195,7 +194,10 @@ function updateProgressComponent(progressComponent, { progress, success, message
   progressComponent.setAttribute("progress", progress.toString());
   progressComponent.setAttribute("success", success);
   progressComponent.setAttribute("message", message);
-  progressComponent.style.setProperty("--progress-text-color", textColor);
+  if (!textColor) {
+    textColor = "rgb(89, 102, 115)";
+  }
+  progressComponent.style.setProperty("--color", textColor);
 }
 
 // src/web/assets/bespokenassets/src/startJobMonitor.ts
@@ -243,7 +245,8 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
-function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase) {
+function processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase) {
+  const actionUrlProcessText = `${actionUrlBase}/process-text`;
   updateProgressComponent(progressComponent, {
     progress: 0.11,
     success: true,
@@ -260,7 +263,7 @@ function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix,
     button.classList.remove("disabled");
     return;
   }
-  if (!actionUrl) {
+  if (!actionUrlProcessText) {
     updateProgressComponent(progressComponent, {
       progress: 0,
       success: false,
@@ -287,7 +290,7 @@ function processText(text, title, actionUrl, voiceId, elementId, fileNamePrefix,
     message: "Sending data to API",
     textColor: "rgb(89, 102, 115)"
   });
-  fetch(actionUrl, {
+  fetch(actionUrlProcessText, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -328,6 +331,7 @@ function _getFieldText(field) {
   let text = "";
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
     text = field.querySelector("textarea")?.value || "";
+    text = _removeFigureElements(text);
   } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
     const inputOrTextarea = field.querySelector(
       'input[type="text"][name^="fields["], textarea[name^="fields["]'
@@ -337,6 +341,13 @@ function _getFieldText(field) {
     }
   }
   return _stripTagsExceptAllowedTags(text, allowedTags);
+}
+function _removeFigureElements(input) {
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = input;
+  const figures = tempDiv.querySelectorAll("figure");
+  figures.forEach((figure) => figure.remove());
+  return tempDiv.innerHTML;
 }
 function _stripTagsExceptAllowedTags(text, allowedTags2) {
   const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
@@ -389,7 +400,6 @@ function handleButtonClick(event) {
     });
     text = text.trim();
   }
-  debugger;
   if (text.length === 0) {
     button.classList.remove("disabled");
     updateProgressComponent(progressComponent, {
@@ -401,12 +411,11 @@ function handleButtonClick(event) {
     return;
   }
   const actionUrlBase = button.getAttribute("data-action-url") || "";
-  const actionUrlProcessText = `${actionUrlBase}/process-text`;
   updateProgressComponent(progressComponent, {
     progress: 0.1,
     success: true,
     message: "Preparing data",
     textColor: "rgb(89, 102, 115)"
   });
-  processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
+  processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 }

@@ -105,12 +105,12 @@ export class ProgressComponent extends HTMLElement {
     return this._count;
   }
 
-  // Update message history
+  // Update message history, ignore duplicates
   private updateMessageHistory(): void {
-    if (this._message) {
-      this._history = [...this._history.slice(-24), this._message];
-    }
+  if (this._message && (this._history.length === 0 || this._history[this._history.length - 1] !== this._message)) {
+    this._history = [...this._history.slice(-24), this._message];
   }
+}
 
   // Toggle expand/collapse of the history
   private toggleExpand(): void {
@@ -206,7 +206,6 @@ export class ProgressComponent extends HTMLElement {
         ${this._history.map((msg) => `<div>${msg}</div>`).join('')}
       </div>
 </div>
-      
     `;
 
     // Add event listeners for interactivity

@@ -18,6 +18,8 @@ export function _getFieldText(field: HTMLElement): string {
 
     text = field.querySelector('textarea')?.value || '';
 
+    text = _removeFigureElements(text);
+
   } else if (field.getAttribute('data-type') === 'craft\\fields\\PlainText') {
 
     // this checks for an input field or a textarea field but only if the name attribute starts with 'fields['
@@ -35,6 +37,25 @@ export function _getFieldText(field: HTMLElement): string {
 
   }
   return _stripTagsExceptAllowedTags(text, allowedTags);
+}
+
+//*
+// * Remove all <figure> elements from the input string in CKEditor fields
+// * @param input
+// *
+function _removeFigureElements(input:string) {
+  // Create a temporary DOM element to work with
+  const tempDiv = document.createElement('div');
+
+  // Set the innerHTML of the div to the input string
+  tempDiv.innerHTML = input;
+
+  // Find all <figure> elements and remove them
+  const figures = tempDiv.querySelectorAll('figure');
+  figures.forEach(figure => figure.remove());
+
+  // Return the remaining text content of the div
+  return tempDiv.innerHTML;
 }
 
 function _stripTagsExceptAllowedTags(text: string, allowedTags: string[]): string {

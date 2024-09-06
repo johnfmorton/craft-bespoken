@@ -1,12 +1,10 @@
 import {updateProgressComponent} from "./updateProgressComponent";
 import {ProgressComponent} from "./progress-component-v2";
-
 import {startJobMonitor} from "./startJobMonitor";
 
 export function processText(
     text: string,
     title: string,
-    actionUrl: string,
     voiceId: string,
     elementId: string,
     fileNamePrefix: string,
@@ -14,6 +12,9 @@ export function processText(
     button: HTMLButtonElement,
     actionUrlBase: string
 ): void {
+
+    const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
+
     updateProgressComponent(progressComponent, {
         progress: 0.11,
         success: true,
@@ -34,7 +35,7 @@ export function processText(
     }
 
     // check to see if the actionUrl is empty
-    if (!actionUrl) {
+    if (!actionUrlProcessText) {
         updateProgressComponent(progressComponent, {
             progress: 0,
             success: false,
@@ -66,7 +67,7 @@ export function processText(
         textColor: 'rgb(89, 102, 115)'
     });
 
-    fetch(actionUrl, {
+    fetch(actionUrlProcessText, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
@@ -86,7 +87,8 @@ export function processText(
                 return;
             }
 
-            // look in the startJobMonitor function to see how the progress is updated
+            // look in the startJobMonitor function to see how
+            // the progress is updated
             startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase);
         })
         .catch(error => {

@@ -11,6 +11,11 @@ export function updateProgressComponent(progressComponent: ProgressComponent, { 
   progressComponent.setAttribute('success', success);
   progressComponent.setAttribute('message', message);
 
+  // if textColor is not provided, use the default value
+    if (!textColor) {
+        textColor = 'rgb(89, 102, 115)';
+    }
+
   // Set the custom CSS property for text color
-  progressComponent.style.setProperty('--progress-text-color', textColor);
+  progressComponent.style.setProperty('--color', textColor);
 }

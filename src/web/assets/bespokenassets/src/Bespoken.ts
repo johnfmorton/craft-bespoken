@@ -76,7 +76,7 @@ function handleButtonClick(event: Event): void {
         });
         text = text.trim();
     }
-    debugger;
+
     if (text.length === 0) {
         // Re-enable the button
         button.classList.remove('disabled');
@@ -90,16 +90,18 @@ function handleButtonClick(event: Event): void {
         return;
     }
 
+    // Text is now ready to be processed
+
     const actionUrlBase: string = button.getAttribute('data-action-url') || '';
-    const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
 
-
-    // Generate the audio by gathering all the required data and sending it to the action URL, process-text
-
-    // this will return the jobId and filename if the request is successful
-
-    // we will then need to start polling the job status to get the progress of the audio generation. Because this is an API call, the work
-    // is done in the background, and we need to poll the API to get the progress of the audio generation.
+    // What's going to happen next:
+    // Generate the audio by gathering all the required data and sending it to
+    // the action URL, process-text this will return the jobId and filename if
+    // the request is successful. If the request is successful, we will then
+    // need to start polling the job status to get the progress of the audio
+    // generation. Because this is an API call, the work is done in the
+    // background, and we need to poll the API to get the progress of the audio
+    // generation.
 
     updateProgressComponent(progressComponent, {
         progress: 0.1,
@@ -107,8 +109,7 @@ function handleButtonClick(event: Event): void {
         message: 'Preparing data',
         textColor: 'rgb(89, 102, 115)'
     });
-// debugger;
-    processText(text, title, actionUrlProcessText, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 
+    processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
 }
 

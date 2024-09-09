@@ -10,10 +10,10 @@ export function processText(
     fileNamePrefix: string,
     progressComponent: ProgressComponent,
     button: HTMLButtonElement,
-    actionUrlBase: string
+    actionUrlProcessText: string
 ): void {
 
-    const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
+    // const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
 
     updateProgressComponent(progressComponent, {
         progress: 0.11,
@@ -87,9 +87,16 @@ export function processText(
                 return;
             }
 
+            // we have the original Action URL of the process-text function
+            // it will look something like this:
+            // https://example.com/index.php/admin/actions/bespoken/bespoken/process-text?site=default
+            // https://example.com/index.php?p=admin/actions/bespoken/bespoken/process-text
+            const actionUrlJobStatus = _updateProcessTextActionUrl( actionUrlProcessText, `job-status&jobId=${bespokenJobId}`);
+
+
             // look in the startJobMonitor function to see how
             // the progress is updated
-            startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase);
+            startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus);
         })
         .catch(error => {
             updateProgressComponent(progressComponent, {
@@ -100,4 +107,22 @@ export function processText(
             });
         });
 
+}
+
+function _updateProcessTextActionUrl(url: string, newString: string): string {
+;
+    // Create a URL object to easily manipulate URL parts
+    const urlObj = new URL(url);
+
+    // Extract the href part of the URL object
+    let href: string = urlObj.href;
+
+    // Replace 'process-text' with the provided new string
+    href = href.replace('process-text', newString);
+
+    // Update the URL object with the modified href
+    urlObj.href = href;
+
+    // Return the modified URL as a string
+    return urlObj.toString();
 }

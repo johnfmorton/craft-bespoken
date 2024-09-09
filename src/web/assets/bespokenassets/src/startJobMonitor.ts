@@ -5,18 +5,14 @@ const pollingInterval = 1000;
 
 let howManyTimes = 0;
 
-export function startJobMonitor(bespokenJobId: string, progressComponent: ProgressComponent, button: HTMLButtonElement, actionUrlBase: string){
+export function startJobMonitor(bespokenJobId: string, progressComponent: ProgressComponent, button: HTMLButtonElement, actionUrlJobStatus: string){
     console.log('startJobMonitor', bespokenJobId);
     const interval = setInterval(async () => {
         howManyTimes++;
 
-        // the URL provided by Craft with include the ? already, which is why we don't need to include it here
-        // and only use the & to append the jobId, an example URL would be:
-        // https://example.com/index.php?p=admin/actions/bespoken/bespoken/job-status&jobId=fbc11bb5-f5a7-4ed7-a854-ac0bd3188807
-        const url = `${actionUrlBase}/job-status&jobId=${bespokenJobId}`;
 
         try {
-            const result = await fetch(url, {
+            const result = await fetch(actionUrlJobStatus, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'}
             });
@@ -66,3 +62,5 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
 
     }, pollingInterval);
 }
+
+

@@ -74,7 +74,7 @@ class GenerateAudio extends BaseJob
         sleep($this->sleepValue);
 
         // download a test file with CURL
-        $url = 'https://wellreadtest.ddev.site/test.mp3';
+        $url = 'https://bespoken-plugin.ddev.site/test.mp3';
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
         $tempFilePath = $tempDir . '/test' . $timestamp . '.mp3';

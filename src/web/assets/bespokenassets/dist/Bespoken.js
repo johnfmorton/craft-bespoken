@@ -233,13 +233,12 @@ function updateProgressComponent(progressComponent, { progress, success, message
 // src/web/assets/bespokenassets/src/startJobMonitor.ts
 var pollingInterval = 1e3;
 var howManyTimes = 0;
-function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase) {
+function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus) {
   console.log("startJobMonitor", bespokenJobId);
   const interval = setInterval(async () => {
     howManyTimes++;
-    const url = `${actionUrlBase}/job-status&jobId=${bespokenJobId}`;
     try {
-      const result = await fetch(url, {
+      const result = await fetch(actionUrlJobStatus, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
       });
@@ -275,8 +274,7 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
-function processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase) {
-  const actionUrlProcessText = `${actionUrlBase}/process-text`;
+function processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText) {
   updateProgressComponent(progressComponent, {
     progress: 0.11,
     success: true,
@@ -336,7 +334,8 @@ function processText(text, title, voiceId, elementId, fileNamePrefix, progressCo
       button.classList.remove("disabled");
       return;
     }
-    startJobMonitor(bespokenJobId, progressComponent, button, actionUrlBase);
+    const actionUrlJobStatus = _updateProcessTextActionUrl(actionUrlProcessText, `job-status&jobId=${bespokenJobId}`);
+    startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus);
   }).catch((error) => {
     updateProgressComponent(progressComponent, {
       progress: 0,
@@ -345,6 +344,14 @@ function processText(text, title, voiceId, elementId, fileNamePrefix, progressCo
       textColor: "rgb(126,7,7)"
     });
   });
+}
+function _updateProcessTextActionUrl(url, newString) {
+  ;
+  const urlObj = new URL(url);
+  let href = urlObj.href;
+  href = href.replace("process-text", newString);
+  urlObj.href = href;
+  return urlObj.toString();
 }
 
 // src/web/assets/bespokenassets/src/utils.ts
@@ -440,12 +447,12 @@ function handleButtonClick(event) {
     });
     return;
   }
-  const actionUrlBase = button.getAttribute("data-action-url") || "";
+  const actionUrl = button.getAttribute("data-action-url") || "";
   updateProgressComponent(progressComponent, {
     progress: 0.1,
     success: true,
     message: "Preparing data",
     textColor: "rgb(89, 102, 115)"
   });
-  processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
+  processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
 }

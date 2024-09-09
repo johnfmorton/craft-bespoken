@@ -92,7 +92,7 @@ function handleButtonClick(event: Event): void {
 
     // Text is now ready to be processed
 
-    const actionUrlBase: string = button.getAttribute('data-action-url') || '';
+    const actionUrl: string = button.getAttribute('data-action-url') || '';
 
     // What's going to happen next:
     // Generate the audio by gathering all the required data and sending it to
@@ -110,6 +110,6 @@ function handleButtonClick(event: Event): void {
         textColor: 'rgb(89, 102, 115)'
     });
 
-    processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlBase);
+    processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
 }
 

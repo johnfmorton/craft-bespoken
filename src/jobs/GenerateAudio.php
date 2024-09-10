@@ -54,7 +54,7 @@ class GenerateAudio extends BaseJob
             // Call the Eleven Labs API
             $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
             // The following is a debugging process for the file save process
-            //$this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            // $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());

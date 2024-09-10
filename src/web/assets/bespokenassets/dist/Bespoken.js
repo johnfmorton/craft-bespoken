@@ -315,7 +315,7 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
   updateProgressComponent(progressComponent, {
     progress: 0.15,
     success: true,
-    message: "Sending data to API",
+    message: "Starting audio generation job in queue system.",
     textColor: "rgb(89, 102, 115)"
   });
   fetch(actionUrlProcessText, {

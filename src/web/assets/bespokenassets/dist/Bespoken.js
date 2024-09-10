@@ -334,7 +334,7 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
       button.classList.remove("disabled");
       return;
     }
-    const actionUrlJobStatus = _updateProcessTextActionUrl(actionUrlProcessText, `job-status&jobId=${bespokenJobId}`);
+    const actionUrlJobStatus = _addJobIdToUrl(_updateProcessTextActionUrl(actionUrlProcessText, `job-status`), bespokenJobId);
     startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus);
   }).catch((error) => {
     updateProgressComponent(progressComponent, {
@@ -352,6 +352,16 @@ function _updateProcessTextActionUrl(url, newString) {
   href = href.replace("process-text", newString);
   urlObj.href = href;
   return urlObj.toString();
+}
+function _addJobIdToUrl(url, jobId) {
+  try {
+    const newUrl = new URL(url);
+    newUrl.searchParams.set("jobId", jobId);
+    return newUrl.toString();
+  } catch (error) {
+    console.error("Invalid URL provided", error);
+    return url;
+  }
 }
 
 // src/web/assets/bespokenassets/src/utils.ts

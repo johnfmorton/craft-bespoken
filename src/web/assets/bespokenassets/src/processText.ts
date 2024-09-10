@@ -90,7 +90,11 @@ export function processText(
             // it will look something like this:
             // https://example.com/index.php/admin/actions/bespoken/bespoken/process-text?site=default
             // https://example.com/index.php?p=admin/actions/bespoken/bespoken/process-text
-            const actionUrlJobStatus = _updateProcessTextActionUrl( actionUrlProcessText, `job-status&jobId=${bespokenJobId}`);
+            // now add &jobId=${bespokenJobId} to the URL
+            // so it will look like this:
+            // https://example.com/index.php?p=admin/actions/bespoken/bespoken/job-status?jobId=${bespokenJobId}
+            // or https://example.com/index.php/admin/actions/bespoken/bespoken/job-status?site=default&jobId=40fc345e-76de-4df0-941b-34418b009ffa
+            const actionUrlJobStatus = _addJobIdToUrl(_updateProcessTextActionUrl( actionUrlProcessText, `job-status`), bespokenJobId) ;
 
 
             // look in the startJobMonitor function to see how
@@ -124,4 +128,20 @@ function _updateProcessTextActionUrl(url: string, newString: string): string {
 
     // Return the modified URL as a string
     return urlObj.toString();
+}
+
+function _addJobIdToUrl(url: string, jobId: string): string {
+  try {
+    // Create a new URL object
+    const newUrl = new URL(url);
+
+    // Add the "jobId" parameter with the passed jobId value
+    newUrl.searchParams.set('jobId', jobId);
+
+    // Return the modified URL as a string
+    return newUrl.toString();
+  } catch (error) {
+    console.error("Invalid URL provided", error);
+    return url; // Return the original URL if there is an error
+  }
 }

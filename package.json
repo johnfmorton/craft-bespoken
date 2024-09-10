@@ -1,5 +1,5 @@
 {
-  "name": "bespoken",
+  "name": "bespoken-buildsystem",
   "version": "1.0.0",
   "description": "Build system for assets related to the Bespoken Craft CMS plugin",
   "main": "index.js",

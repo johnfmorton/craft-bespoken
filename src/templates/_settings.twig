@@ -1,9 +1,9 @@
 {# @var plugin \johnfmorton\wellread\WellRead #}
 {# @var settings \johnfmorton\wellread\models\Settings #}
 
-<h2 class="first">ElevenLabs account details and settings</h2>
+<h2 class="first">ElevenLabs account details</h2>
 
-{# TODO: put this in the translations file #}
+{# TODO: put the following text into the translations file #}
 
 <p>The Bespoken plugin integrates your ElevenLabs account with Craft CMS. If you do not have an ElevenLabs account, sign up <a href="https://elevenlabs.io/?from=partnergomez2285">here</a>. This is a referral link which will help continue development of the plugin.</p>
 
@@ -21,7 +21,10 @@
     value: settings['elevenlabsApiKey']})
 }}
 
-{#{{ dump(settings) }}#}
+<hr>
+
+<h2>Voice configuration</h2>
+
 
 {% set input %}
 {{ forms.radioGroup({
@@ -49,11 +52,7 @@
     input
 ) }}
 
-<hr>
 
-<h2>Voice configuration</h2>
-
-{# save the voice id uju3wxzG5OhpWcoi3SMy#}
 {% set input %}
 {{  forms.editableTable({
     id: 'voices',
@@ -99,7 +98,8 @@
     input
 ) }}
 
-{# Now add a table for Pronunciation with a word and pronunciation column #}
+{# Table for Pronunciation with a word and pronunciation column #}
+
 {% set input %}
 {{  forms.editableTable({
     id: 'pronunciations',
@@ -129,7 +129,7 @@
         }
     },
     rows: settings['pronunciations'] ?? [],
-})
+    })
 }}
 {% endset %}
 
@@ -144,22 +144,18 @@
     input
 ) }}
 
-
-
+<hr>
 
 <h2>File save options</h2>
+
+<p>Bespoken will save the audio files it creates as native Craft CMS Assets. The filesystem can be local or a cloud provider.</p>
 
 {% set craftAssetVolumes =  [] %}
 
 {# Loop through the array #}
 {% for volume in craft.app.volumes.allVolumes %}
-{#    <p>{{ volume.name }} : {{ volume.handle }}</p>#}
     {% set craftAssetVolumes = craftAssetVolumes|merge([{label: volume.name, value: volume.handle}]) %}
 {% endfor %}
-
-{# dump the array #}
-
-{#{{ dump(craftAssetVolumes) }}#}
 
 {{ forms.selectField(
     {
@@ -192,7 +188,6 @@
     }
 ) }}
 
-
 {{ forms.textField(
     {
         label: 'Similarity boost' | t('bespoken'),
@@ -204,7 +199,6 @@
         errors: settings.getErrors('similarity_boost')
     }
 ) }}
-
 
 {{ forms.textField(
     {

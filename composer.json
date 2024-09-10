@@ -1,7 +1,8 @@
 {
   "name": "johnfmorton/craft-bespoken",
-  "description": "Customizable, high-quality text-to-speech generation for Craft CMS",
+  "description": "Customizable, high-quality text-to-speech generation for Craft CMS.",
   "type": "craft-plugin",
+  "version": "5.0.0",
   "license": "proprietary",
   "support": {
     "email": "john+bespoken@johnfmorton.com",

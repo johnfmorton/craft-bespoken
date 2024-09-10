@@ -141,13 +141,13 @@ class BespokenController extends Controller
         // Step 1: Remove special characters and trim leading/trailing spaces
         $cleanText = preg_replace('/[^\w\s]/u', '', trim($text));
 //
-//        // Step 2: Replace multiple spaces with a single hyphen
+//        // REMOVED: Replace multiple spaces with a single hyphen
 //        $cleanText = preg_replace('/\s+/', '-', $cleanText);
 //
-//        // Step 3: Convert to lowercase
+//        // REMOVED: Convert to lowercase
 //        $cleanText = strtolower($cleanText);
 //
-//        // Step 4: If a limit is set, truncate the string to the limit
+//        // Step 2: If a limit is set, truncate the string to the limit
         if (is_numeric($limit)) {
             $cleanText = substr($cleanText, 0, $limit);
         }

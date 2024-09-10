@@ -76,12 +76,8 @@ class BespokenService extends Component
             ];
         }
 
-
         return [
-//            'text' => $text,
-//            'elementId' => $elementId,
             'jobId' => $jobId,
-//            'voiceId' => $voiceId,
             'success' => true,
             'filename' => $filename,
             'bespokenJobId' => $bespokenJobId,
@@ -117,88 +113,6 @@ class BespokenService extends Component
      * @param $title
      * @return string
      */
-    public function jobMonitorOld($jobId): array
-    {
-        if (!$jobId) {
-            return [
-                'success' => false,
-                'message' => 'Job ID is required',
-            ];
-        }
-
-        $queue = Craft::$app->getQueue();
-
-        // Try to get the job by jobId
-        $job = (new \craft\db\Query())
-            ->select(['id', 'progress', 'description', 'timeUpdated', 'progressLabel'])
-            ->from('{{%queue}}')
-            ->where(['id' => $jobId])
-            ->one();
-
-        $jobProgress = $job['progress'];
-
-        $jobWaiting = $queue->isWaiting($jobId);
-        $jobReserved = $queue->isReserved($jobId);
-        // check if the job is done, but I doubt this is necessary given the conditional above
-        $jobDone = $queue->isDone($jobId);
-
-        // confirm that the job exists
-        if (!$job) {
-
-            return [
-                'status' => 'unknown',
-                'success' => false,
-                'description' => 'The job is not found in the queue.',
-            ];
-        }
-
-        if ($jobWaiting) {
-            $status = [
-                'status' => 'waiting',
-                'success' => true,
-                'jobId' => $jobId,
-                'progress' => $jobProgress,
-                'description' => $job['description'],
-                'progressLabel' => $job['progressLabel'],
-                'lastUpdated' => $job['timeUpdated'],
-            ];
-        } elseif ($jobReserved) {
-            $status = [
-                'status' => 'reserved',
-                'success' => true,
-                'jobId' => $jobId,
-                'progress' => $jobProgress,
-                'description' => $job['description'],
-                'progressLabel' => $job['progressLabel'],
-                'lastUpdated' => $job['timeUpdated'],
-            ];
-        } elseif ($jobDone) {
-
-
-
-            $status = [
-                'status' => 'done',
-                'success' => true,
-                'jobId' => $jobId,
-                'progress' => $jobProgress,
-                'description' => $job['description'],
-                'progressLabel' => $job['progressLabel'],
-                'lastUpdated' => $job['timeUpdated'],
-            ];
-        } else {
-            $status = [
-                'status' => 'unknown',
-                'success' => false,
-                'description' => 'Job status is not in the queue.',
-                'jobId' => $jobId,
-            ];
-        }
-
-        return $status;
-
-
-    }
-
     private function _generateFilename($title): string
     {
         // the title needs to be formatted to remove spaces and special characters
@@ -216,7 +130,7 @@ class BespokenService extends Component
         if (!empty($title)) {
             return $title . '-audio-' . $timestamp . $extension;
         }
-        // fall bad to using the element ID
-        return 'audio-file-entry-' . $timestamp . $extension;
+        // fallback file name
+        return 'audio-file-' . $timestamp . $extension;
     }
 }

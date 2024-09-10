@@ -52,9 +52,9 @@ class GenerateAudio extends BaseJob
             Bespoken::info('Job status updated to running' . __LINE__ . ' ' . __FILE__);
 
             // Call the Eleven Labs API
-            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            //$this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
             // The following is a debugging process for the file save process
-            //$this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
@@ -90,13 +90,13 @@ class GenerateAudio extends BaseJob
         // add a pause to simulate a long-running process
         sleep($this->sleepValue);
 
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Downloaded the test file correctly');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Success. Downloaded the test file.');
 
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'FAKE ERROR: Error saving the audio file to the assets.');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'Preparing file for Craft assets part 1');
 
         // add a pause to simulate a long-running process
         sleep($this->sleepValue * 2);
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.7, 'post sleep');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.7, 'Preparing file for Craft assets part 2');
         $this->saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId);
     }
 

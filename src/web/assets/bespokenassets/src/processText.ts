@@ -4,7 +4,6 @@ import {startJobMonitor} from "./startJobMonitor";
 
 export function processText(
     text: string,
-    title: string,
     voiceId: string,
     elementId: string,
     fileNamePrefix: string,
@@ -58,7 +57,7 @@ export function processText(
         return;
     }
 
-    const data = {text, voiceId, entryTitle: title, fileNamePrefix, elementId};
+    const data = {text, voiceId, fileNamePrefix, elementId};
 
     updateProgressComponent(progressComponent, {
         progress: 0.15,

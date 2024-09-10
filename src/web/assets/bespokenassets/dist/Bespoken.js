@@ -274,7 +274,7 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
-function processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText) {
+function processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText) {
   updateProgressComponent(progressComponent, {
     progress: 0.11,
     success: true,
@@ -311,7 +311,7 @@ function processText(text, title, voiceId, elementId, fileNamePrefix, progressCo
     button.classList.remove("disabled");
     return;
   }
-  const data = { text, voiceId, entryTitle: title, fileNamePrefix, elementId };
+  const data = { text, voiceId, fileNamePrefix, elementId };
   updateProgressComponent(progressComponent, {
     progress: 0.15,
     success: true,
@@ -373,9 +373,7 @@ function _getFieldText(field) {
     const inputOrTextarea = field.querySelector(
       'input[type="text"][name^="fields["], textarea[name^="fields["]'
     );
-    if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
-      text = inputOrTextarea.value;
-    }
+    text = field.querySelector("input")?.value || field.querySelector("textarea")?.value || "";
   }
   return _stripTagsExceptAllowedTags(text, allowedTags);
 }
@@ -386,9 +384,24 @@ function _removeFigureElements(input) {
   figures.forEach((figure) => figure.remove());
   return tempDiv.innerHTML;
 }
-function _stripTagsExceptAllowedTags(text, allowedTags2) {
+function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
+  const blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"];
   const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
-  let strippedText = text.replace(/<\/p>/g, " </p>").replace(/<\/?[^>]+(>|$)/g, (match) => allowedTagsPattern.test(match) ? match : "");
+  const blockElementsPattern = new RegExp(`<(/?(${blockElements.join("|")}))\\b[^>]*>`, "gi");
+  let strippedText = text.replace(/<\/?[^>]+(>|$)/g, (match) => {
+    if (allowedTagsPattern.test(match)) {
+      return match;
+    }
+    if (blockElementsPattern.test(match)) {
+      let tagContent = match.replace(/<\/?[^>]+(>|$)/g, "").trim();
+      if (tagContent && !/[.!?]$/.test(tagContent)) {
+        return tagContent + ". ";
+      }
+      return tagContent + " ";
+    }
+    let inlineContent = match.replace(/<\/?[^>]+(>|$)/g, "").trim();
+    return inlineContent ? inlineContent + " " : "";
+  });
   return strippedText.replace(/\s+/g, " ").trim();
 }
 
@@ -428,14 +441,15 @@ function handleButtonClick(event) {
         text += titleToAdd + " ";
       } else {
         const targetField = document.getElementById(`fields-${handle}-field`);
+        debugger;
         if (targetField) {
           const textStep1 = _getFieldText(targetField);
-          const textToAdd = textStep1.endsWith(".") ? textStep1 : textStep1 + ".";
-          text += textToAdd + " ";
+          text += textStep1 + " ";
         }
       }
     });
     text = text.trim();
+    debugger;
   }
   if (text.length === 0) {
     button.classList.remove("disabled");
@@ -454,5 +468,5 @@ function handleButtonClick(event) {
     message: "Preparing data",
     textColor: "rgb(89, 102, 115)"
   });
-  processText(text, title, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
+  processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
 }

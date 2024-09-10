@@ -26,15 +26,14 @@ export function _getFieldText(field: HTMLElement): string {
     // this is to accommodate how Craft CMS shows the field handles when a developer
     // has their account set to show field handles instead of field labels
     const inputOrTextarea = field.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-    'input[type="text"][name^="fields["], textarea[name^="fields["]'
-  );
-      if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
-        text = inputOrTextarea.value;
-      }
+        'input[type="text"][name^="fields["], textarea[name^="fields["]'
+      );
 
-    // text = field.querySelector('input')?.value || field.querySelector('textarea')?.value || '';
+      // if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
+      //   text = inputOrTextarea.value;
+      // }
 
-
+    text = field.querySelector('input')?.value || field.querySelector('textarea')?.value || '';
   }
   return _stripTagsExceptAllowedTags(text, allowedTags);
 }
@@ -58,8 +57,44 @@ function _removeFigureElements(input:string) {
   return tempDiv.innerHTML;
 }
 
-function _stripTagsExceptAllowedTags(text: string, allowedTags: string[]): string {
+function _stripTagsExceptAllowedTags(text, allowedTags = []) {
+  // Define block elements that should end with punctuation
+  const blockElements = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+
+  // Create a regex pattern for allowed tags
   const allowedTagsPattern = new RegExp(`<(\/?(${allowedTags.join('|')}))\\b[^>]*>`, 'gi');
-  let strippedText = text.replace(/<\/p>/g, ' </p>').replace(/<\/?[^>]+(>|$)/g, match => allowedTagsPattern.test(match) ? match : '');
+
+  // Create a regex pattern for block elements
+  const blockElementsPattern = new RegExp(`<(\/?(${blockElements.join('|')}))\\b[^>]*>`, 'gi');
+
+  // Strip tags and process the content
+  let strippedText = text.replace(/<\/?[^>]+(>|$)/g, match => {
+    // Check if the tag is allowed
+    if (allowedTagsPattern.test(match)) {
+      return match; // Keep allowed tags
+    }
+
+    // Process block elements
+    if (blockElementsPattern.test(match)) {
+      // Get the content inside the block element
+      let tagContent = match.replace(/<\/?[^>]+(>|$)/g, '').trim();
+
+      // If the content doesn't end with punctuation, add a period
+      if (tagContent && !/[.!?]$/.test(tagContent)) {
+        return tagContent + '. ';
+      }
+
+      // If it already ends with punctuation, just add a space
+      return tagContent + ' ';
+    }
+
+    // For inline elements, just return the content with a space
+    let inlineContent = match.replace(/<\/?[^>]+(>|$)/g, '').trim();
+    return inlineContent ? inlineContent + ' ' : '';
+  });
+
+  // Replace multiple spaces with a single space and trim the result
   return strippedText.replace(/\s+/g, ' ').trim();
 }
+
+

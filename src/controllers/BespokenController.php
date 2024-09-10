@@ -48,11 +48,22 @@ class BespokenController extends Controller
 
         $text = $postData['text'];
         $voiceId = $postData['voiceId'];
-        $entryTitle = $postData['entryTitle'];
         $fileNamePrefix = $postData['fileNamePrefix'];
         $elementId = $this->_confirmAndCastToInt($postData['elementId']);
 
+        // retrieve the element by the elementId
+        $element = Craft::$app->elements->getElementById($elementId);
 
+        // if the element is not found, return an error
+        if (!$element) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Element not found'
+            ]);
+        }
+
+        // Retrieve the title of the element
+        $entryTitle = $this->_cleanTitle($element->title, 15);
 
         // call the sendTextToElevenLabsApi service method
         $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix);
@@ -105,4 +116,31 @@ class BespokenController extends Controller
         return 0;
 
     }
+
+    /**
+     * Helper function to clean up a title
+     *
+     * @param string $text
+     * @param int|null $limit
+     * @return string
+     */
+    private function _cleanTitle(string $text, int $limit = null): string
+    {
+    // Step 1: Remove special characters and trim leading/trailing spaces
+    $cleanText = preg_replace('/[^\w\s]/u', '', trim($text));
+
+    // Step 2: Replace multiple spaces with a single hyphen
+    $cleanText = preg_replace('/\s+/', '-', $cleanText);
+
+    // Step 3: Convert to lowercase
+    $cleanText = strtolower($cleanText);
+
+    // Step 4: If a limit is set, truncate the string to the limit
+    if (is_numeric($limit)) {
+        $cleanText = substr($cleanText, 0, $limit);
+    }
+
+    return $cleanText;
+}
+
 }

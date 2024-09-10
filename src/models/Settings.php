@@ -3,6 +3,7 @@
 namespace johnfmorton\bespoken\models;
 
 use craft\base\Model;
+use johnfmorton\bespoken\validators\BespokenPronuciationValidator;
 use johnfmorton\bespoken\validators\BespokenSettingZeroToOneValidator;
 use johnfmorton\bespoken\validators\BespokenVoicesValidator;
 
@@ -18,6 +19,21 @@ class Settings extends Model
         [
             'voice' => "Brian (Default)",
             'voiceId' => "nPczCjzI2devNBz1zQrb"
+        ]
+    ];
+
+    public array $pronunciations = [
+        [
+            'word' => 'DDEV',
+            'pronunciation' => 'deedev'
+        ],
+        [
+            'word' => 'colonel',
+            'pronunciation' => 'kernel'
+        ],
+        [
+            'word' => 'bologna',
+            'pronunciation' => 'baloney'
         ]
     ];
 
@@ -102,6 +118,7 @@ class Settings extends Model
             ['elevenlabsApiKey', 'string'],
             ['elevenlabsApiKey', 'default', 'value' => ''],
             ['voices', BespokenVoicesValidator::class],
+            ['pronunciations', BespokenPronuciationValidator::class],
             ['voiceModel', 'string'],
             ['voiceModel', 'default', 'value' => 'eleven_multilingual_v2'],
             ['model_id', 'string'],

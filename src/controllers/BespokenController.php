@@ -47,6 +47,18 @@ class BespokenController extends Controller
         $postData = Craft::$app->request->post();
 
         $text = $postData['text'];
+
+        // Get the list of pronunciations from the settings model
+        $pronunciations = BespokenPlugin::getInstance()->getSettings()->pronunciations;
+
+        // Loop through the pronunciations and replace the word with the pronunciation, regardless of case
+        foreach ($pronunciations as $pronunciation) {
+            $text = str_ireplace($pronunciation['word'], $pronunciation['pronunciation'], $text);
+        }
+
+        BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
+
+
         $voiceId = $postData['voiceId'];
         $fileNamePrefix = $postData['fileNamePrefix'];
         $elementId = $this->_confirmAndCastToInt($postData['elementId']);

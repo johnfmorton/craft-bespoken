@@ -99,6 +99,54 @@
     input
 ) }}
 
+{# Now add a table for Pronunciation with a word and pronunciation column #}
+{% set input %}
+{{  forms.editableTable({
+    id: 'pronunciations',
+    minRows: 0,
+    initJs: true,
+    name: 'pronunciations',
+    static: false,
+    staticRows: false,
+    addRowLabel: 'Add a new pronunciation'|t('bespoken'),
+    allowAdd: true,
+    allowReorder: false,
+    allowDelete: true,
+    cols: {
+        word: {
+            heading: 'Word' | t('bespoken'),
+            type: 'singleline',
+            width: '50%',
+            handle: 'word',
+            class: 'code'
+        },
+        pronunciation: {
+            heading: 'Pronunciation' | t('bespoken'),
+            type: 'singleline',
+            width: '50%',
+            handle: 'pronunciation',
+            class: 'code'
+        }
+    },
+    rows: settings['pronunciations'] ?? [],
+})
+}}
+{% endset %}
+
+{{ forms.field(
+    {
+        label: 'Pronunciations'|t('wellread'),
+        instructions: 'Pronunciations instructions' | t('bespoken'),
+        name: 'pronunciations',
+        id: 'pronunciations',
+        errors: settings.errors.pronunciations ?? []
+    },
+    input
+) }}
+
+
+
+
 <h2>File save options</h2>
 
 {% set craftAssetVolumes =  [] %}

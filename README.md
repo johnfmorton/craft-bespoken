@@ -1,6 +1,14 @@
 # Bespoken
 
-Text-to-speech generation with ElevenLabs for Craft CMS
+_Bespoken_ uses the ElevenLabs API to bring customizable, high-quality narration to Craft CMS. With the click of a button in the control panel, your content becomes accessible to a broader audience. 
+
+## Highlights
+
+* Users can create audio narration of posts with a single click.
+* Audio files are saved as native Assets and are usable anywhere in Craft.
+* Use any of ElevenLab's professional voice models.
+* Create your custom voice models for use with your site.
+* Create a set of custom pronunciations for unique words used in your site.
 
 ## Requirements
 
@@ -28,3 +36,21 @@ composer require johnfmorton/craft-bespoken
 # tell Craft to install the plugin
 ./craft plugin/install bespoken
 ```
+
+## Set up
+
+1. Create an account with ElevenLabs and get your API key.
+2. Add your API key to the plugin settings.
+3. Choose a voice model for your site.
+4. Customize the voices available on your site. The voice ID is the ID from the ElevenLabs API, but you can use any name you like.
+5. Create a set of custom pronunciations for unique words used in your site.
+6. Create an Asset volume to store the audio files and choose it in the plugin settings.
+7. Leave the Advanced settings as they are unless you have a specific need to change them.
+
+## Create a Bespoken field
+
+1. Create a new field in Craft.
+2. Choose the Bespoken field type.
+3. Choose at least one fieldHandle from the entry to narrate. Multiple field handles can be included, separated by commas. Consider including the title field as your first field.
+4. Optionally, you can provide a prefix for the filename of your audio file.
+5. Choose at least one voice for the field. 

@@ -105,16 +105,16 @@ class BespokenController extends Controller
 
     /**
      * Helper function to confirm that the elementId is an integer
+     *
      * @param mixed $elementId
      * @return int
      */
     private function _confirmAndCastToInt(mixed $elementId): int
     {
         if (is_numeric($elementId)) {
-            return (int) $elementId;
+            return (int)$elementId;
         }
         return 0;
-
     }
 
     /**
@@ -126,21 +126,21 @@ class BespokenController extends Controller
      */
     private function _cleanTitle(string $text, int $limit = null): string
     {
-    // Step 1: Remove special characters and trim leading/trailing spaces
-    $cleanText = preg_replace('/[^\w\s]/u', '', trim($text));
+        // Step 1: Remove special characters and trim leading/trailing spaces
+        $cleanText = preg_replace('/[^\w\s]/u', '', trim($text));
+//
+//        // Step 2: Replace multiple spaces with a single hyphen
+//        $cleanText = preg_replace('/\s+/', '-', $cleanText);
+//
+//        // Step 3: Convert to lowercase
+//        $cleanText = strtolower($cleanText);
+//
+//        // Step 4: If a limit is set, truncate the string to the limit
+        if (is_numeric($limit)) {
+            $cleanText = substr($cleanText, 0, $limit);
+        }
 
-    // Step 2: Replace multiple spaces with a single hyphen
-    $cleanText = preg_replace('/\s+/', '-', $cleanText);
-
-    // Step 3: Convert to lowercase
-    $cleanText = strtolower($cleanText);
-
-    // Step 4: If a limit is set, truncate the string to the limit
-    if (is_numeric($limit)) {
-        $cleanText = substr($cleanText, 0, $limit);
+        return $cleanText;
     }
-
-    return $cleanText;
-}
 
 }

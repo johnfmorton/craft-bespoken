@@ -278,7 +278,7 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
   updateProgressComponent(progressComponent, {
     progress: 0.11,
     success: true,
-    message: "Generating audio...",
+    message: "Data prepared for API call.",
     textColor: "rgb(89, 102, 115)"
   });
   if (!text) {
@@ -369,13 +369,14 @@ function _getFieldText(field) {
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
     text = field.querySelector("textarea")?.value || "";
     text = _removeFigureElements(text);
+    text = _stripTagsExceptAllowedTags(text, allowedTags);
   } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
-    const inputOrTextarea = field.querySelector(
-      'input[type="text"][name^="fields["], textarea[name^="fields["]'
-    );
-    text = field.querySelector("input")?.value || field.querySelector("textarea")?.value || "";
+    text = _getFieldValue(field);
+    if (!/[.!?]\s*$/.test(text)) {
+      text += ". ";
+    }
   }
-  return _stripTagsExceptAllowedTags(text, allowedTags);
+  return text;
 }
 function _removeFigureElements(input) {
   const tempDiv = document.createElement("div");
@@ -388,21 +389,38 @@ function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
   const blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"];
   const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
   const blockElementsPattern = new RegExp(`<(/?(${blockElements.join("|")}))\\b[^>]*>`, "gi");
-  let strippedText = text.replace(/<\/?[^>]+(>|$)/g, (match) => {
-    if (allowedTagsPattern.test(match)) {
-      return match;
-    }
-    if (blockElementsPattern.test(match)) {
-      let tagContent = match.replace(/<\/?[^>]+(>|$)/g, "").trim();
-      if (tagContent && !/[.!?]$/.test(tagContent)) {
-        return tagContent + ". ";
+  let strippedText = "";
+  let currentIndex = 0;
+  text.replace(/<\/?[^>]+>/g, (match, offset) => {
+    let contentBeforeTag = text.slice(currentIndex, offset).trim();
+    if (contentBeforeTag) {
+      strippedText += contentBeforeTag;
+      if (blockElementsPattern.test(text.slice(currentIndex))) {
+        if (!/[.!?]$/.test(contentBeforeTag)) {
+          strippedText += ".";
+        }
       }
-      return tagContent + " ";
+      strippedText += " ";
     }
-    let inlineContent = match.replace(/<\/?[^>]+(>|$)/g, "").trim();
-    return inlineContent ? inlineContent + " " : "";
+    if (allowedTagsPattern.test(match)) {
+      strippedText += match;
+    }
+    currentIndex = offset + match.length;
   });
+  let remainingContent = text.slice(currentIndex).trim();
+  if (remainingContent) {
+    strippedText += remainingContent;
+    if (blockElementsPattern.test(remainingContent)) {
+      if (!/[.!?]$/.test(remainingContent)) {
+        strippedText += ".";
+      }
+    }
+  }
   return strippedText.replace(/\s+/g, " ").trim();
+}
+function _getFieldValue(element) {
+  const inputElement = element.querySelector('input[name^="fields["], textarea[name^="fields["]');
+  return inputElement ? inputElement.value : null;
 }
 
 // src/web/assets/bespokenassets/src/Bespoken.ts
@@ -441,15 +459,13 @@ function handleButtonClick(event) {
         text += titleToAdd + " ";
       } else {
         const targetField = document.getElementById(`fields-${handle}-field`);
-        debugger;
         if (targetField) {
           const textStep1 = _getFieldText(targetField);
-          text += textStep1 + " ";
+          text += textStep1;
         }
       }
     });
     text = text.trim();
-    debugger;
   }
   if (text.length === 0) {
     button.classList.remove("disabled");

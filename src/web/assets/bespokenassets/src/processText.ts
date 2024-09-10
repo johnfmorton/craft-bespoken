@@ -17,7 +17,7 @@ export function processText(
     updateProgressComponent(progressComponent, {
         progress: 0.11,
         success: true,
-        message: 'Generating audio...',
+        message: 'Data prepared for API call.',
         textColor: 'rgb(89, 102, 115)'
     });
 

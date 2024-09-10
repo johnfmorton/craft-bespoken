@@ -20,22 +20,23 @@ export function _getFieldText(field: HTMLElement): string {
 
     text = _removeFigureElements(text);
 
+    text = _stripTagsExceptAllowedTags(text, allowedTags)
+
   } else if (field.getAttribute('data-type') === 'craft\\fields\\PlainText') {
 
     // this checks for an input field or a textarea field but only if the name attribute starts with 'fields['
     // this is to accommodate how Craft CMS shows the field handles when a developer
     // has their account set to show field handles instead of field labels
-    const inputOrTextarea = field.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-        'input[type="text"][name^="fields["], textarea[name^="fields["]'
-      );
+    text = _getFieldValue(field);
 
-      // if (inputOrTextarea instanceof HTMLInputElement || inputOrTextarea instanceof HTMLTextAreaElement) {
-      //   text = inputOrTextarea.value;
-      // }
-
-    text = field.querySelector('input')?.value || field.querySelector('textarea')?.value || '';
+    // The field must end with a period || question mark and a space
+    if (!/[.!?]\s*$/.test(text)) {
+      text += '. ';
+    }
+    //
+    // debugger;
   }
-  return _stripTagsExceptAllowedTags(text, allowedTags);
+  return text;
 }
 
 //*
@@ -67,34 +68,62 @@ function _stripTagsExceptAllowedTags(text, allowedTags = []) {
   // Create a regex pattern for block elements
   const blockElementsPattern = new RegExp(`<(\/?(${blockElements.join('|')}))\\b[^>]*>`, 'gi');
 
-  // Strip tags and process the content
-  let strippedText = text.replace(/<\/?[^>]+(>|$)/g, match => {
-    // Check if the tag is allowed
-    if (allowedTagsPattern.test(match)) {
-      return match; // Keep allowed tags
-    }
+  // Function to strip tags and handle block/inline content correctly
+  let strippedText = '';
+  let currentIndex = 0;
 
-    // Process block elements
-    if (blockElementsPattern.test(match)) {
-      // Get the content inside the block element
-      let tagContent = match.replace(/<\/?[^>]+(>|$)/g, '').trim();
+  // Iterate over the HTML and replace tags with content
+  text.replace(/<\/?[^>]+>/g, (match, offset) => {
+    // Add the content before the tag
+    let contentBeforeTag = text.slice(currentIndex, offset).trim();
 
-      // If the content doesn't end with punctuation, add a period
-      if (tagContent && !/[.!?]$/.test(tagContent)) {
-        return tagContent + '. ';
+    if (contentBeforeTag) {
+      strippedText += contentBeforeTag;
+
+      // If this is a block element, ensure it ends with punctuation
+      if (blockElementsPattern.test(text.slice(currentIndex))) {
+        if (!/[.!?]$/.test(contentBeforeTag)) {
+          strippedText += '.';
+        }
       }
 
-      // If it already ends with punctuation, just add a space
-      return tagContent + ' ';
+      strippedText += ' '; // Add a space after block content
     }
 
-    // For inline elements, just return the content with a space
-    let inlineContent = match.replace(/<\/?[^>]+(>|$)/g, '').trim();
-    return inlineContent ? inlineContent + ' ' : '';
+    // Check if the tag is allowed
+    if (allowedTagsPattern.test(match)) {
+      strippedText += match; // Keep allowed tags
+    }
+
+    // Update the current index to just after the current tag
+    currentIndex = offset + match.length;
   });
+
+  // Add the final part of the string (after the last tag)
+  let remainingContent = text.slice(currentIndex).trim();
+  if (remainingContent) {
+    strippedText += remainingContent;
+
+    // Ensure punctuation for block elements
+    if (blockElementsPattern.test(remainingContent)) {
+      if (!/[.!?]$/.test(remainingContent)) {
+        strippedText += '.';
+      }
+    }
+  }
 
   // Replace multiple spaces with a single space and trim the result
   return strippedText.replace(/\s+/g, ' ').trim();
+}
+
+
+
+function _getFieldValue(element: HTMLElement): string | null {
+    // Select the first input or textarea element that has a name attribute that starts with "fields["
+    const inputElement = element.querySelector<HTMLInputElement | HTMLTextAreaElement>('input[name^="fields["], textarea[name^="fields["]');
+
+    // If the element exists, return its value, otherwise return null
+    return inputElement ? inputElement.value : null;
 }
 
 

@@ -4,6 +4,12 @@
   "type": "craft-plugin",
   "version": "5.0.0",
   "license": "proprietary",
+  "authors": [
+    {
+      "name": "John F Morton",
+      "homepage": "https://jmx2.com/"
+    }
+  ],
   "support": {
     "email": "john+bespoken@johnfmorton.com",
     "issues": "https://github.com/johnfmorton/craft-bespoken/issues?state=open",
@@ -28,7 +34,7 @@
   "extra": {
     "handle": "bespoken",
     "name": "Bespoken",
-    "developer": "johnfmorton",
+    "developer": "John F Morton",
     "documentationUrl": "https://github.com/johnfmorton/craft-bespoken",
     "class": "johnfmorton\\bespoken\\Bespoken"
   },

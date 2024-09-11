@@ -381,10 +381,7 @@ function _getFieldText(field) {
     text = _removeFigureElements(text);
     text = _stripTagsExceptAllowedTags(text, allowedTags);
   } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
-    text = _getFieldValue(field);
-    if (!/[.!?]\s*$/.test(text)) {
-      text += ". ";
-    }
+    text = _processPlainTextField(_getFieldValue(field));
   }
   return text;
 }
@@ -432,6 +429,18 @@ function _getFieldValue(element) {
   const inputElement = element.querySelector('input[name^="fields["], textarea[name^="fields["]');
   return inputElement ? inputElement.value : null;
 }
+function _processPlainTextField(inputText) {
+  let textArray = inputText.split("\n");
+  const punctuationRegex = /[.!?]["']?$/;
+  textArray = textArray.filter((line) => line.trim() !== "").map((line) => {
+    line = line.trim();
+    if (!punctuationRegex.test(line)) {
+      line += ".";
+    }
+    return line;
+  });
+  return textArray.join(" ");
+}
 
 // src/web/assets/bespokenassets/src/Bespoken.ts
 document.addEventListener("DOMContentLoaded", () => {
@@ -470,12 +479,12 @@ function handleButtonClick(event) {
       } else {
         const targetField = document.getElementById(`fields-${handle}-field`);
         if (targetField) {
-          const textStep1 = _getFieldText(targetField);
-          text += textStep1;
+          text += _getFieldText(targetField);
         }
       }
     });
     text = text.trim();
+    debugger;
   }
   if (text.length === 0) {
     button.classList.remove("disabled");

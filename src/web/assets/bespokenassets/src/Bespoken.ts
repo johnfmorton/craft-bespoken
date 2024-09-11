@@ -68,14 +68,13 @@ function handleButtonClick(event: Event): void {
                 const targetField = document.getElementById(`fields-${handle}-field`) as HTMLElement | null;
 
                 if (targetField) {
-                    const textStep1 = _getFieldText(targetField);
-                    // if the text does not end with a period, add one
-                    // const textToAdd = textStep1.endsWith('.') ? textStep1 : textStep1 + '.';
-                    text += (textStep1);
+                    text += _getFieldText(targetField);
                 }
             }
         });
         text = text.trim();
+
+        debugger;
     }
 
     if (text.length === 0) {

@@ -11,7 +11,7 @@ Bespoken stores audio files as Craft Assets. Create them once and use the audio 
 * Bespoken supports CKEditor fields or Plain Text fields.
 * Support for 32 languages.
 * Use any of ElevenLab's professional voice models.
-* Use Voice Cloning to create custom voice models for use with your Craft site. See the [ElevenLabs Voice Cloning page](https://elevenlabs.io/voice-cloning) for more information.
+* Use Voice Cloning to create custom voice models for your Craft site. See the [ElevenLabs Voice Cloning page](https://elevenlabs.io/voice-cloning) for more information.
 * Bespoken lets you create custom pronunciations for unique words used in your site to ensure difficult words are pronounced correctly.
 
 ## Requirements

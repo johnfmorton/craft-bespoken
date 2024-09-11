@@ -35,7 +35,7 @@
     "handle": "bespoken",
     "name": "Bespoken",
     "developer": "John F Morton",
-    "documentationUrl": "https://github.com/johnfmorton/craft-bespoken",
+    "documentationUrl": "https://github.com/johnfmorton/craft-bespoken/blob/main/DOCUMENTATION.md",
     "class": "johnfmorton\\bespoken\\Bespoken"
   },
   "scripts": {

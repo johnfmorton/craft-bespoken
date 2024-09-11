@@ -1,4 +1,4 @@
-# Bespoken
+# Bespoken, text-to-speech for Craft CMS
 
 _Bespoken_ uses the ElevenLabs API to bring customizable, high-quality narration to Craft CMS. With the click of a button in the control panel, your content becomes accessible to a broader audience. 
 

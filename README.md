@@ -1,13 +1,14 @@
 # Bespoken, text-to-speech for Craft CMS
 
-_Bespoken_ uses the ElevenLabs API to bring customizable, high-quality narration to Craft CMS. With the click of a button in the control panel, your content becomes accessible to a broader audience. 
+_Bespoken_ uses the ElevenLabs API to bring customizable, high-quality narration to Craft CMS. With the click of a button in the control panel, your content becomes accessible to a broader audience. Embed your audio files in your site, use them in your podcast, or share them on social media.
 
 ## Highlights
 
 * Users can create audio narration of posts with a single click.
+* Support for 32 languages.
 * Audio files are saved as native Assets and are usable anywhere in Craft.
 * Use any of ElevenLab's professional voice models.
-* Create your custom voice models for use with your site.
+* Use Voice Cloning to create custom voice models for use with your Craft site. See the [ElevenLabs Voice Cloning page](https://elevenlabs.io/voice-cloning) for more information.
 * Create a set of custom pronunciations for unique words used in your site.
 
 ## Requirements

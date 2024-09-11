@@ -27,13 +27,7 @@ export function _getFieldText(field: HTMLElement): string {
     // this checks for an input field or a textarea field but only if the name attribute starts with 'fields['
     // this is to accommodate how Craft CMS shows the field handles when a developer
     // has their account set to show field handles instead of field labels
-    text = _getFieldValue(field);
-
-    // The field must end with a period || question mark and a space
-    if (!/[.!?]\s*$/.test(text)) {
-      text += '. ';
-    }
-    //
+    text = _processPlainTextField(_getFieldValue(field));
     // debugger;
   }
   return text;
@@ -126,4 +120,36 @@ function _getFieldValue(element: HTMLElement): string | null {
     return inputElement ? inputElement.value : null;
 }
 
+/*
+* _processPlainTextField
+* params: inputText: string
+* Explanation:
+* Splitting the text: The inputText is split into an array using split('\n') to break it into lines.
+* Filtering: The filter method removes elements that are only line breaks or spaces.
+* Ensuring punctuation: Each line is checked using a regular expression to see if it ends with punctuation (including quotes), and if not, a period is added.
+* Joining: The lines are rejoined into a single string using join(' ').
+ */
+function _processPlainTextField(inputText: string): string {
+    // Split the input text by line breaks
+    let textArray: string[] = inputText.split('\n');
 
+    // Define a regex to check for punctuation at the end of a string
+    const punctuationRegex = /[.!?]["']?$/;
+
+    // Filter and process the array
+    textArray = textArray
+        .filter(line => line.trim() !== "") // Skip lines that are only line breaks or spaces
+        .map(line => {
+            line = line.trim(); // Trim spaces at the start and end of each line
+
+            // Check if the line ends with punctuation (including cases with a closing quote mark)
+            if (!punctuationRegex.test(line)) {
+                line += '.'; // Add a period if there's no punctuation
+            }
+
+            return line;
+        });
+
+    // Join the array into a single string with a space between each element
+    return textArray.join(' ');
+}

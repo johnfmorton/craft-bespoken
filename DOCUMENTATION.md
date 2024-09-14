@@ -20,7 +20,7 @@ Once the setup is complete. Create a Bespoken field for the Entry Type you want 
 
 1. Create a new field in Craft.
 2. Choose the Bespoken field type.
-3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken support CKEditor fields and Plain Text fields. (See below for information on the text from fields are processed.) Multiple field handles can be included, separated by commas. Consider including the title field as your first field.
+3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken supports CKEditor fields and Plain Text fields. (See below for information on how the text from fields is processed.) Multiple field handles can be included, separated by commas. Consider including the `title` field as your first field.
 4. Optionally, you can provide a prefix for the filename of your audio file. This can be useful if there are multiple instances of Bespoken fields in your entry type.
 5. Choose at least one voice for the field. 
 
@@ -44,4 +44,4 @@ Relying on the queue system means that the audio files are created in the backgr
 
 If your queue is running automatically in the background via [CRON job or daemon](https://craftcms.com/docs/5.x/system/queue.html#queue-runners), the field type will update with the status of your audio file. 
 
-If the queue is run only on [HTTP](https://craftcms.com/docs/5.x/system/queue.html#http), the queue may not run until refresh the page.
+If the queue is run only on [HTTP](https://craftcms.com/docs/5.x/system/queue.html#http), the queue may not run until you refresh the page.

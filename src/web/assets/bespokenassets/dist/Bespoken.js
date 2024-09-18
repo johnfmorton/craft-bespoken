@@ -484,7 +484,6 @@ function handleButtonClick(event) {
       }
     });
     text = text.trim();
-    debugger;
   }
   if (text.length === 0) {
     button.classList.remove("disabled");

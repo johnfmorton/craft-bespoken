@@ -28,7 +28,6 @@ export function _getFieldText(field: HTMLElement): string {
     // this is to accommodate how Craft CMS shows the field handles when a developer
     // has their account set to show field handles instead of field labels
     text = _processPlainTextField(_getFieldValue(field));
-    // debugger;
   }
   return text;
 }

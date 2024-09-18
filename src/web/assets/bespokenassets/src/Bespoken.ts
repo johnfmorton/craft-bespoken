@@ -73,8 +73,6 @@ function handleButtonClick(event: Event): void {
             }
         });
         text = text.trim();
-
-        debugger;
     }
 
     if (text.length === 0) {

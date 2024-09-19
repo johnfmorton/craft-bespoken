@@ -24,6 +24,14 @@ Once the setup is complete. Create a Bespoken field for the Entry Type you want 
 4. Optionally, you can provide a prefix for the filename of your audio file. This can be useful if there are multiple instances of Bespoken fields in your entry type.
 5. Choose at least one voice for the field. 
 
+### Example of the settings for a Bespoken plugin
+
+![Bespoken field status](./documentation-assets/settings-page.png)
+
+### Example of the field set up for a Bespoken plugin
+
+![Bespoken field status](./documentation-assets/field-setup.png)
+
 The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message. 
 
 ### Example of a successful audio file creation

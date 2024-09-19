@@ -4,6 +4,8 @@ _Bespoken_ uses the ElevenLabs API to bring customizable, high-quality narration
 
 Bespoken stores audio files as Craft Assets. Create them once and use the audio files anywhere. Embed your audio files in your site, use them in your podcast, share them on social media, etc.
 
+The [Bespoken Web Component](https://www.npmjs.com/package/bespoken-audio-player) is a companion piece to this plugin. It is a customizable and accessible web component that provides a rich audio playback experience. It supports playlists, playback controls, progress tracking, and is designed to be easily integrated into any web application.
+
 ## Highlights
 
 * Users can create audio narration of posts with a single click.

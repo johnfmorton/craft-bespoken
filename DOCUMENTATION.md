@@ -24,6 +24,19 @@ Once the setup is complete. Create a Bespoken field for the Entry Type you want 
 4. Optionally, you can provide a prefix for the filename of your audio file. This can be useful if there are multiple instances of Bespoken fields in your entry type.
 5. Choose at least one voice for the field. 
 
+The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message. 
+
+### Example of a successful audio file creation
+
+![Bespoken field status](./documentation-assets/status-success.png)
+
+### Example of an error audio file creation
+
+In this example, you can see that the audio file creation failed because there were not enough credits left in the ElevenLabs account to create the audio file.
+
+![Bespoken field status](./documentation-assets/status-error.png)
+
+
 ### How text is processed from a CKEditor field
 
 The Bespoken plugin processes text from a CKEditor field by stripping out the HTML tags added by the CKEditor field and converting the text to plain text. This means that the audio file will not include any HTML tags.

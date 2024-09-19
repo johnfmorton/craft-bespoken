@@ -42,7 +42,7 @@ class BespokenController extends Controller
         $this->requirePostRequest();
         $this->requireLogin();
 
-        BespokenPlugin::info('Sending text to Eleven Labs API in ' . __METHOD__ . ' method in ' . __FILE__);
+        BespokenPlugin::info('Bespoken controller: ' . __METHOD__ . ' method in ' . __FILE__);
 
         $postData = Craft::$app->request->post();
 

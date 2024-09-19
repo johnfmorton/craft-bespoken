@@ -56,6 +56,12 @@ class BespokenController extends Controller
             $text = str_ireplace($pronunciation['word'], $pronunciation['pronunciation'], $text);
         }
 
+        // remove any   characters
+        $text = str_replace(' ', ' ', $text);
+
+        // remove all double spaces and replace them with a single space
+        $text = preg_replace('/\s+/', ' ', $text);
+
         BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
 
 

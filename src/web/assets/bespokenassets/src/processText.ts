@@ -57,7 +57,9 @@ export function processText(
         return;
     }
 
-    const data = {text, voiceId, fileNamePrefix, elementId};
+    const decodedText = _decodeHtml(text);
+
+    const data = {text: decodedText, voiceId, fileNamePrefix, elementId};
 
     updateProgressComponent(progressComponent, {
         progress: 0.15,
@@ -73,7 +75,7 @@ export function processText(
     })
         .then(response => response.json())
         .then(data => {
-            const {filename, jobId, bespokenJobId, success, message} = data;
+            const {bespokenJobId, success, message} = data;
 
             if (!success) {
                 updateProgressComponent(progressComponent, {
@@ -144,4 +146,12 @@ function _addJobIdToUrl(url: string, jobId: string): string {
     console.error("Invalid URL provided", error);
     return url; // Return the original URL if there is an error
   }
+}
+
+
+// I need to swap out the HTML entities in the text before sending it to the API
+function _decodeHtml(html: string): string {
+    const txt = document.createElement("textarea");
+    txt.innerHTML = html;
+    return txt.value;
 }

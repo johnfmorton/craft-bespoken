@@ -68,7 +68,7 @@ function handleButtonClick(event: Event): void {
                 const targetField = document.getElementById(`fields-${handle}-field`) as HTMLElement | null;
 
                 if (targetField) {
-                    text += _getFieldText(targetField);
+                    text += _getFieldText(targetField) + " ";
                 }
             }
         });

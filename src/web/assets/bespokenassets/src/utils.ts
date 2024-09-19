@@ -51,7 +51,11 @@ function _removeFigureElements(input:string) {
   return tempDiv.innerHTML;
 }
 
-function _stripTagsExceptAllowedTags(text, allowedTags = []) {
+function _stripTagsExceptAllowedTags(text: string, allowedTags = []) {
+
+  // Remove <code> tags (with or without attributes) and </code> tags
+  text = text.replace(/<code[^>]*>|<\/code>/g, '');
+
   // Define block elements that should end with punctuation
   const blockElements = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 
@@ -66,9 +70,9 @@ function _stripTagsExceptAllowedTags(text, allowedTags = []) {
   let currentIndex = 0;
 
   // Iterate over the HTML and replace tags with content
-  text.replace(/<\/?[^>]+>/g, (match, offset) => {
-    // Add the content before the tag
+  text = text.replace(/<\/?[^>]+>/g, (match, offset) => {
     let contentBeforeTag = text.slice(currentIndex, offset).trim();
+    let replacement = '';
 
     if (contentBeforeTag) {
       strippedText += contentBeforeTag;
@@ -85,12 +89,14 @@ function _stripTagsExceptAllowedTags(text, allowedTags = []) {
 
     // Check if the tag is allowed
     if (allowedTagsPattern.test(match)) {
-      strippedText += match; // Keep allowed tags
+      replacement = match; // Keep allowed tags
     }
 
     // Update the current index to just after the current tag
     currentIndex = offset + match.length;
-  });
+
+    return replacement; // Return the string to replace the match
+});
 
   // Add the final part of the string (after the last tag)
   let remainingContent = text.slice(currentIndex).trim();

@@ -311,7 +311,8 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
     button.classList.remove("disabled");
     return;
   }
-  const data = { text, voiceId, fileNamePrefix, elementId };
+  const decodedText = _decodeHtml(text);
+  const data = { text: decodedText, voiceId, fileNamePrefix, elementId };
   updateProgressComponent(progressComponent, {
     progress: 0.15,
     success: true,
@@ -323,7 +324,7 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   }).then((response) => response.json()).then((data2) => {
-    const { filename, jobId, bespokenJobId, success, message } = data2;
+    const { bespokenJobId, success, message } = data2;
     if (!success) {
       updateProgressComponent(progressComponent, {
         progress: 0,
@@ -363,6 +364,11 @@ function _addJobIdToUrl(url, jobId) {
     return url;
   }
 }
+function _decodeHtml(html) {
+  const txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
+}
 
 // src/web/assets/bespokenassets/src/utils.ts
 var allowedTags = ["phoneme", "break"];
@@ -393,13 +399,15 @@ function _removeFigureElements(input) {
   return tempDiv.innerHTML;
 }
 function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
+  text = text.replace(/<code[^>]*>|<\/code>/g, "");
   const blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"];
   const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
   const blockElementsPattern = new RegExp(`<(/?(${blockElements.join("|")}))\\b[^>]*>`, "gi");
   let strippedText = "";
   let currentIndex = 0;
-  text.replace(/<\/?[^>]+>/g, (match, offset) => {
+  text = text.replace(/<\/?[^>]+>/g, (match, offset) => {
     let contentBeforeTag = text.slice(currentIndex, offset).trim();
+    let replacement = "";
     if (contentBeforeTag) {
       strippedText += contentBeforeTag;
       if (blockElementsPattern.test(text.slice(currentIndex))) {
@@ -410,9 +418,10 @@ function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
       strippedText += " ";
     }
     if (allowedTagsPattern.test(match)) {
-      strippedText += match;
+      replacement = match;
     }
     currentIndex = offset + match.length;
+    return replacement;
   });
   let remainingContent = text.slice(currentIndex).trim();
   if (remainingContent) {
@@ -479,7 +488,7 @@ function handleButtonClick(event) {
       } else {
         const targetField = document.getElementById(`fields-${handle}-field`);
         if (targetField) {
-          text += _getFieldText(targetField);
+          text += _getFieldText(targetField) + " ";
         }
       }
     });

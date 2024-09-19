@@ -400,6 +400,8 @@ function _removeFigureElements(input) {
 }
 function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
   text = text.replace(/<code[^>]*>|<\/code>/g, "");
+  text = text.replace(/<a[^>]*>|<\/a>/g, "");
+  text = text.replace(/&nbsp;/g, " ");
   const blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"];
   const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
   const blockElementsPattern = new RegExp(`<(/?(${blockElements.join("|")}))\\b[^>]*>`, "gi");
@@ -411,7 +413,7 @@ function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
     if (contentBeforeTag) {
       strippedText += contentBeforeTag;
       if (blockElementsPattern.test(text.slice(currentIndex))) {
-        if (!/[.!?]$/.test(contentBeforeTag)) {
+        if (!/[:.!?]$/.test(contentBeforeTag)) {
           strippedText += ".";
         }
       }

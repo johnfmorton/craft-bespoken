@@ -56,6 +56,12 @@ function _stripTagsExceptAllowedTags(text: string, allowedTags = []) {
   // Remove <code> tags (with or without attributes) and </code> tags
   text = text.replace(/<code[^>]*>|<\/code>/g, '');
 
+  // Remove <a> tags (with or without attributes) and </a> tags
+  text = text.replace(/<a[^>]*>|<\/a>/g, '');
+
+  // Replace and non-breaking spaces with regular spaces
+  text = text.replace(/&nbsp;/g, ' ');
+
   // Define block elements that should end with punctuation
   const blockElements = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 
@@ -79,7 +85,7 @@ function _stripTagsExceptAllowedTags(text: string, allowedTags = []) {
 
       // If this is a block element, ensure it ends with punctuation
       if (blockElementsPattern.test(text.slice(currentIndex))) {
-        if (!/[.!?]$/.test(contentBeforeTag)) {
+        if (!/[:.!?]$/.test(contentBeforeTag)) {
           strippedText += '.';
         }
       }

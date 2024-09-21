@@ -2,7 +2,7 @@
 
 ## 5.0.3 - 2024-09-21
 ### Added
-- Added a new feature to allow users to exclude elements within a CKEditor field by adding the class `bespoken-exclude` to the element. This feature is useful for excluding elements like code blocks from the audio file.
+- Added a new feature to allow users to exclude elements within a CKEditor field by adding the class `bespoken-exclude` to an element. This feature is useful for excluding elements like code blocks from the audio file. See the "Excluding elements from the audio file" section in the documentation for more information.
 
 ## 5.0.2 - 2024-09-19
 ### Fixed

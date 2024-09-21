@@ -169,10 +169,6 @@ In the _Custom Styles_ section, define the styles for the `bespoken-exclude` and
 
 These CSS styles are **only** for the CKEditor field and will not affect the front end of your site. The styles are used to visually indicate to the content author which elements are excluded from the audio file.
 
-This is how they'll look in the CKEditor field.
-
-![Example of CKEditor field with custom styles](./documentation-assets/ckeditor-example.gif)
-
 For the frontend of your site, you will need to add CSS styles to hide the elements with the `bespoken-exclude` class. 
 
 ```css

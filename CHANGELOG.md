@@ -1,5 +1,9 @@
 # Release Notes for Bespoken
 
+## 5.0.3 - 2024-09-21
+### Added
+- Added a new feature to allow users to exclude elements within a CKEditor field by adding the class `bespoken-exclude` to the element. This feature is useful for excluding elements like code blocks from the audio file.
+
 ## 5.0.2 - 2024-09-19
 ### Fixed
 - Updated Javascript to decode HTML entities to allow proper replacement of text for the pronunciation fixes feature.

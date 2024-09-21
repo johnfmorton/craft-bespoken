@@ -53,7 +53,10 @@ function _removeFigureElements(input:string) {
 
 function _stripTagsExceptAllowedTags(text: string, allowedTags = []) {
 
-  // Remove <code> tags (with or without attributes) and </code> tags
+  // Remove any element and its contents that has the class "audio-exclude"
+  text = _removeAudioExcludeElements(text);
+
+  // Remove <code> tags (with or without attributes) and </code> tags, but leave the content
   text = text.replace(/<code[^>]*>|<\/code>/g, '');
 
   // Remove <a> tags (with or without attributes) and </a> tags
@@ -163,4 +166,31 @@ function _processPlainTextField(inputText: string): string {
 
     // Join the array into a single string with a space between each element
     return textArray.join(' ');
+}
+
+function _removeAudioExcludeElements(htmlString:string): string {
+  // Create a new DOM parser
+  const parser = new DOMParser();
+
+  // Parse the string into a DOM object
+  const doc = parser.parseFromString(htmlString, 'text/html');
+
+  // Log the entire parsed document to check the structure
+  // console.log('Parsed HTML structure:', doc.body.innerHTML);
+
+  // Select all elements that have the class "audio-exclude"
+  const elementsToRemove = doc.querySelectorAll('.audio-exclude');
+
+  // Log to see if any elements were selected
+  // console.log('Elements to remove:', elementsToRemove);
+
+  // Remove each of those elements from the DOM by using parentNode
+  elementsToRemove.forEach((element) => {
+    if (element.parentNode) {
+      element.parentNode.removeChild(element);
+    }
+  });
+
+  // Return the modified HTML as a string
+  return doc.body.innerHTML;
 }

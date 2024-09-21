@@ -399,6 +399,7 @@ function _removeFigureElements(input) {
   return tempDiv.innerHTML;
 }
 function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
+  text = _removeAudioExcludeElements(text);
   text = text.replace(/<code[^>]*>|<\/code>/g, "");
   text = text.replace(/<a[^>]*>|<\/a>/g, "");
   text = text.replace(/&nbsp;/g, " ");
@@ -451,6 +452,17 @@ function _processPlainTextField(inputText) {
     return line;
   });
   return textArray.join(" ");
+}
+function _removeAudioExcludeElements(htmlString) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlString, "text/html");
+  const elementsToRemove = doc.querySelectorAll(".audio-exclude");
+  elementsToRemove.forEach((element) => {
+    if (element.parentNode) {
+      element.parentNode.removeChild(element);
+    }
+  });
+  return doc.body.innerHTML;
 }
 
 // src/web/assets/bespokenassets/src/Bespoken.ts

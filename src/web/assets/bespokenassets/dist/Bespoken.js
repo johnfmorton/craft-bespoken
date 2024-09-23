@@ -371,7 +371,6 @@ function _decodeHtml(html) {
 }
 
 // src/web/assets/bespokenassets/src/utils.ts
-var allowedTags = ["phoneme", "break"];
 function _getInputValue(selector) {
   const input = document.querySelector(selector);
   return input?.value || "";
@@ -385,7 +384,7 @@ function _getFieldText(field) {
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
     text = field.querySelector("textarea")?.value || "";
     text = _removeFigureElements(text);
-    text = _stripTagsExceptAllowedTags(text, allowedTags);
+    text = _stripTags(text);
   } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
     text = _processPlainTextField(_getFieldValue(field));
   }
@@ -398,44 +397,15 @@ function _removeFigureElements(input) {
   figures.forEach((figure) => figure.remove());
   return tempDiv.innerHTML;
 }
-function _stripTagsExceptAllowedTags(text, allowedTags2 = []) {
+function _stripTags(text) {
   text = _removeBespokenExcludeElements(text);
-  text = text.replace(/<code[^>]*>|<\/code>/g, "");
-  text = text.replace(/<a[^>]*>|<\/a>/g, "");
+  let tagsToRemove = ["code", "strong", "i", "sup", "sub", "span", "a", "u", "s"];
+  text = _removeTags(text, tagsToRemove);
   text = text.replace(/&nbsp;/g, " ");
-  const blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"];
-  const allowedTagsPattern = new RegExp(`<(/?(${allowedTags2.join("|")}))\\b[^>]*>`, "gi");
-  const blockElementsPattern = new RegExp(`<(/?(${blockElements.join("|")}))\\b[^>]*>`, "gi");
-  let strippedText = "";
-  let currentIndex = 0;
-  text = text.replace(/<\/?[^>]+>/g, (match, offset) => {
-    let contentBeforeTag = text.slice(currentIndex, offset).trim();
-    let replacement = "";
-    if (contentBeforeTag) {
-      strippedText += contentBeforeTag;
-      if (blockElementsPattern.test(text.slice(currentIndex))) {
-        if (!/[:.!?]$/.test(contentBeforeTag)) {
-          strippedText += ".";
-        }
-      }
-      strippedText += " ";
-    }
-    if (allowedTagsPattern.test(match)) {
-      replacement = match;
-    }
-    currentIndex = offset + match.length;
-    return replacement;
-  });
-  let remainingContent = text.slice(currentIndex).trim();
-  if (remainingContent) {
-    strippedText += remainingContent;
-    if (blockElementsPattern.test(remainingContent)) {
-      if (!/[.!?]$/.test(remainingContent)) {
-        strippedText += ".";
-      }
-    }
-  }
-  return strippedText.replace(/\s+/g, " ").trim();
+  text = _ensureBlockFormatting(text);
+  text = text.replace(/<[^>]*>/g, "");
+  text = text.replace(/\s{2,}/g, " ");
+  return text;
 }
 function _getFieldValue(element) {
   const inputElement = element.querySelector('input[name^="fields["], textarea[name^="fields["]');
@@ -463,6 +433,36 @@ function _removeBespokenExcludeElements(htmlString) {
     }
   });
   return doc.body.innerHTML;
+}
+function _removeTags(text, tags) {
+  tags.forEach((tag) => {
+    const regex = new RegExp(`<${tag}[^>]*>|</${tag}>`, "g");
+    text = text.replace(regex, "");
+  });
+  return text;
+}
+function _ensureBlockFormatting(html, blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "pre"]) {
+  function trimSpaces(text) {
+    return text.replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, "");
+  }
+  function endsWithPunctuation(text) {
+    return /[.!?]['"”’]?$/.test(text);
+  }
+  const sortedBlockElements = blockElements.sort((a, b) => b.length - a.length);
+  const blockRegex = new RegExp(
+    `<(${sortedBlockElements.join("|")})([^>]*)>([\\s\\S]*?)<\\/\\1>`,
+    "gi"
+  );
+  return html.replace(blockRegex, (match, tagName, attributes, content) => {
+    let trimmedContent = trimSpaces(content);
+    if (trimmedContent === "") {
+      return "";
+    }
+    if (!endsWithPunctuation(trimmedContent)) {
+      trimmedContent += ". ";
+    }
+    return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
+  });
 }
 
 // src/web/assets/bespokenassets/src/Bespoken.ts

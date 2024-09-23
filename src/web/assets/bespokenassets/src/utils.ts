@@ -1,6 +1,3 @@
-// These are the tags that are allowed to be sent to the API for text-to-speech conversion because they help with pronunciation
-const allowedTags: string[] = ['phoneme', 'break'];
-
 export function _getInputValue(selector: string): string {
   const input = document.querySelector(selector) as HTMLInputElement | null;
   return input?.value || '';
@@ -20,7 +17,7 @@ export function _getFieldText(field: HTMLElement): string {
 
     text = _removeFigureElements(text);
 
-    text = _stripTagsExceptAllowedTags(text, allowedTags)
+    text = _stripTags(text)
 
   } else if (field.getAttribute('data-type') === 'craft\\fields\\PlainText') {
 
@@ -32,10 +29,16 @@ export function _getFieldText(field: HTMLElement): string {
   return text;
 }
 
-//*
-// * Remove all <figure> elements from the input string in CKEditor fields
-// * @param input
-// *
+/*
+* _removeFigureElements
+* Remove all <figure> elements from the input string in CKEditor fields
+* @param input
+* @returns string
+* Explanation: This function removes all <figure> elements from the input string.
+* Figures are often used for images in CKEditor fields, and we want to exclude
+* them from the text-to-speech conversion. CKEditor also wraps tables in <figure> elements,
+* so this function will remove those as well.
+*/
 function _removeFigureElements(input:string) {
   // Create a temporary DOM element to work with
   const tempDiv = document.createElement('div');
@@ -51,81 +54,35 @@ function _removeFigureElements(input:string) {
   return tempDiv.innerHTML;
 }
 
-function _stripTagsExceptAllowedTags(text: string, allowedTags = []) {
+function _stripTags(text: string) {
 
   // Remove any element and its contents that has the class "audio-exclude"
   text = _removeBespokenExcludeElements(text);
 
-  // Remove <code> tags (with or without attributes) and </code> tags, but leave the content
-  text = text.replace(/<code[^>]*>|<\/code>/g, '');
+  let tagsToRemove = ['code', 'strong', 'i', 'sup', 'sub', 'span', 'a', 'u', 's'];
 
-  // Remove <a> tags (with or without attributes) and </a> tags
-  text = text.replace(/<a[^>]*>|<\/a>/g, '');
+  text = _removeTags(text, tagsToRemove);
 
   // Replace and non-breaking spaces with regular spaces
   text = text.replace(/&nbsp;/g, ' ');
 
-  // Define block elements that should end with punctuation
-  const blockElements = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+  text = _ensureBlockFormatting(text);
 
-  // Create a regex pattern for allowed tags
-  const allowedTagsPattern = new RegExp(`<(\/?(${allowedTags.join('|')}))\\b[^>]*>`, 'gi');
+  // remove any remaining HTML tags
+  text = text.replace(/<[^>]*>/g, '');
 
-  // Create a regex pattern for block elements
-  const blockElementsPattern = new RegExp(`<(\/?(${blockElements.join('|')}))\\b[^>]*>`, 'gi');
+  // remove any remaining double spaces
+  text = text.replace(/\s{2,}/g, ' ');
 
-  // Function to strip tags and handle block/inline content correctly
-  let strippedText = '';
-  let currentIndex = 0;
-
-  // Iterate over the HTML and replace tags with content
-  text = text.replace(/<\/?[^>]+>/g, (match, offset) => {
-    let contentBeforeTag = text.slice(currentIndex, offset).trim();
-    let replacement = '';
-
-    if (contentBeforeTag) {
-      strippedText += contentBeforeTag;
-
-      // If this is a block element, ensure it ends with punctuation
-      if (blockElementsPattern.test(text.slice(currentIndex))) {
-        if (!/[:.!?]$/.test(contentBeforeTag)) {
-          strippedText += '.';
-        }
-      }
-
-      strippedText += ' '; // Add a space after block content
-    }
-
-    // Check if the tag is allowed
-    if (allowedTagsPattern.test(match)) {
-      replacement = match; // Keep allowed tags
-    }
-
-    // Update the current index to just after the current tag
-    currentIndex = offset + match.length;
-
-    return replacement; // Return the string to replace the match
-});
-
-  // Add the final part of the string (after the last tag)
-  let remainingContent = text.slice(currentIndex).trim();
-  if (remainingContent) {
-    strippedText += remainingContent;
-
-    // Ensure punctuation for block elements
-    if (blockElementsPattern.test(remainingContent)) {
-      if (!/[.!?]$/.test(remainingContent)) {
-        strippedText += '.';
-      }
-    }
-  }
-
-  // Replace multiple spaces with a single space and trim the result
-  return strippedText.replace(/\s+/g, ' ').trim();
+  return text;
 }
 
 
-
+/*
+* _getFieldValue
+* params: element: HTMLElement
+* Explanation: This function retrieves the value of the first input or textarea element within the provided element.
+*/
 function _getFieldValue(element: HTMLElement): string | null {
     // Select the first input or textarea element that has a name attribute that starts with "fields["
     const inputElement = element.querySelector<HTMLInputElement | HTMLTextAreaElement>('input[name^="fields["], textarea[name^="fields["]');
@@ -142,7 +99,7 @@ function _getFieldValue(element: HTMLElement): string | null {
 * Filtering: The filter method removes elements that are only line breaks or spaces.
 * Ensuring punctuation: Each line is checked using a regular expression to see if it ends with punctuation (including quotes), and if not, a period is added.
 * Joining: The lines are rejoined into a single string using join(' ').
- */
+*/
 function _processPlainTextField(inputText: string): string {
     // Split the input text by line breaks
     let textArray: string[] = inputText.split('\n');
@@ -168,6 +125,11 @@ function _processPlainTextField(inputText: string): string {
     return textArray.join(' ');
 }
 
+/*
+* _removeBespokenExcludeElements
+* params: htmlString: string
+* Explanation: This function removes all elements with the class "bespoken-exclude" from the input HTML string.
+*/
 function _removeBespokenExcludeElements(htmlString:string): string {
   // Create a new DOM parser
   const parser = new DOMParser();
@@ -181,9 +143,6 @@ function _removeBespokenExcludeElements(htmlString:string): string {
   // Select all elements that have the class "audio-exclude"
   const elementsToRemove = doc.querySelectorAll('.bespoken-exclude');
 
-  // Log to see if any elements were selected
-  // console.log('Elements to remove:', elementsToRemove);
-
   // Remove each of those elements from the DOM by using parentNode
   elementsToRemove.forEach((element) => {
     if (element.parentNode) {
@@ -193,4 +152,68 @@ function _removeBespokenExcludeElements(htmlString:string): string {
 
   // Return the modified HTML as a string
   return doc.body.innerHTML;
+}
+
+/*
+* _removeTags
+* params: text: string, tags: string[]
+* Explanation: This function removes specified HTML tags from the input text string.
+* I've manually configured the tags to remove in the function, but you could pass them as an argument if needed.
+* These tags are the tags that the CKEditor adds to the text when you apply formatting.
+*/
+function _removeTags(text: string, tags: string[]) {
+  tags.forEach(tag => {
+    const regex = new RegExp(`<${tag}[^>]*>|</${tag}>`, 'g');
+    text = text.replace(regex, '');
+  });
+  return text;
+}
+
+/*
+* _ensureBlockFormatting
+* params: html: string, blockElements: string[]
+* Explanation: This function ensures that block elements in the HTML content end with punctuation.
+ */
+function _ensureBlockFormatting(
+  html: string,
+  blockElements: string[] = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre']
+): string {
+  // Define a helper function to trim spaces, including &nbsp;, but skip for <pre> elements
+  function trimSpaces(text: string): string {
+    return text.replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, ''); // Trim leading/trailing spaces and non-breaking spaces for non-pre elements
+  }
+
+  // Define a helper function to check if the text ends with a valid punctuation
+  function endsWithPunctuation(text: string): boolean {
+    return /[.!?]['"”’]?$/.test(text);
+  }
+
+  // Create a sorted version of the blockElements array by length to ensure longer tags like <pre> are matched before shorter ones like <p>
+  const sortedBlockElements = blockElements.sort((a, b) => b.length - a.length);
+
+  // Define a regex to correctly match individual block elements one at a time
+  const blockRegex = new RegExp(
+    `<(${sortedBlockElements.join('|')})([^>]*)>([\\s\\S]*?)<\\/\\1>`,
+    'gi'
+  );
+
+  // Process all block elements one at a time
+  return html.replace(blockRegex, (match, tagName, attributes, content) => {
+
+    // Trim leading and trailing spaces
+    let trimmedContent = trimSpaces(content);
+
+    // If the block is empty after trimming, remove the whole block
+    if (trimmedContent === '') {
+      return ''; // Remove the empty block
+    }
+
+    // Ensure the content ends with a period, question mark, or exclamation point, but skip adding a period to <pre> if undesired
+    if (!endsWithPunctuation(trimmedContent)) {
+      trimmedContent += '. ';
+    }
+
+    // Return the modified block element with the updated content
+    return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
+  });
 }

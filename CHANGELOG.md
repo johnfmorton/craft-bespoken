@@ -1,5 +1,9 @@
 # Release Notes for Bespoken
 
+## 5.0.5 - 2024-10-31
+### Fixed
+- Fixed an issue in processing text to be sent to the API that neglected to add a pause for list items. This caused the text to be read as one continuous sentence when a list item did not end with some form of punctuation. This issue has been resolved, and list items will now be read as separate clauses in the generated audio file.
+
 ## 5.0.4 - 2024-09-23
 ### Fixed
 - Fixed a bug that caused some inline HTML elements to have a pause added before them during audio generation.

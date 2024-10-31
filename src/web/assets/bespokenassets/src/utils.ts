@@ -115,7 +115,7 @@ function _processPlainTextField(inputText: string): string {
 
             // Check if the line ends with punctuation (including cases with a closing quote mark)
             if (!punctuationRegex.test(line)) {
-                line += '.'; // Add a period if there's no punctuation
+                line += '. '; // Add a period if there's no punctuation
             }
 
             return line;
@@ -158,7 +158,7 @@ function _removeBespokenExcludeElements(htmlString:string): string {
 * _removeTags
 * params: text: string, tags: string[]
 * Explanation: This function removes specified HTML tags from the input text string.
-* I've manually configured the tags to remove in the function, but you could pass them as an argument if needed.
+* Pass in the tags to remove in the function. See the tags in the 'tagsToRemove' array.
 * These tags are the tags that the CKEditor adds to the text when you apply formatting.
 */
 function _removeTags(text: string, tags: string[]) {
@@ -176,7 +176,7 @@ function _removeTags(text: string, tags: string[]) {
  */
 function _ensureBlockFormatting(
   html: string,
-  blockElements: string[] = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre']
+  blockElements: string[] = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'li']
 ): string {
   // Define a helper function to trim spaces, including &nbsp;, but skip for <pre> elements
   function trimSpaces(text: string): string {
@@ -211,7 +211,11 @@ function _ensureBlockFormatting(
     // Ensure the content ends with a period, question mark, or exclamation point, but skip adding a period to <pre> if undesired
     if (!endsWithPunctuation(trimmedContent)) {
       trimmedContent += '. ';
+    } else {
+        trimmedContent += ' '; // Add a space without adding a period if the content already ends with punctuation
+        // later we will remove any double spaces later in the _stripTags function process
     }
+
 
     // Return the modified block element with the updated content
     return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;

@@ -417,7 +417,7 @@ function _processPlainTextField(inputText) {
   textArray = textArray.filter((line) => line.trim() !== "").map((line) => {
     line = line.trim();
     if (!punctuationRegex.test(line)) {
-      line += ".";
+      line += ". ";
     }
     return line;
   });
@@ -441,7 +441,7 @@ function _removeTags(text, tags) {
   });
   return text;
 }
-function _ensureBlockFormatting(html, blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "pre"]) {
+function _ensureBlockFormatting(html, blockElements = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "li"]) {
   function trimSpaces(text) {
     return text.replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, "");
   }
@@ -460,6 +460,8 @@ function _ensureBlockFormatting(html, blockElements = ["p", "div", "h1", "h2", "
     }
     if (!endsWithPunctuation(trimmedContent)) {
       trimmedContent += ". ";
+    } else {
+      trimmedContent += " ";
     }
     return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
   });

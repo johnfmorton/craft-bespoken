@@ -94,8 +94,9 @@ function handleButtonClick(event: Event): void {
 
     // What's going to happen next:
     // Generate the audio by gathering all the required data and sending it to
-    // the action URL, process-text this will return the jobId and filename if
-    // the request is successful. If the request is successful, we will then
+    // the action URL, use the process-text function on the text: this will return
+    // the jobId and filename if the request is successful.
+    // If the request is successful, we will then
     // need to start polling the job status to get the progress of the audio
     // generation. Because this is an API call, the work is done in the
     // background, and we need to poll the API to get the progress of the audio

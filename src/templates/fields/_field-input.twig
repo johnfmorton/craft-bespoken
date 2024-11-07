@@ -69,7 +69,35 @@
                         }
                     }
                 }) }}
-{#                <progress-component progress="0.0" message="" svg-height="14" class="bespoken-progress-component"></progress-component>#}
+
+
+                {%  if fieldSettings.showPreview %}
+                {{ forms.button({
+                    label: 'Preview Script button' | t('bespoken'),
+                    class: [
+                        'btn',
+                        'bespoken-button',
+                        'bespoken-preview',
+                    ],
+                    attributes: {
+                        data: {
+                            'target-field': field.sourceField,
+                        }
+                    }
+                }) }}
+
+
+<modal-dialog class="bespoken-dialog" >
+  <span slot="title">Dialog Title</span>
+  <span slot="description">This is a description for the dialog.</span>
+  <div slot="content">
+    <p>Your HTML content goes here.</p>
+  </div>
+</modal-dialog>
+
+
+
+                {% endif %}
 
                 <progress-component progress="0" size="24" message="Waiting to generate audio." class="bespoken-progress-component"></progress-component>
             </div>

@@ -110,6 +110,7 @@ export function processText(
                 message: 'Error during API request.',
                 textColor: 'rgb(126,7,7)'
             });
+            console.error('Error:', error);
         });
 
 }

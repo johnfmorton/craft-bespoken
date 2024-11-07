@@ -33,6 +33,8 @@ class BespokenField extends Field
 
     public array $voiceOptions = [];
 
+    public bool $showPreview = true;
+
     public static function displayName(): string
     {
         return Craft::t('bespoken', 'Bespoken Field Name');

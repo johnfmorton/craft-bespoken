@@ -34,6 +34,30 @@
     readonly: false,
 }) }}
 
+{% set input %}
+
+{#    radio button group for showPreview #}
+{{ forms.radioGroup({
+    label: 'Script preview' | t('bespoken'),
+    instructions: 'Enable the script preview option?' | t('bespoken'),
+    id: 'showPreview',
+    name: 'showPreview',
+    options: [
+        { value: '1', label: 'Yes' },
+        { value: '0', label: 'No' },
+    ],
+    value: field['showPreview'],
+}) }}
+{% endset %}
+
+{{ forms.field(
+    {
+        label: 'Preview script option' | t('bespoken'),
+        instructions: 'Enable the script preview option?' | t('bespoken'),
+    },
+    input
+) }}
+
 
 {{ forms.textField({
     label: 'Filename prefix'| t('bespoken'),
@@ -55,6 +79,7 @@
 {% if voiceOptionsTransformed | length  == 0 %}
 <div class="bespoken-error">{{ 'No voice options available for plugin'|t('bespoken') }}</div>
 {% else %}
+
 {% set input %}
 {{ forms.checkboxGroup({
     label: 'Voice Options' | t('bespoken'),

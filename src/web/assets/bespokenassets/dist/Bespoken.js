@@ -4,35 +4,6 @@ var ModalDialog = class extends HTMLElement {
     super();
     this.debounceTimeout = null;
     const shadow = this.attachShadow({ mode: "open" });
-    this.modal = document.createElement("div");
-    this.modal.className = "modal";
-    this.innerContainer = document.createElement("div");
-    this.innerContainer.className = "inner-container";
-    this.closeButton = document.createElement("button");
-    this.closeButton.className = "close-button";
-    this.closeButton.textContent = "X";
-    this.closeButton.addEventListener("click", () => this.close());
-    this.innerContainer.appendChild(this.closeButton);
-    const titleSlot = document.createElement("slot");
-    titleSlot.name = "title";
-    titleSlot.className = "title";
-    const descriptionSlot = document.createElement("slot");
-    descriptionSlot.name = "description";
-    descriptionSlot.className = "description";
-    const separator = document.createElement("hr");
-    separator.className = "separator";
-    this.contentContainer = document.createElement("div");
-    this.contentContainer.className = "content-container";
-    const contentSlot = document.createElement("slot");
-    contentSlot.name = "content";
-    contentSlot.className = "content";
-    this.innerContainer.appendChild(titleSlot);
-    this.innerContainer.appendChild(descriptionSlot);
-    this.innerContainer.appendChild(separator);
-    this.contentContainer.appendChild(contentSlot);
-    this.innerContainer.appendChild(this.contentContainer);
-    this.modal.appendChild(this.innerContainer);
-    shadow.appendChild(this.modal);
     const style = document.createElement("style");
     style.textContent = `
       .modal {
@@ -105,6 +76,38 @@ var ModalDialog = class extends HTMLElement {
       }
     `;
     shadow.appendChild(style);
+    this.modal = document.createElement("div");
+    this.modal.className = "modal";
+    this.innerContainer = document.createElement("div");
+    this.innerContainer.className = "inner-container";
+    this.closeButton = document.createElement("button");
+    this.closeButton.className = "close-button";
+    this.closeButton.textContent = "X";
+    this.closeButton.addEventListener("click", () => this.close());
+    this.innerContainer.appendChild(this.closeButton);
+    const titleSlot = document.createElement("slot");
+    titleSlot.name = "title";
+    titleSlot.className = "title";
+    const descriptionSlot = document.createElement("slot");
+    descriptionSlot.name = "description";
+    descriptionSlot.className = "description";
+    const separator = document.createElement("hr");
+    separator.className = "separator";
+    this.contentContainer = document.createElement("div");
+    this.contentContainer.className = "content-container";
+    const contentSlot = document.createElement("slot");
+    contentSlot.name = "content";
+    contentSlot.className = "content";
+    this.innerContainer.appendChild(titleSlot);
+    this.innerContainer.appendChild(descriptionSlot);
+    this.innerContainer.appendChild(separator);
+    this.contentContainer.appendChild(contentSlot);
+    this.innerContainer.appendChild(this.contentContainer);
+    this.modal.appendChild(this.innerContainer);
+    shadow.appendChild(this.modal);
+    if (this.hasAttribute("x-cloak")) {
+      this.removeAttribute("x-cloak");
+    }
     this.modal.addEventListener("click", (event) => {
       if (event.target === this.modal) {
         this.close();

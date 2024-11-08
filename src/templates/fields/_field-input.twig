@@ -55,21 +55,6 @@
             }) }}
 
             <div class=" group flex flex-row">
-                {{ forms.button({
-                    label: 'Start Audio Job' | t('bespoken'),
-                    class: [
-                        'btn',
-                        'bespoken-button',
-                        'bespoken-generate',
-                    ],
-                    attributes: {
-                        data: {
-                            'target-field': field.sourceField,
-                            'action-url': actionUrl('bespoken/bespoken/process-text')
-                        }
-                    }
-                }) }}
-
 
                 {%  if fieldSettings.showPreview %}
                 {{ forms.button({
@@ -87,13 +72,30 @@
                 }) }}
 
 
-<modal-dialog class="bespoken-dialog" >
-  <div slot="title">{{ "Preview window title" | t('bespoken') }}</div>
-  <div slot="description">{{ "Preview window description" | t('bespoken') }}</div>
-  <div slot="content"></div>
-</modal-dialog>
+                {{ forms.button({
+                    label: 'Start Audio Job' | t('bespoken'),
+                    class: [
+                        'btn',
+                        'bespoken-button',
+                        'bespoken-generate',
+                    ],
+                    attributes: {
+                        data: {
+                            'target-field': field.sourceField,
+                            'action-url': actionUrl('bespoken/bespoken/process-text')
+                        }
+                    }
+                }) }}
 
 
+
+
+
+                <modal-dialog class="bespoken-dialog" x-cloak>
+                  <div slot="title">{{ "Preview window title" | t('bespoken') }}</div>
+                  <div slot="description">{{ "Preview window description" | t('bespoken') }}</div>
+                  <div slot="content"></div>
+                </modal-dialog>
 
                 {% endif %}
 
@@ -101,5 +103,9 @@
             </div>
         </div>
     {% endif %}
+
+    {% css %}
+    [x-cloak] { display: none !important; }
+    {% endcss %}
 
 </div>

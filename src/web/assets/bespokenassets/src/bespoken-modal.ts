@@ -13,62 +13,7 @@ export default class ModalDialog extends HTMLElement {
     // Attach shadow DOM to encapsulate styles and structure
     const shadow = this.attachShadow({ mode: 'open' });
 
-    // Create the main modal container (the overlay)
-    this.modal = document.createElement('div');
-    this.modal.className = 'modal';
-
-    // Create the inner container that holds all dialog content
-    this.innerContainer = document.createElement('div');
-    this.innerContainer.className = 'inner-container';
-
-    // Create a close button for the modal
-    this.closeButton = document.createElement('button');
-    this.closeButton.className = 'close-button';
-    this.closeButton.textContent = 'X';
-    this.closeButton.addEventListener('click', () => this.close());
-
-    // Append the close button to the inner container
-    this.innerContainer.appendChild(this.closeButton);
-
-    // Create the slots for title, description, and content
-    const titleSlot = document.createElement('slot');
-    titleSlot.name = 'title';
-    titleSlot.className = 'title';
-
-    const descriptionSlot = document.createElement('slot');
-    descriptionSlot.name = 'description';
-    descriptionSlot.className = 'description';
-
-    // Create an <hr> element for visual separation before the content
-    const separator = document.createElement('hr');
-    separator.className = 'separator';
-
-    // Create the content container
-    this.contentContainer = document.createElement('div');
-    this.contentContainer.className = 'content-container';
-
-    const contentSlot = document.createElement('slot');
-    contentSlot.name = 'content';
-    contentSlot.className = 'content';
-
-    // Append the slots to the inner container
-    this.innerContainer.appendChild(titleSlot);
-    this.innerContainer.appendChild(descriptionSlot);
-    this.innerContainer.appendChild(separator);
-
-    // Append the content slot to the content container
-    this.contentContainer.appendChild(contentSlot);
-
-    // Append the content container to the inner container
-    this.innerContainer.appendChild(this.contentContainer);
-
-    // Append the inner container to the modal
-    this.modal.appendChild(this.innerContainer);
-
-    // Append the modal to the shadow DOM
-    shadow.appendChild(this.modal);
-
-    // Define the styles for the modal component
+    // Create the style first to prevent unstyled content flash
     const style = document.createElement('style');
     style.textContent = `
       .modal {
@@ -141,6 +86,66 @@ export default class ModalDialog extends HTMLElement {
       }
     `;
     shadow.appendChild(style);
+
+    // Create the main modal container (the overlay)
+    this.modal = document.createElement('div');
+    this.modal.className = 'modal';
+
+    // Create the inner container that holds all dialog content
+    this.innerContainer = document.createElement('div');
+    this.innerContainer.className = 'inner-container';
+
+    // Create a close button for the modal
+    this.closeButton = document.createElement('button');
+    this.closeButton.className = 'close-button';
+    this.closeButton.textContent = 'X';
+    this.closeButton.addEventListener('click', () => this.close());
+
+    // Append the close button to the inner container
+    this.innerContainer.appendChild(this.closeButton);
+
+    // Create the slots for title, description, and content
+    const titleSlot = document.createElement('slot');
+    titleSlot.name = 'title';
+    titleSlot.className = 'title';
+
+    const descriptionSlot = document.createElement('slot');
+    descriptionSlot.name = 'description';
+    descriptionSlot.className = 'description';
+
+    // Create an <hr> element for visual separation before the content
+    const separator = document.createElement('hr');
+    separator.className = 'separator';
+
+    // Create the content container
+    this.contentContainer = document.createElement('div');
+    this.contentContainer.className = 'content-container';
+
+    const contentSlot = document.createElement('slot');
+    contentSlot.name = 'content';
+    contentSlot.className = 'content';
+
+    // Append the slots to the inner container
+    this.innerContainer.appendChild(titleSlot);
+    this.innerContainer.appendChild(descriptionSlot);
+    this.innerContainer.appendChild(separator);
+
+    // Append the content slot to the content container
+    this.contentContainer.appendChild(contentSlot);
+
+    // Append the content container to the inner container
+    this.innerContainer.appendChild(this.contentContainer);
+
+    // Append the inner container to the modal
+    this.modal.appendChild(this.innerContainer);
+
+    // Append the modal to the shadow DOM
+    shadow.appendChild(this.modal);
+
+    // Remove x-cloak attribute if present
+    if (this.hasAttribute('x-cloak')) {
+      this.removeAttribute('x-cloak');
+    }
 
     // Close the modal if clicked outside the inner container
     this.modal.addEventListener('click', (event) => {
@@ -273,7 +278,11 @@ export default class ModalDialog extends HTMLElement {
 customElements.define('modal-dialog', ModalDialog);
 
 // Usage Example (in HTML):
-// <modal-dialog id="myDialog">
+// <!-- in the HTML head, include the rule to prevent flash of unstyled content -->
+// <style>[x-cloak] { display: none !important; }</style>
+//
+// <!-- note the x-cloak attribute which will be removed in the initialization process -->
+// <modal-dialog id="myDialog" x-cloak>
 //   <span slot="title">Dialog Title</span>
 //   <span slot="description">This is a description for the dialog</span>
 //   <div slot="content">

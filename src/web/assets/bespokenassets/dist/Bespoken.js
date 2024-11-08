@@ -1,61 +1,37 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-
 // src/web/assets/bespokenassets/src/bespoken-modal.ts
-var require_bespoken_modal = __commonJS({
-  "src/web/assets/bespokenassets/src/bespoken-modal.ts"() {
-    var ModalDialog2 = class extends HTMLElement {
-      constructor() {
-        super();
-        const shadow = this.attachShadow({ mode: "open" });
-        this.modal = document.createElement("div");
-        this.modal.className = "modal";
-        this.innerContainer = document.createElement("div");
-        this.innerContainer.className = "inner-container";
-        this.closeButton = document.createElement("button");
-        this.closeButton.className = "close-button";
-        this.closeButton.textContent = "X";
-        this.closeButton.addEventListener("click", () => this.close());
-        this.innerContainer.appendChild(this.closeButton);
-        this.titleSlot = document.createElement("slot");
-        this.titleSlot.name = "title";
-        this.titleSlot.className = "title";
-        this.descriptionSlot = document.createElement("slot");
-        this.descriptionSlot.name = "description";
-        this.descriptionSlot.className = "description";
-        this.contentSlot = document.createElement("slot");
-        this.contentSlot.name = "content";
-        this.contentSlot.className = "content";
-        this.innerContainer.appendChild(this.titleSlot);
-        this.innerContainer.appendChild(this.descriptionSlot);
-        this.innerContainer.appendChild(this.contentSlot);
-        this.modal.appendChild(this.innerContainer);
-        shadow.appendChild(this.modal);
-        const style = document.createElement("style");
-        style.textContent = `
+var ModalDialog = class extends HTMLElement {
+  constructor() {
+    super();
+    this.debounceTimeout = null;
+    const shadow = this.attachShadow({ mode: "open" });
+    this.modal = document.createElement("div");
+    this.modal.className = "modal";
+    this.innerContainer = document.createElement("div");
+    this.innerContainer.className = "inner-container";
+    this.closeButton = document.createElement("button");
+    this.closeButton.className = "close-button";
+    this.closeButton.textContent = "X";
+    this.closeButton.addEventListener("click", () => this.close());
+    this.innerContainer.appendChild(this.closeButton);
+    const titleSlot = document.createElement("slot");
+    titleSlot.name = "title";
+    titleSlot.className = "title";
+    const descriptionSlot = document.createElement("slot");
+    descriptionSlot.name = "description";
+    descriptionSlot.className = "description";
+    this.contentContainer = document.createElement("div");
+    this.contentContainer.className = "content-container";
+    const contentSlot = document.createElement("slot");
+    contentSlot.name = "content";
+    contentSlot.className = "content";
+    this.innerContainer.appendChild(titleSlot);
+    this.innerContainer.appendChild(descriptionSlot);
+    this.contentContainer.appendChild(contentSlot);
+    this.innerContainer.appendChild(this.contentContainer);
+    this.modal.appendChild(this.innerContainer);
+    shadow.appendChild(this.modal);
+    const style = document.createElement("style");
+    style.textContent = `
       .modal {
         position: fixed;
         top: 0;
@@ -76,17 +52,18 @@ var require_bespoken_modal = __commonJS({
         opacity: 1;
       }
       .inner-container {
-      display: flex;
-        flex-direction: column;
-        gap: 5px;
         background: white;
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         max-width: 500px;
         width: 90%;
+        max-height: 85vh;
         box-sizing: border-box;
         position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
       }
       .close-button {
         position: absolute;
@@ -98,79 +75,111 @@ var require_bespoken_modal = __commonJS({
         cursor: pointer;
       }
       .title {
-        font-size: 1.25em;
+        font-size: 1.5em;
         font-weight: bold;
         margin-bottom: 10px;
+        flex: 0 0 auto;
       }
       .description {
-        display: block;
-        font-size: 0.875em;
+        font-size: 1em;
         color: #666;
-        padding-bottom: 5px;
-        margin-bottom: 5px;
-        border-bottom: 1px solid #ddd;
+        margin-bottom: 15px;
+        flex: 0 0 auto;
+      }
+      .content-container {
+        flex: 1 1 auto;
+        overflow-y: auto;
       }
       .content {
         font-size: 1em;
       }
     `;
-        shadow.appendChild(style);
-        this.modal.addEventListener("click", (event) => {
-          if (event.target === this.modal) {
-            this.close();
-          }
-        });
-        this.setAttribute("hidden", "");
+    shadow.appendChild(style);
+    this.modal.addEventListener("click", (event) => {
+      if (event.target === this.modal) {
+        this.close();
       }
-      // Method to open the dialog
-      open() {
-        this.modal.classList.add("show");
-      }
-      // Method to close the dialog
-      close() {
-        this.modal.classList.remove("show");
-      }
-      // Set title content
-      setTitle(title) {
-        const titleElement = document.createElement("span");
-        titleElement.slot = "title";
-        titleElement.textContent = title;
-        this.clearSlotContent(this.titleSlot);
-        this.appendChild(titleElement);
-      }
-      // Set description content
-      setDescription(description) {
-        const descriptionElement = document.createElement("span");
-        descriptionElement.slot = "description";
-        descriptionElement.textContent = description;
-        this.clearSlotContent(this.descriptionSlot);
-        this.appendChild(descriptionElement);
-      }
-      // Set content for the main content area
-      setContent(content) {
-        const contentElement = typeof content === "string" ? document.createElement("div") : content;
-        contentElement.slot = "content";
-        if (typeof content === "string") {
-          contentElement.textContent = content;
-        }
-        this.clearSlotContent(this.contentSlot);
-        this.appendChild(contentElement);
-      }
-      // Utility method to clear the slot content before adding new content
-      clearSlotContent(slot) {
-        const assignedElements = slot.assignedElements();
-        assignedElements.forEach((el) => el.remove());
-      }
-      connectedCallback() {
-        this.removeAttribute("hidden");
-      }
-    };
-    customElements.define("modal-dialog", ModalDialog2);
+    });
+    this.resizeObserver = new ResizeObserver(() => {
+      this.debouncedHandleResize();
+    });
   }
-});
-
-// src/web/assets/bespokenassets/src/Bespoken.ts
-var import_bespoken_modal = __toESM(require_bespoken_modal());
+  // Method to open the modal dialog
+  open() {
+    this.modal.classList.add("show");
+    document.body.style.overflow = "hidden";
+    this.calculateContentHeight();
+    this.resizeObserver.observe(document.body);
+  }
+  // Method to close the modal dialog
+  close() {
+    this.modal.classList.remove("show");
+    document.body.style.overflow = "";
+    this.resizeObserver.unobserve(document.body);
+  }
+  // Method to calculate and set the content container's max height dynamically
+  calculateContentHeight() {
+    const innerContainerHeight = this.innerContainer.getBoundingClientRect().height;
+    const otherElementsHeight = this.closeButton.offsetHeight + 40;
+    const maxHeight = innerContainerHeight - otherElementsHeight;
+    this.contentContainer.style.maxHeight = `${maxHeight}px`;
+  }
+  // Debounced function to handle window resize events
+  debouncedHandleResize() {
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+    }
+    this.debounceTimeout = window.setTimeout(() => {
+      this.calculateContentHeight();
+    }, 200);
+  }
+  // Method to set the title content
+  setTitle(title) {
+    let titleElement = this.querySelector('[slot="title"]');
+    if (!titleElement) {
+      titleElement = document.createElement("span");
+      titleElement.slot = "title";
+      this.appendChild(titleElement);
+    }
+    titleElement.textContent = title;
+  }
+  // Method to set the description content
+  setDescription(description) {
+    let descriptionElement = this.querySelector('[slot="description"]');
+    if (!descriptionElement) {
+      descriptionElement = document.createElement("span");
+      descriptionElement.slot = "description";
+      this.appendChild(descriptionElement);
+    }
+    descriptionElement.textContent = description;
+  }
+  // Method to set the main content
+  setContent(content) {
+    let contentElement = this.querySelector('[slot="content"]');
+    if (!contentElement) {
+      contentElement = document.createElement("div");
+      contentElement.slot = "content";
+      this.appendChild(contentElement);
+    }
+    if (typeof content === "string") {
+      contentElement.textContent = content;
+    } else {
+      contentElement.innerHTML = "";
+      contentElement.appendChild(content);
+    }
+  }
+  // Lifecycle hook that runs when the component is added to the DOM
+  connectedCallback() {
+  }
+  // Lifecycle hook that runs when the component is removed from the DOM
+  disconnectedCallback() {
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+    }
+    this.resizeObserver.disconnect();
+  }
+};
+customElements.define("modal-dialog", ModalDialog);
 
 // src/web/assets/bespokenassets/src/progress-component-v2.ts
 var ProgressComponent = class extends HTMLElement {
@@ -648,7 +657,7 @@ document.addEventListener("DOMContentLoaded", () => {
     customElements.define("progress-component", ProgressComponent);
   }
   if (!customElements.get("modal-dialog")) {
-    customElements.define("modal-dialog", import_bespoken_modal.default);
+    customElements.define("modal-dialog", ModalDialog);
   }
   const buttons = document.querySelectorAll(".bespoken-generate");
   buttons.forEach((button) => {

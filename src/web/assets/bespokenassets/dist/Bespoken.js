@@ -1,32 +1,62 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
 // src/web/assets/bespokenassets/src/bespoken-modal.ts
-var ModalDialog = class extends HTMLElement {
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: "open" });
-    this.modal = document.createElement("div");
-    this.modal.className = "modal";
-    this.closeButton = document.createElement("button");
-    this.closeButton.className = "close-button";
-    this.closeButton.textContent = "X";
-    this.closeButton.addEventListener("click", () => this.close());
-    this.modal.appendChild(this.closeButton);
-    const titleSlot = document.createElement("slot");
-    titleSlot.name = "title";
-    titleSlot.className = "title";
-    const descriptionSlot = document.createElement("slot");
-    descriptionSlot.name = "description";
-    descriptionSlot.className = "description";
-    const contentSlot = document.createElement("slot");
-    contentSlot.name = "content";
-    contentSlot.className = "content";
-    this.modal.appendChild(titleSlot);
-    this.modal.appendChild(descriptionSlot);
-    this.modal.appendChild(contentSlot);
-    shadow.appendChild(this.modal);
-    const style = document.createElement("style");
-    style.textContent = `
+var require_bespoken_modal = __commonJS({
+  "src/web/assets/bespokenassets/src/bespoken-modal.ts"() {
+    var ModalDialog2 = class extends HTMLElement {
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: "open" });
+        this.modal = document.createElement("div");
+        this.modal.className = "modal";
+        this.innerContainer = document.createElement("div");
+        this.innerContainer.className = "inner-container";
+        this.closeButton = document.createElement("button");
+        this.closeButton.className = "close-button";
+        this.closeButton.textContent = "X";
+        this.closeButton.addEventListener("click", () => this.close());
+        this.innerContainer.appendChild(this.closeButton);
+        this.titleSlot = document.createElement("slot");
+        this.titleSlot.name = "title";
+        this.titleSlot.className = "title";
+        this.descriptionSlot = document.createElement("slot");
+        this.descriptionSlot.name = "description";
+        this.descriptionSlot.className = "description";
+        this.contentSlot = document.createElement("slot");
+        this.contentSlot.name = "content";
+        this.contentSlot.className = "content";
+        this.innerContainer.appendChild(this.titleSlot);
+        this.innerContainer.appendChild(this.descriptionSlot);
+        this.innerContainer.appendChild(this.contentSlot);
+        this.modal.appendChild(this.innerContainer);
+        shadow.appendChild(this.modal);
+        const style = document.createElement("style");
+        style.textContent = `
       .modal {
-        
         position: fixed;
         top: 0;
         left: 0;
@@ -39,12 +69,24 @@ var ModalDialog = class extends HTMLElement {
         visibility: hidden;
         opacity: 0;
         transition: opacity 0.3s ease;
-        
-        z-index: 10000;
+        z-index: 5000;
       }
       .modal.show {
         visibility: visible;
         opacity: 1;
+      }
+      .inner-container {
+      display: flex;
+        flex-direction: column;
+        gap: 5px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        max-width: 500px;
+        width: 90%;
+        box-sizing: border-box;
+        position: relative;
       }
       .close-button {
         position: absolute;
@@ -55,39 +97,80 @@ var ModalDialog = class extends HTMLElement {
         font-size: 20px;
         cursor: pointer;
       }
-      .title, .description, .content {
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        width: 400px;
+      .title {
+        font-size: 1.25em;
+        font-weight: bold;
+        margin-bottom: 10px;
       }
       .description {
-        font-size: 14px;
+        display: block;
+        font-size: 0.875em;
         color: #666;
+        padding-bottom: 5px;
+        margin-bottom: 5px;
+        border-bottom: 1px solid #ddd;
+      }
+      .content {
+        font-size: 1em;
       }
     `;
-    shadow.appendChild(style);
-    this.modal.addEventListener("click", (event) => {
-      if (event.target === this.modal) {
-        this.close();
+        shadow.appendChild(style);
+        this.modal.addEventListener("click", (event) => {
+          if (event.target === this.modal) {
+            this.close();
+          }
+        });
+        this.setAttribute("hidden", "");
       }
-    });
-    this.setAttribute("hidden", "");
+      // Method to open the dialog
+      open() {
+        this.modal.classList.add("show");
+      }
+      // Method to close the dialog
+      close() {
+        this.modal.classList.remove("show");
+      }
+      // Set title content
+      setTitle(title) {
+        const titleElement = document.createElement("span");
+        titleElement.slot = "title";
+        titleElement.textContent = title;
+        this.clearSlotContent(this.titleSlot);
+        this.appendChild(titleElement);
+      }
+      // Set description content
+      setDescription(description) {
+        const descriptionElement = document.createElement("span");
+        descriptionElement.slot = "description";
+        descriptionElement.textContent = description;
+        this.clearSlotContent(this.descriptionSlot);
+        this.appendChild(descriptionElement);
+      }
+      // Set content for the main content area
+      setContent(content) {
+        const contentElement = typeof content === "string" ? document.createElement("div") : content;
+        contentElement.slot = "content";
+        if (typeof content === "string") {
+          contentElement.textContent = content;
+        }
+        this.clearSlotContent(this.contentSlot);
+        this.appendChild(contentElement);
+      }
+      // Utility method to clear the slot content before adding new content
+      clearSlotContent(slot) {
+        const assignedElements = slot.assignedElements();
+        assignedElements.forEach((el) => el.remove());
+      }
+      connectedCallback() {
+        this.removeAttribute("hidden");
+      }
+    };
+    customElements.define("modal-dialog", ModalDialog2);
   }
-  open() {
-    this.modal.classList.add("show");
-  }
-  close() {
-    this.modal.classList.remove("show");
-  }
-  connectedCallback() {
-    this.removeAttribute("hidden");
-  }
-  disconnectedCallback() {
-  }
-};
-customElements.define("modal-dialog", ModalDialog);
+});
+
+// src/web/assets/bespokenassets/src/Bespoken.ts
+var import_bespoken_modal = __toESM(require_bespoken_modal());
 
 // src/web/assets/bespokenassets/src/progress-component-v2.ts
 var ProgressComponent = class extends HTMLElement {
@@ -565,7 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
     customElements.define("progress-component", ProgressComponent);
   }
   if (!customElements.get("modal-dialog")) {
-    customElements.define("modal-dialog", ModalDialog);
+    customElements.define("modal-dialog", import_bespoken_modal.default);
   }
   const buttons = document.querySelectorAll(".bespoken-generate");
   buttons.forEach((button) => {
@@ -624,7 +707,9 @@ function handlePreviewButtonClick(event) {
   const parentElement = event.target.closest(".bespoken-fields");
   const modal = parentElement.querySelector(".bespoken-dialog");
   if (modal) {
-    modal.title = title;
+    modal.setTitle("Preview");
+    modal.setDescription("This is a preview of the generated script");
+    modal.setContent(text);
     modal.open();
   }
 }

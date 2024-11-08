@@ -174,8 +174,10 @@ function handlePreviewButtonClick(event: Event): void {
 
     if (modal)
     {
-        modal.title = title;
-
+        // modal.title = title;
+        modal.setTitle("Preview");
+        modal.setDescription("This is a preview of the generated script");
+        modal.setContent(text);
         // modal.content = text;
         // modal.description = text;
         modal.open();

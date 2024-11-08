@@ -4,6 +4,7 @@ export default class ModalDialog extends HTMLElement {
   private innerContainer: HTMLElement;
   private titleSlot: HTMLSlotElement;
   private descriptionSlot: HTMLSlotElement;
+  private contentContainer: HTMLElement;
   private contentSlot: HTMLSlotElement;
 
   constructor() {
@@ -38,6 +39,11 @@ export default class ModalDialog extends HTMLElement {
     this.descriptionSlot.name = 'description';
     this.descriptionSlot.className = 'description';
 
+    // Content Container
+    // create an element to hold the content
+    this.contentContainer = document.createElement('div');
+    this.contentContainer.className = 'content-container';
+
     // Content slot
     this.contentSlot = document.createElement('slot');
     this.contentSlot.name = 'content';
@@ -46,7 +52,8 @@ export default class ModalDialog extends HTMLElement {
     // Append slots to the inner container
     this.innerContainer.appendChild(this.titleSlot);
     this.innerContainer.appendChild(this.descriptionSlot);
-    this.innerContainer.appendChild(this.contentSlot);
+    this.innerContainer.appendChild(this.contentContainer);
+    this.contentContainer.appendChild(this.contentSlot);
 
     // Append the inner container to the modal
     this.modal.appendChild(this.innerContainer);
@@ -86,6 +93,7 @@ export default class ModalDialog extends HTMLElement {
         max-width: 500px;
         width: 90%;
         max-height: 85vh; /* Limit the inner container's height to 85% of the viewport height */
+        height: 100%;
         box-sizing: border-box;
         position: relative;
         overflow: hidden;
@@ -102,22 +110,32 @@ export default class ModalDialog extends HTMLElement {
         cursor: pointer;
       }
       .title {
+        flex: 0 0 auto;
         font-size: 1.25em;
         font-weight: bold;
         margin-bottom: 10px;
+        height: 100%;
       }
       .description {
+        flex: 0 0 auto;
         display: block;
         font-size: 0.875em;
         color: #666;
         padding-bottom: 5px;
         margin-bottom: 5px;
         border-bottom: 1px solid #ddd;
+        
+      }
+      .content-container {
+        background: red;
+        flex: 1 1 auto;
+        font-size: 1em;
+        height: 50%;
       }
       .content {
-        font-size: 1em;
+        display: block;
+        height: 100%;
         overflow-y: auto; /* Allow scrolling within the content area if content overflows */
-        flex-grow: 1; /* Take up remaining space in the container */
       }
     `;
     shadow.appendChild(style);

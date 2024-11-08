@@ -34,4 +34,6 @@ return [
     'Prefix instructions' => 'An optional prefix to the audio filename.',
     'Source field instructions' => 'The field handle of the field that will be read aloud. To include multiple handles, separate the handles with a comma. You can include `title` to have the title of your entry have it included in your audio narration.',
     'Pronunciations instructions' => 'Add words and alternate spellings that reflects their pronunciation to help the AI pronounce some words. These will be swapped out in the text before sending to the API.',
+    'Preview window title' => 'Preview of the narration script',
+    'Preview window description' => 'Correct any errors in your entry before generating the audio.',
 ];

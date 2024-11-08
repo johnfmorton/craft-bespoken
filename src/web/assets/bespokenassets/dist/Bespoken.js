@@ -19,6 +19,8 @@ var ModalDialog = class extends HTMLElement {
     const descriptionSlot = document.createElement("slot");
     descriptionSlot.name = "description";
     descriptionSlot.className = "description";
+    const separator = document.createElement("hr");
+    separator.className = "separator";
     this.contentContainer = document.createElement("div");
     this.contentContainer.className = "content-container";
     const contentSlot = document.createElement("slot");
@@ -26,6 +28,7 @@ var ModalDialog = class extends HTMLElement {
     contentSlot.className = "content";
     this.innerContainer.appendChild(titleSlot);
     this.innerContainer.appendChild(descriptionSlot);
+    this.innerContainer.appendChild(separator);
     this.contentContainer.appendChild(contentSlot);
     this.innerContainer.appendChild(this.contentContainer);
     this.modal.appendChild(this.innerContainer);
@@ -82,13 +85,16 @@ var ModalDialog = class extends HTMLElement {
         flex: 0 0 auto;
       }
       .description {
-      display: block;
+        display: block;
         font-size: 0.85em;
         color: #666;
-        padding-bottom: 5px;
-        margin-bottom: 5px;
         flex: 0 0 auto;
-        border-bottom: 1px solid #ddd;
+      }
+      .separator {
+        border: none;
+        border-top: 1px solid #ddd;
+        margin: 10px 0;
+        flex: 0 0 auto;
       }
       .content-container {
         flex: 1 1 auto;
@@ -101,6 +107,11 @@ var ModalDialog = class extends HTMLElement {
     shadow.appendChild(style);
     this.modal.addEventListener("click", (event) => {
       if (event.target === this.modal) {
+        this.close();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
         this.close();
       }
     });
@@ -140,22 +151,45 @@ var ModalDialog = class extends HTMLElement {
   // Method to set the title content
   setTitle(title) {
     let titleElement = this.querySelector('[slot="title"]');
-    if (!titleElement) {
-      titleElement = document.createElement("span");
-      titleElement.slot = "title";
-      this.appendChild(titleElement);
+    if (title) {
+      if (!titleElement) {
+        titleElement = document.createElement("span");
+        titleElement.slot = "title";
+        this.appendChild(titleElement);
+      }
+      titleElement.textContent = title;
+      titleElement.style.display = "block";
+    } else if (titleElement) {
+      titleElement.style.display = "none";
     }
-    titleElement.textContent = title;
   }
   // Method to set the description content
   setDescription(description) {
     let descriptionElement = this.querySelector('[slot="description"]');
-    if (!descriptionElement) {
-      descriptionElement = document.createElement("span");
-      descriptionElement.slot = "description";
-      this.appendChild(descriptionElement);
+    if (description) {
+      if (!descriptionElement) {
+        descriptionElement = document.createElement("span");
+        descriptionElement.slot = "description";
+        this.appendChild(descriptionElement);
+      }
+      descriptionElement.textContent = description;
+      descriptionElement.style.display = "block";
+    } else if (descriptionElement) {
+      descriptionElement.style.display = "none";
     }
-    descriptionElement.textContent = description;
+  }
+  // Lifecycle hook that runs when the component is added to the DOM
+  connectedCallback() {
+    this.initializeSlots();
+  }
+  // Method to initialize slots and apply styles if default content is present
+  initializeSlots() {
+    const descriptionElement = this.querySelector('[slot="description"]');
+    if (descriptionElement && descriptionElement.textContent.trim() !== "") {
+      descriptionElement.style.display = "block";
+    } else if (descriptionElement) {
+      descriptionElement.style.display = "none";
+    }
   }
   // Method to set the main content
   setContent(content) {
@@ -171,9 +205,6 @@ var ModalDialog = class extends HTMLElement {
       contentElement.innerHTML = "";
       contentElement.appendChild(content);
     }
-  }
-  // Lifecycle hook that runs when the component is added to the DOM
-  connectedCallback() {
   }
   // Lifecycle hook that runs when the component is removed from the DOM
   disconnectedCallback() {
@@ -720,8 +751,6 @@ function handlePreviewButtonClick(event) {
   const parentElement = event.target.closest(".bespoken-fields");
   const modal = parentElement.querySelector(".bespoken-dialog");
   if (modal) {
-    modal.setTitle("Preview");
-    modal.setDescription("This is a preview of the generated script");
     modal.setContent(text);
     modal.open();
   }

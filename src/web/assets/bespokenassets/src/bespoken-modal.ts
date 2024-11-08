@@ -39,6 +39,10 @@ export default class ModalDialog extends HTMLElement {
     descriptionSlot.name = 'description';
     descriptionSlot.className = 'description';
 
+    // Create an <hr> element for visual separation before the content
+    const separator = document.createElement('hr');
+    separator.className = 'separator';
+
     // Create the content container
     this.contentContainer = document.createElement('div');
     this.contentContainer.className = 'content-container';
@@ -50,6 +54,7 @@ export default class ModalDialog extends HTMLElement {
     // Append the slots to the inner container
     this.innerContainer.appendChild(titleSlot);
     this.innerContainer.appendChild(descriptionSlot);
+    this.innerContainer.appendChild(separator);
 
     // Append the content slot to the content container
     this.contentContainer.appendChild(contentSlot);
@@ -116,13 +121,16 @@ export default class ModalDialog extends HTMLElement {
         flex: 0 0 auto;
       }
       .description {
-      display: block;
+        display: block;
         font-size: 0.85em;
         color: #666;
-        padding-bottom: 5px;
-        margin-bottom: 5px;
         flex: 0 0 auto;
-        border-bottom: 1px solid #ddd;
+      }
+      .separator {
+        border: none;
+        border-top: 1px solid #ddd;
+        margin: 10px 0;
+        flex: 0 0 auto;
       }
       .content-container {
         flex: 1 1 auto;
@@ -137,6 +145,13 @@ export default class ModalDialog extends HTMLElement {
     // Close the modal if clicked outside the inner container
     this.modal.addEventListener('click', (event) => {
       if (event.target === this.modal) {
+        this.close();
+      }
+    });
+
+    // Close the modal if the ESC key is pressed
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
         this.close();
       }
     });
@@ -183,23 +198,49 @@ export default class ModalDialog extends HTMLElement {
   // Method to set the title content
   setTitle(title: string) {
     let titleElement = this.querySelector('[slot="title"]');
-    if (!titleElement) {
-      titleElement = document.createElement('span');
-      titleElement.slot = 'title';
-      this.appendChild(titleElement);
+    if (title) {
+      if (!titleElement) {
+        titleElement = document.createElement('span');
+        titleElement.slot = 'title';
+        this.appendChild(titleElement);
+      }
+      titleElement.textContent = title;
+      (titleElement as HTMLElement).style.display = 'block';
+    } else if (titleElement) {
+      (titleElement as HTMLElement).style.display = 'none';
     }
-    titleElement.textContent = title;
   }
 
   // Method to set the description content
   setDescription(description: string) {
     let descriptionElement = this.querySelector('[slot="description"]');
-    if (!descriptionElement) {
-      descriptionElement = document.createElement('span');
-      descriptionElement.slot = 'description';
-      this.appendChild(descriptionElement);
+    if (description) {
+      if (!descriptionElement) {
+        descriptionElement = document.createElement('span');
+        descriptionElement.slot = 'description';
+        this.appendChild(descriptionElement);
+      }
+      descriptionElement.textContent = description;
+      (descriptionElement as HTMLElement).style.display = 'block';
+    } else if (descriptionElement) {
+      (descriptionElement as HTMLElement).style.display = 'none';
     }
-    descriptionElement.textContent = description;
+  }
+
+  // Lifecycle hook that runs when the component is added to the DOM
+  connectedCallback() {
+    // Set up any additional behavior if necessary when the component is attached to the DOM
+    this.initializeSlots();
+  }
+
+  // Method to initialize slots and apply styles if default content is present
+  private initializeSlots() {
+    const descriptionElement = this.querySelector('[slot="description"]');
+    if (descriptionElement && descriptionElement.textContent.trim() !== '') {
+      (descriptionElement as HTMLElement).style.display = 'block';
+    } else if (descriptionElement) {
+      (descriptionElement as HTMLElement).style.display = 'none';
+    }
   }
 
   // Method to set the main content
@@ -218,11 +259,6 @@ export default class ModalDialog extends HTMLElement {
     }
   }
 
-  // Lifecycle hook that runs when the component is added to the DOM
-  connectedCallback() {
-    // Set up any additional behavior if necessary when the component is attached to the DOM
-  }
-
   // Lifecycle hook that runs when the component is removed from the DOM
   disconnectedCallback() {
     // Clean up any resources if necessary when the component is detached from the DOM
@@ -239,12 +275,12 @@ customElements.define('modal-dialog', ModalDialog);
 // Usage Example (in HTML):
 // <modal-dialog id="myDialog">
 //   <span slot="title">Dialog Title</span>
-//   <span slot="description">This is a description for the dialog.</span>
+//   <span slot="description">This is a description for the dialog</span>
 //   <div slot="content">
 //     <p>Your HTML content goes here.</p>
 //   </div>
 // </modal-dialog>
-// 
+//
 // <script>
 //   const myDialog = document.getElementById('myDialog');
 //   myDialog.open();

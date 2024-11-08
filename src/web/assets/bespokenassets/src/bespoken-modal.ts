@@ -109,16 +109,20 @@ export default class ModalDialog extends HTMLElement {
         cursor: pointer;
       }
       .title {
-        font-size: 1.5em;
+        display: block;
+        font-size: 1.25em;
         font-weight: bold;
-        margin-bottom: 10px;
+        margin-bottom: 4px;
         flex: 0 0 auto;
       }
       .description {
-        font-size: 1em;
+      display: block;
+        font-size: 0.85em;
         color: #666;
-        margin-bottom: 15px;
+        padding-bottom: 5px;
+        margin-bottom: 5px;
         flex: 0 0 auto;
+        border-bottom: 1px solid #ddd;
       }
       .content-container {
         flex: 1 1 auto;

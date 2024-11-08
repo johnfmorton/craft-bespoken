@@ -1,4 +1,4 @@
-class ModalDialog extends HTMLElement {
+export default class ModalDialog extends HTMLElement {
   private modal: HTMLElement;
   private closeButton: HTMLElement;
   private innerContainer: HTMLElement;
@@ -76,7 +76,7 @@ class ModalDialog extends HTMLElement {
         opacity: 1;
       }
       .inner-container {
-      display: flex;
+        display: flex;
         flex-direction: column;
         gap: 5px;
         background: white;
@@ -85,8 +85,12 @@ class ModalDialog extends HTMLElement {
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         max-width: 500px;
         width: 90%;
+        max-height: 85vh; /* Limit the inner container's height to 85% of the viewport height */
         box-sizing: border-box;
         position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
       }
       .close-button {
         position: absolute;
@@ -112,6 +116,8 @@ class ModalDialog extends HTMLElement {
       }
       .content {
         font-size: 1em;
+        overflow-y: auto; /* Allow scrolling within the content area if content overflows */
+        flex-grow: 1; /* Take up remaining space in the container */
       }
     `;
     shadow.appendChild(style);

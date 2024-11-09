@@ -298,3 +298,5 @@ customElements.define('modal-dialog', ModalDialog);
 //   myDialog.setContent('This is the updated main content.');
 //   // To close the dialog: myDialog.close();
 // </script>
+
+// x-cloak class name "borrowed" from Alpine.js - https://alpinejs.dev/directives/cloak

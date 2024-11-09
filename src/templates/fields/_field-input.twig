@@ -71,6 +71,7 @@
                     }
                 }) }}
 
+                {% endif %}
 
                 {{ forms.button({
                     label: 'Start Audio Job' | t('bespoken'),
@@ -87,16 +88,12 @@
                     }
                 }) }}
 
-
-
-
-
+                {%  if fieldSettings.showPreview %}
                 <modal-dialog class="bespoken-dialog" x-cloak>
                   <div slot="title">{{ "Preview window title" | t('bespoken') }}</div>
                   <div slot="description">{{ "Preview window description" | t('bespoken') }}</div>
                   <div slot="content"></div>
                 </modal-dialog>
-
                 {% endif %}
 
                 <progress-component progress="0" size="24" message="Waiting to generate audio." class="bespoken-progress-component"></progress-component>

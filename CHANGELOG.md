@@ -2,7 +2,7 @@
 
 ## 5.0.6 - 2024-11-09
 ### Added
-- Added a new feature to allow users to preview the script that will be sent to the ElevenLabs API. This feature is useful for debugging pronunciation issues and other potential problems. The preview can be accessed by clicking the "Preview" button in the Bespoken field in the entry editor. The preview button can also be disabled in the field settings if desired.
+- A new feature was added to allow users to preview the script that will be sent to the ElevenLabs API. This feature is helpful for debugging pronunciation issues and other potential problems. The preview can be accessed by clicking the "Preview" button in the Bespoken field in the entry editor. The preview button can also be disabled in the field settings if desired.
 
 ## 5.0.5 - 2024-10-31
 ### Fixed

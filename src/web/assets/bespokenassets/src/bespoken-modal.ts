@@ -118,8 +118,9 @@ export default class ModalDialog extends HTMLElement {
     separator.className = 'separator';
 
     // Create the content container
-    this.contentContainer = document.createElement('div');
+    this.contentContainer = document.createElement('section'); // Change to section for semantic meaning
     this.contentContainer.className = 'content-container';
+    this.contentContainer.tabIndex = 0; // Make content container focusable
 
     const contentSlot = document.createElement('slot');
     contentSlot.name = 'content';
@@ -161,6 +162,13 @@ export default class ModalDialog extends HTMLElement {
       }
     });
 
+    // Trap focus within the modal when open
+    this.modal.addEventListener('keydown', (event) => {
+      if (event.key === 'Tab' && this.modal.classList.contains('show')) {
+        this.trapFocus(event);
+      }
+    });
+
     // Create a ResizeObserver to handle resizing
     this.resizeObserver = new ResizeObserver(() => {
       this.debouncedHandleResize();
@@ -173,6 +181,9 @@ export default class ModalDialog extends HTMLElement {
     document.body.style.overflow = 'hidden'; // Prevent scrolling of the background when the modal is open
     this.calculateContentHeight();
     this.resizeObserver.observe(document.body);
+    // debugger;
+    this.focusFirstElement();
+
   }
 
   // Method to close the modal dialog
@@ -231,6 +242,40 @@ export default class ModalDialog extends HTMLElement {
       (descriptionElement as HTMLElement).style.display = 'none';
     }
   }
+
+  // Trap focus inside the modal
+  // Trap focus inside the modal
+private trapFocus(event: KeyboardEvent) {
+  const focusableElements = this.shadowRoot!.querySelectorAll<HTMLElement>(
+    '.close-button, .content-container'
+  );
+  const focusArray = Array.from(focusableElements);
+  const activeElement = this.shadowRoot!.activeElement as HTMLElement; // Get the active element within the shadow DOM
+  const currentIndex = focusArray.indexOf(activeElement);
+
+  if (event.shiftKey && currentIndex === 0) {
+    // Shift + Tab, focus last element
+    focusArray[focusArray.length - 1].focus();
+    event.preventDefault();
+  } else if (!event.shiftKey && currentIndex === focusArray.length - 1) {
+    // Tab, focus first element
+    focusArray[0].focus();
+    event.preventDefault();
+  }
+}
+
+
+  // Focus the first focusable element in the modal
+  private focusFirstElement() {
+    const focusableElements = this.shadowRoot!.querySelectorAll<HTMLElement>(
+      '.close-button, .content-container'
+    );
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus();
+    }
+  }
+
+
 
   // Lifecycle hook that runs when the component is added to the DOM
   connectedCallback() {
@@ -298,5 +343,4 @@ customElements.define('modal-dialog', ModalDialog);
 //   myDialog.setContent('This is the updated main content.');
 //   // To close the dialog: myDialog.close();
 // </script>
-
 // x-cloak class name "borrowed" from Alpine.js - https://alpinejs.dev/directives/cloak

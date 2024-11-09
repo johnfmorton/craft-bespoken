@@ -93,8 +93,9 @@ var ModalDialog = class extends HTMLElement {
     descriptionSlot.className = "description";
     const separator = document.createElement("hr");
     separator.className = "separator";
-    this.contentContainer = document.createElement("div");
+    this.contentContainer = document.createElement("section");
     this.contentContainer.className = "content-container";
+    this.contentContainer.tabIndex = 0;
     const contentSlot = document.createElement("slot");
     contentSlot.name = "content";
     contentSlot.className = "content";
@@ -118,6 +119,11 @@ var ModalDialog = class extends HTMLElement {
         this.close();
       }
     });
+    this.modal.addEventListener("keydown", (event) => {
+      if (event.key === "Tab" && this.modal.classList.contains("show")) {
+        this.trapFocus(event);
+      }
+    });
     this.resizeObserver = new ResizeObserver(() => {
       this.debouncedHandleResize();
     });
@@ -128,6 +134,7 @@ var ModalDialog = class extends HTMLElement {
     document.body.style.overflow = "hidden";
     this.calculateContentHeight();
     this.resizeObserver.observe(document.body);
+    this.focusFirstElement();
   }
   // Method to close the modal dialog
   close() {
@@ -179,6 +186,32 @@ var ModalDialog = class extends HTMLElement {
       descriptionElement.style.display = "block";
     } else if (descriptionElement) {
       descriptionElement.style.display = "none";
+    }
+  }
+  // Trap focus inside the modal
+  // Trap focus inside the modal
+  trapFocus(event) {
+    const focusableElements = this.shadowRoot.querySelectorAll(
+      ".close-button, .content-container"
+    );
+    const focusArray = Array.from(focusableElements);
+    const activeElement = this.shadowRoot.activeElement;
+    const currentIndex = focusArray.indexOf(activeElement);
+    if (event.shiftKey && currentIndex === 0) {
+      focusArray[focusArray.length - 1].focus();
+      event.preventDefault();
+    } else if (!event.shiftKey && currentIndex === focusArray.length - 1) {
+      focusArray[0].focus();
+      event.preventDefault();
+    }
+  }
+  // Focus the first focusable element in the modal
+  focusFirstElement() {
+    const focusableElements = this.shadowRoot.querySelectorAll(
+      ".close-button, .content-container"
+    );
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus();
     }
   }
   // Lifecycle hook that runs when the component is added to the DOM

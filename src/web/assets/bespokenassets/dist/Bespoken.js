@@ -634,6 +634,30 @@ function _cleanTitle(text) {
   const cleanText = text.replace(/[^\w\s]/gi, "").trim();
   return cleanText;
 }
+async function _getFieldTextViaAPI(elementId, fieldNames) {
+  try {
+    const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!result.ok) {
+      throw new Error(`HTTP error! Status: ${result.status}`);
+    }
+    const responseData = await result.json();
+    if (!responseData.element) {
+      throw new Error("Missing element in response data");
+    }
+    for (let i = 0; i < fieldNames.length; i++) {
+      if (responseData.element[fieldNames[i]]) {
+        return responseData.element[fieldNames[i]];
+      }
+    }
+    return " EMPTY FIELD ";
+  } catch (error) {
+    console.error("Error fetching element content:", error);
+    return " EMPTY FIELD ";
+  }
+}
 function _getFieldText(field) {
   let text = "";
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
@@ -866,7 +890,19 @@ function generateScript(targetFieldHandles, title) {
               const viewTypeTest = _getMatrixViewType(targetField);
               switch (viewTypeTest) {
                 case "cards":
-                  text += "Matrix field displayed as cards goes here. ";
+                  let targetFieldCards = targetField.querySelector(".nested-element-cards");
+                  if (targetFieldCards) {
+                    const cards = targetFieldCards.querySelectorAll(".card");
+                    cards.forEach(async (card) => {
+                      const status = card.getAttribute("data-status");
+                      const id = card.getAttribute("data-id");
+                      debugger;
+                      if (status === "live") {
+                        const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                        text += newText + " ";
+                      }
+                    });
+                  }
                   break;
                 case "inline-editable-elements":
                   let targetFieldInline = targetField.querySelector(".blocks");

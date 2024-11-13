@@ -204,7 +204,23 @@ function generateScript(targetFieldHandles: string, title: string | undefined): 
                             switch (viewTypeTest) {
                                 case 'cards':
                                     // Matrix fields displayed as cards are scraped via the API
-                                    text += "Matrix field displayed as cards goes here. ";
+                                    let targetFieldCards = targetField.querySelector('.nested-element-cards');
+                                    if (targetFieldCards) {
+                                        const cards = targetFieldCards.querySelectorAll('.card');
+                                        cards.forEach(async card => {
+                                            const status = card.getAttribute('data-status');
+                                            const id = card.getAttribute('data-id');
+                                            debugger;
+                                            if (status === 'live') {
+                                                // arrayOfEntryIds.push(id);
+                                                const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                                                text += newText + " ";
+                                            }
+                                        });
+                                    }
+
+
+                                    // text += "Matrix field displayed as cards goes here. ";
                                     break;
                                 case 'inline-editable-elements':
                                     // Matrix fields displayed as inline-editable-elements are scraped directly from the page

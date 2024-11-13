@@ -214,29 +214,39 @@ function generateScript(targetFieldHandles: string, title: string | undefined): 
 
                                     // if the matrix field has nested elements then...
                                     if (targetFieldInline) {
+                                        const blocks = targetFieldInline.querySelectorAll('.matrixblock');
+                                        blocks.forEach(block => {
+                                            const isDisabled = block.classList.contains('disabled-entry');
+                                            const id = block.getAttribute('data-id');
+                                            if (!isDisabled) {
+                                                // get the .fields element
+                                                const fields = block.querySelector('.fields');
 
+                                                // find the .field element
+                                                const field = fields.querySelector('.field');
+                                                // debugger;
+                                                text += _getFieldText(field as HTMLElement) + " ";
+
+                                            }
+                                        });
 
                                     }
-
-
-
-                                    text += _getFieldText(targetField) + " TEXT FROM INLINE EDITABLE ELEMENTS ";
+                                    break;
+                                case 'element-index':
+                                    // Matrix fields displayed as element-index are scraped via the API
+                                    text += "Matrix field displayed as element-index goes here. ";
                                     break;
                                 default:
                                     // Matrix fields displayed as tables are scraped via the API
-                                    text += "Matrix field displayed as tables goes here. ";
+                                    text += " There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ";
                             }
                             break;
                     }
-
                     // debugger;
-
-
                 }
             }
         });
         text = text.trim();
     }
-
     return text;
 }

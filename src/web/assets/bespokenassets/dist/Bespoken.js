@@ -871,11 +871,23 @@ function generateScript(targetFieldHandles, title) {
                 case "inline-editable-elements":
                   let targetFieldInline = targetField.querySelector(".blocks");
                   if (targetFieldInline) {
+                    const blocks = targetFieldInline.querySelectorAll(".matrixblock");
+                    blocks.forEach((block) => {
+                      const isDisabled = block.classList.contains("disabled-entry");
+                      const id = block.getAttribute("data-id");
+                      if (!isDisabled) {
+                        const fields = block.querySelector(".fields");
+                        const field = fields.querySelector(".field");
+                        text += _getFieldText(field) + " ";
+                      }
+                    });
                   }
-                  text += _getFieldText(targetField) + " TEXT FROM INLINE EDITABLE ELEMENTS ";
+                  break;
+                case "element-index":
+                  text += "Matrix field displayed as element-index goes here. ";
                   break;
                 default:
-                  text += "Matrix field displayed as tables goes here. ";
+                  text += " There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ";
               }
               break;
           }

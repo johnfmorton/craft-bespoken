@@ -808,7 +808,7 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener("click", handlePreviewButtonClick);
   });
 });
-function handleGenerateButtonClick(event) {
+async function handleGenerateButtonClick(event) {
   const button = event.target.closest(".bespoken-generate");
   if (!button) return;
   button.classList.add("disabled");
@@ -825,7 +825,7 @@ function handleGenerateButtonClick(event) {
     }
   });
   const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-  const text = generateScript(targetFieldHandles, title);
+  const text = await generateScript(targetFieldHandles, title);
   console.log("Generated script:", text);
   if (text.length === 0) {
     button.classList.remove("disabled");
@@ -846,13 +846,13 @@ function handleGenerateButtonClick(event) {
   });
   processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
 }
-function handlePreviewButtonClick(event) {
+async function handlePreviewButtonClick(event) {
   const button = event.target.closest(".bespoken-preview");
   if (!button) return;
   const elementId = _getInputValue('input[name="elementId"]');
   const title = _cleanTitle(_getInputValue("#title") || elementId);
   const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-  const text = generateScript(targetFieldHandles, title);
+  const text = await generateScript(targetFieldHandles, title);
   const parentElement = event.target.closest(".bespoken-fields");
   const modal = parentElement.querySelector(".bespoken-dialog");
   if (modal) {
@@ -860,23 +860,24 @@ function handlePreviewButtonClick(event) {
     modal.open();
   }
 }
-function generateScript(targetFieldHandles, title) {
+async function generateScript(targetFieldHandles, title) {
   console.log("Generating script for field handles:", targetFieldHandles);
   let text = "";
   if (targetFieldHandles) {
     const fieldHandlesArray = _parseFieldHandles(targetFieldHandles);
-    fieldHandlesArray.forEach((handle) => {
+    for (const handle of fieldHandlesArray) {
       if (handle === "title") {
         const titleToAdd = title.endsWith(".") ? title : title + ".";
         text += titleToAdd + " ";
       } else {
         let nestedHandles = [];
+        let currentHandle = handle;
         if (handle instanceof Object) {
           const mainHandle = Object.keys(handle)[0];
           nestedHandles = handle[mainHandle];
-          handle = mainHandle;
+          currentHandle = mainHandle;
         }
-        const targetField = document.getElementById(`fields-${handle}-field`);
+        const targetField = document.getElementById(`fields-${currentHandle}-field`);
         if (targetField) {
           const fieldType = _getFieldType(targetField);
           switch (fieldType) {
@@ -893,15 +894,14 @@ function generateScript(targetFieldHandles, title) {
                   let targetFieldCards = targetField.querySelector(".nested-element-cards");
                   if (targetFieldCards) {
                     const cards = targetFieldCards.querySelectorAll(".card");
-                    cards.forEach(async (card) => {
+                    for (const card of cards) {
                       const status = card.getAttribute("data-status");
                       const id = card.getAttribute("data-id");
-                      debugger;
                       if (status === "live") {
                         const newText = await _getFieldTextViaAPI(id, nestedHandles);
                         text += newText + " ";
                       }
-                    });
+                    }
                   }
                   break;
                 case "inline-editable-elements":
@@ -910,7 +910,6 @@ function generateScript(targetFieldHandles, title) {
                     const blocks = targetFieldInline.querySelectorAll(".matrixblock");
                     blocks.forEach((block) => {
                       const isDisabled = block.classList.contains("disabled-entry");
-                      const id = block.getAttribute("data-id");
                       if (!isDisabled) {
                         const fields = block.querySelector(".fields");
                         const field = fields.querySelector(".field");
@@ -929,7 +928,7 @@ function generateScript(targetFieldHandles, title) {
           }
         }
       }
-    });
+    }
     text = text.trim();
   }
   return text;

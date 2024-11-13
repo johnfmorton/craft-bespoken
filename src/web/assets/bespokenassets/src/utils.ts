@@ -271,7 +271,6 @@ function _ensureBlockFormatting(
         // later we will remove any double spaces later in the _stripTags function process
     }
 
-
     // Return the modified block element with the updated content
     return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
   });

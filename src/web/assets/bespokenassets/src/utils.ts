@@ -275,3 +275,43 @@ function _ensureBlockFormatting(
     return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
   });
 }
+
+
+/*
+* _getFieldType
+* params: element: HTMLElement
+* description: This function retrieves the type of a field element in the CMS.
+* The type is determined by the data-type attribute of the element.
+* We can only process certain types of fields, so this function helps identify them.
+*
+* The function returns a string representing the type of the field.
+ */
+export function _getFieldType(element: HTMLElement): 'plain-text' | 'ckeditor' | 'matrix' | 'invalid' {
+    const entryType = element.getAttribute('data-type');
+
+    if (entryType === 'craft\\fields\\PlainText') {
+        return 'plain-text';
+    }
+    if ( entryType === 'craft\\ckeditor\\Field') {
+        return 'ckeditor';
+    }
+
+    if (entryType === 'craft\\fields\\Matrix') {
+        return 'matrix';
+    }
+    return 'invalid';
+}
+
+
+export function _getMatrixViewType(element: HTMLElement):  'cards' | 'inline-editable-elements' | 'element-index' | 'unknown' {
+    if (element.querySelector('.nested-element-cards')) {
+        return 'cards';
+    }
+    if (element.querySelector('.blocks')) {
+        return 'inline-editable-elements';
+    }
+    if (element.querySelector('.element-index')) {
+        return 'element-index';
+    }
+    return 'unknown';
+}

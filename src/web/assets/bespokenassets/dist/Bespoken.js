@@ -649,7 +649,12 @@ async function _getFieldTextViaAPI(elementId, fieldNames) {
     }
     for (let i = 0; i < fieldNames.length; i++) {
       if (responseData.element[fieldNames[i]]) {
-        return responseData.element[fieldNames[i]];
+        const returnedText = responseData.element[fieldNames[i]];
+        if (_isHTML(returnedText)) {
+          return _processCKEditorFields(returnedText);
+        } else {
+          return _processPlainTextField(returnedText);
+        }
       }
     }
     return " EMPTY FIELD ";
@@ -790,6 +795,10 @@ function _parseFieldHandles(input) {
   }
   return result;
 }
+function _isHTML(input) {
+  const htmlTagRegex = /<\/?[a-z][\s\S]*?>/i;
+  return htmlTagRegex.test(input);
+}
 
 // src/web/assets/bespokenassets/src/Bespoken.ts
 document.addEventListener("DOMContentLoaded", () => {
@@ -893,7 +902,7 @@ async function generateScript(targetFieldHandles, title) {
                 case "cards":
                   let targetFieldCards = targetField.querySelector(".nested-element-cards");
                   if (targetFieldCards) {
-                    const cards = targetFieldCards.querySelectorAll(".card");
+                    const cards = Array.from(targetFieldCards.querySelectorAll(".card"));
                     for (const card of cards) {
                       const status = card.getAttribute("data-status");
                       const id = card.getAttribute("data-id");
@@ -919,7 +928,18 @@ async function generateScript(targetFieldHandles, title) {
                   }
                   break;
                 case "element-index":
-                  text += "Matrix field displayed as element-index goes here. ";
+                  let targetFieldGrid = targetField.querySelector(".card-grid");
+                  if (targetFieldGrid) {
+                    const cards = Array.from(targetFieldGrid.querySelectorAll(".card"));
+                    for (const card of cards) {
+                      const status = card.getAttribute("data-status");
+                      const id = card.getAttribute("data-id");
+                      if (status === "live") {
+                        const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                        text += newText + " ";
+                      }
+                    }
+                  }
                   break;
                 default:
                   text += " There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ";

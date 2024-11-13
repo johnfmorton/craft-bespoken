@@ -112,9 +112,11 @@ class BespokenController extends Controller
     public function actionGetElementContent(): Response
     {
         $this->requireLogin();
-        $elementId = Craft::$app->request->get('elementId') ?? 702;
+        $elementId = Craft::$app->request->get('elementId');
 
         $element = Craft::$app->elements->getElementById($elementId);
+
+
 
         if (!$element) {
             return $this->asJson([
@@ -124,6 +126,7 @@ class BespokenController extends Controller
         }
 
         return $this->asJson([
+
             'success' => true,
             'element' => $element
         ]);

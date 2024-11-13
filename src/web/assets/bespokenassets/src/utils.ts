@@ -40,7 +40,13 @@ export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[
         // Return the content of the first found field
         for (let i = 0; i < fieldNames.length; i++) {
             if (responseData.element[fieldNames[i]]) {
-                return responseData.element[fieldNames[i]];
+                const returnedText: string = responseData.element[fieldNames[i]];
+                if (_isHTML(returnedText)) {
+                    return _processCKEditorFields(returnedText);
+                } else {
+                    return _processPlainTextField(returnedText);
+                }
+
             }
         }
 
@@ -346,4 +352,11 @@ export function _parseFieldHandles(input: string): ParsedFieldHandle[] {
     }
 
     return result;
+}
+
+// helper
+function _isHTML(input: string): boolean {
+  // Regular expression to check for HTML tags
+  const htmlTagRegex = /<\/?[a-z][\s\S]*?>/i;
+  return htmlTagRegex.test(input);
 }

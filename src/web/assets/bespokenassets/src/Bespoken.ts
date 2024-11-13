@@ -208,7 +208,7 @@ async function generateScript(targetFieldHandles: string, title: string | undefi
                                     // Matrix fields displayed as cards are scraped via the API
                                     let targetFieldCards = targetField.querySelector('.nested-element-cards');
                                     if (targetFieldCards) {
-                                        const cards = targetFieldCards.querySelectorAll('.card');
+                                        const cards = Array.from(targetFieldCards.querySelectorAll('.card'));
                                         for (const card of cards) {
                                             const status = card.getAttribute('data-status');
                                             const id = card.getAttribute('data-id');
@@ -243,7 +243,20 @@ async function generateScript(targetFieldHandles: string, title: string | undefi
                                     break;
                                 case 'element-index':
                                     // Matrix fields displayed as element-index are scraped via the API
-                                    text += "Matrix field displayed as element-index goes here. ";
+                                    let targetFieldGrid = targetField.querySelector('.card-grid');
+                                    
+                                    if (targetFieldGrid) {
+                                        const cards =  Array.from(targetFieldGrid.querySelectorAll('.card'));
+
+                                        for (const card of cards) {
+                                            const status = card.getAttribute('data-status');
+                                            const id = card.getAttribute('data-id');
+                                            if (status === 'live') {
+                                                const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                                                text += newText + " ";
+                                            }
+                                        }
+                                    }
                                     break;
                                 default:
                                     // Matrix fields displayed as tables are scraped via the API
@@ -368,7 +381,20 @@ function generateScriptOLD(targetFieldHandles: string, title: string | undefined
                                     break;
                                 case 'element-index':
                                     // Matrix fields displayed as element-index are scraped via the API
-                                    text += "Matrix field displayed as element-index goes here. ";
+                                    let targetFieldGrid = targetField.querySelector('.card-grid');
+
+                                    if (targetFieldGrid) {
+                                        const cards = targetFieldGrid.querySelectorAll('.card');
+                                        cards.forEach(async card => {
+                                            const status = card.getAttribute('data-status');
+                                            const id = card.getAttribute('data-id');
+                                            if (status === 'live') {
+                                                // arrayOfEntryIds.push(id);
+                                                // text += 'content from element ' + id + " ";
+                                                text +=  await _getFieldTextViaAPI(id, nestedHandles) + " ";
+                                            }
+                                        });
+                                    }
                                     break;
                                 default:
                                     // Matrix fields displayed as tables are scraped via the API

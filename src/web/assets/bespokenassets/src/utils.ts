@@ -315,3 +315,35 @@ export function _getMatrixViewType(element: HTMLElement):  'cards' | 'inline-edi
     }
     return 'unknown';
 }
+
+
+
+// Define types for structured output
+type FieldHandle = string;
+type NestedFieldHandles = { [key: string]: FieldHandle[] };
+type ParsedFieldHandle = FieldHandle | NestedFieldHandles;
+
+/*
+* _parseFieldHandles
+* params: input: string
+* description: This function parses a string input containing field handles and nested field handles.
+ */
+export function _parseFieldHandles(input: string): ParsedFieldHandle[] {
+    const result: ParsedFieldHandle[] = [];
+    const regex = /(\w+)(?:\[(.*?)\])?/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(input)) !== null) {
+        const mainHandle: FieldHandle = match[1];
+        const nestedHandles: string | undefined = match[2];
+
+        if (nestedHandles) {
+            const nestedArray: FieldHandle[] = nestedHandles.split(',').map(handle => handle.trim());
+            result.push({ [mainHandle]: nestedArray });
+        } else {
+            result.push(mainHandle);
+        }
+    }
+
+    return result;
+}

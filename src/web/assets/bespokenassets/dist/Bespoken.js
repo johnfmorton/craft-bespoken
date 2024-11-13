@@ -634,30 +634,6 @@ function _cleanTitle(text) {
   const cleanText = text.replace(/[^\w\s]/gi, "").trim();
   return cleanText;
 }
-async function _getFieldTextViaAPI(elementId, fieldNames) {
-  try {
-    const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" }
-    });
-    if (!result.ok) {
-      throw new Error(`HTTP error! Status: ${result.status}`);
-    }
-    const responseData = await result.json();
-    if (!responseData.element) {
-      throw new Error("Missing element in response data");
-    }
-    for (let i = 0; i < fieldNames.length; i++) {
-      if (responseData.element[fieldNames[i]]) {
-        return responseData.element[fieldNames[i]];
-      }
-    }
-    return " EMPTY FIELD ";
-  } catch (error) {
-    console.error("Error fetching element content:", error);
-    return " EMPTY FIELD ";
-  }
-}
 function _getFieldText(field) {
   let text = "";
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
@@ -749,6 +725,22 @@ function _ensureBlockFormatting(html, blockElements = ["p", "div", "h1", "h2", "
     return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
   });
 }
+function _parseFieldHandles(input) {
+  const result = [];
+  const regex = /(\w+)(?:\[(.*?)\])?/g;
+  let match;
+  while ((match = regex.exec(input)) !== null) {
+    const mainHandle = match[1];
+    const nestedHandles = match[2];
+    if (nestedHandles) {
+      const nestedArray = nestedHandles.split(",").map((handle) => handle.trim());
+      result.push({ [mainHandle]: nestedArray });
+    } else {
+      result.push(mainHandle);
+    }
+  }
+  return result;
+}
 
 // src/web/assets/bespokenassets/src/Bespoken.ts
 document.addEventListener("DOMContentLoaded", () => {
@@ -819,7 +811,7 @@ function handlePreviewButtonClick(event) {
     modal.open();
   }
 }
-async function generateScript(targetFieldHandles, title) {
+function generateScript(targetFieldHandles, title) {
   console.log("Generating script for field handles:", targetFieldHandles);
   let text = "";
   if (targetFieldHandles) {
@@ -835,88 +827,14 @@ async function generateScript(targetFieldHandles, title) {
           nestedHandles = handle[mainHandle];
           handle = mainHandle;
         }
+        debugger;
         const targetField = document.getElementById(`fields-${handle}-field`);
         if (targetField) {
-          const entryType = targetField.getAttribute("data-type");
-          if (entryType === "craft\\fields\\Matrix") {
-            const arrayOfEntryIds = [];
-            let matrixViewType = null;
-            if (targetField.querySelector(".nested-element-cards")) {
-              matrixViewType = "nested-element-cards";
-              let targetFieldCards = targetField.querySelector(".nested-element-cards");
-              if (targetFieldCards) {
-                const cards = targetFieldCards.querySelectorAll(".card");
-                cards.forEach(async (card) => {
-                  const status = card.getAttribute("data-status");
-                  const id = card.getAttribute("data-id");
-                  if (status === "live") {
-                    arrayOfEntryIds.push(id);
-                    const newText = await _getFieldTextViaAPI(id, nestedHandles);
-                    debugger;
-                    text += newText + " ";
-                  }
-                });
-              }
-            }
-            if (targetField.querySelector(".blocks")) {
-              matrixViewType = "inline-editable-elements";
-              let targetFieldInline = targetField.querySelector(".blocks");
-              if (targetFieldInline) {
-                const blocks = targetFieldInline.querySelectorAll(".matrixblock");
-                blocks.forEach((block) => {
-                  const isDisabled = block.classList.contains("disabled-entry");
-                  const id = block.getAttribute("data-id");
-                  if (!isDisabled) {
-                    const fields = block.querySelector(".fields");
-                    const field = fields.querySelector(".field");
-                    debugger;
-                    text += _getFieldText(field) + " ";
-                  }
-                });
-              }
-            }
-            if (targetField.querySelector(".card-grid")) {
-              matrixViewType = "element-index";
-              let targetFieldGrid = targetField.querySelector(".card-grid");
-              if (targetFieldGrid) {
-                const cards = targetFieldGrid.querySelectorAll(".card");
-                cards.forEach(async (card) => {
-                  const status = card.getAttribute("data-status");
-                  const id = card.getAttribute("data-id");
-                  if (status === "live") {
-                    arrayOfEntryIds.push(id);
-                    text += await _getFieldTextViaAPI(id, nestedHandles) + " ";
-                  }
-                });
-              }
-            }
-            if (!matrixViewType) {
-              console.error("Matrix field does not have a recognized view type");
-              return;
-            }
-          } else {
-            text += _getFieldText(targetField) + " ";
-          }
+          text += _getFieldText(targetField) + " ";
         }
       }
     });
     text = text.trim();
   }
-  debugger;
   return text;
-}
-function _parseFieldHandles(input) {
-  const result = [];
-  const regex = /(\w+)(?:\[(.*?)\])?/g;
-  let match;
-  while ((match = regex.exec(input)) !== null) {
-    const mainHandle = match[1];
-    const nestedHandles = match[2];
-    if (nestedHandles) {
-      result.push({ [mainHandle]: nestedHandles.split(",").map((handle) => handle.trim()) });
-    } else {
-      result.push(mainHandle);
-    }
-  }
-  return result;
 }

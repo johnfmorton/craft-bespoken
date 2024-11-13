@@ -634,15 +634,43 @@ function _cleanTitle(text) {
   const cleanText = text.replace(/[^\w\s]/gi, "").trim();
   return cleanText;
 }
+async function _getFieldTextViaAPI(elementId, fieldNames) {
+  try {
+    const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!result.ok) {
+      throw new Error(`HTTP error! Status: ${result.status}`);
+    }
+    const responseData = await result.json();
+    if (!responseData.element) {
+      throw new Error("Missing element in response data");
+    }
+    for (let i = 0; i < fieldNames.length; i++) {
+      if (responseData.element[fieldNames[i]]) {
+        return responseData.element[fieldNames[i]];
+      }
+    }
+    return " EMPTY FIELD ";
+  } catch (error) {
+    console.error("Error fetching element content:", error);
+    return " EMPTY FIELD ";
+  }
+}
 function _getFieldText(field) {
   let text = "";
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
     text = field.querySelector("textarea")?.value || "";
-    text = _removeFigureElements(text);
-    text = _stripTags(text);
+    text = _processCKEditorFields(text);
   } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
     text = _processPlainTextField(_getFieldValue(field));
   }
+  return text;
+}
+function _processCKEditorFields(text) {
+  text = _removeFigureElements(text);
+  text = _stripTags(text);
   return text;
 }
 function _removeFigureElements(input) {
@@ -791,23 +819,104 @@ function handlePreviewButtonClick(event) {
     modal.open();
   }
 }
-function generateScript(targetFieldHandles, title) {
+async function generateScript(targetFieldHandles, title) {
   console.log("Generating script for field handles:", targetFieldHandles);
   let text = "";
   if (targetFieldHandles) {
-    const fieldHandlesArray = targetFieldHandles.split(",").map((handle) => handle.trim());
+    const fieldHandlesArray = _parseFieldHandles(targetFieldHandles);
     fieldHandlesArray.forEach((handle) => {
       if (handle === "title") {
         const titleToAdd = title.endsWith(".") ? title : title + ".";
         text += titleToAdd + " ";
       } else {
+        let nestedHandles = [];
+        if (handle instanceof Object) {
+          const mainHandle = Object.keys(handle)[0];
+          nestedHandles = handle[mainHandle];
+          handle = mainHandle;
+        }
         const targetField = document.getElementById(`fields-${handle}-field`);
         if (targetField) {
-          text += _getFieldText(targetField) + " ";
+          const entryType = targetField.getAttribute("data-type");
+          if (entryType === "craft\\fields\\Matrix") {
+            const arrayOfEntryIds = [];
+            let matrixViewType = null;
+            if (targetField.querySelector(".nested-element-cards")) {
+              matrixViewType = "nested-element-cards";
+              let targetFieldCards = targetField.querySelector(".nested-element-cards");
+              if (targetFieldCards) {
+                const cards = targetFieldCards.querySelectorAll(".card");
+                cards.forEach(async (card) => {
+                  const status = card.getAttribute("data-status");
+                  const id = card.getAttribute("data-id");
+                  if (status === "live") {
+                    arrayOfEntryIds.push(id);
+                    const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                    debugger;
+                    text += newText + " ";
+                  }
+                });
+              }
+            }
+            if (targetField.querySelector(".blocks")) {
+              matrixViewType = "inline-editable-elements";
+              let targetFieldInline = targetField.querySelector(".blocks");
+              if (targetFieldInline) {
+                const blocks = targetFieldInline.querySelectorAll(".matrixblock");
+                blocks.forEach((block) => {
+                  const isDisabled = block.classList.contains("disabled-entry");
+                  const id = block.getAttribute("data-id");
+                  if (!isDisabled) {
+                    const fields = block.querySelector(".fields");
+                    const field = fields.querySelector(".field");
+                    debugger;
+                    text += _getFieldText(field) + " ";
+                  }
+                });
+              }
+            }
+            if (targetField.querySelector(".card-grid")) {
+              matrixViewType = "element-index";
+              let targetFieldGrid = targetField.querySelector(".card-grid");
+              if (targetFieldGrid) {
+                const cards = targetFieldGrid.querySelectorAll(".card");
+                cards.forEach(async (card) => {
+                  const status = card.getAttribute("data-status");
+                  const id = card.getAttribute("data-id");
+                  if (status === "live") {
+                    arrayOfEntryIds.push(id);
+                    text += await _getFieldTextViaAPI(id, nestedHandles) + " ";
+                  }
+                });
+              }
+            }
+            if (!matrixViewType) {
+              console.error("Matrix field does not have a recognized view type");
+              return;
+            }
+          } else {
+            text += _getFieldText(targetField) + " ";
+          }
         }
       }
     });
     text = text.trim();
   }
+  debugger;
   return text;
+}
+function _parseFieldHandles(input) {
+  const result = [];
+  const regex = /(\w+)(?:\[(.*?)\])?/g;
+  let match;
+  while ((match = regex.exec(input)) !== null) {
+    const mainHandle = match[1];
+    const nestedHandles = match[2];
+    if (nestedHandles) {
+      result.push({ [mainHandle]: nestedHandles.split(",").map((handle) => handle.trim()) });
+    } else {
+      result.push(mainHandle);
+    }
+  }
+  return result;
 }

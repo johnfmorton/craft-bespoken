@@ -93,6 +93,7 @@ class BespokenController extends Controller
      * Action to check the status of an audio file generation job
      *
      * @throws MethodNotAllowedHttpException
+     * @throws \JsonException
      */
     public function actionJobStatus(): Response
     {
@@ -102,6 +103,30 @@ class BespokenController extends Controller
         // call the sendTextToElevenLabsApi service method
         $result = BespokenPlugin::getInstance()->bespokenService->jobMonitor($jobId);
         return $this->asJson($result);
+    }
+
+    /**
+     * Action to get the content of an Element by its ID
+     * @return Response
+     */
+    public function actionGetElementContent(): Response
+    {
+        $this->requireLogin();
+        $elementId = Craft::$app->request->get('elementId') ?? 702;
+
+        $element = Craft::$app->elements->getElementById($elementId);
+
+        if (!$element) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Element not found'
+            ]);
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'element' => $element
+        ]);
     }
 
     public function beforeAction($action): bool
@@ -115,6 +140,12 @@ class BespokenController extends Controller
         // Don’t require a CSRF token for the job-monitor action
         // The action already requires a logged-in user
         if ($action->id === 'job-status') {
+            $this->enableCsrfValidation = false;
+        }
+
+        // Don't require a CSRF token for the get-element-content action
+        // The action already requires a logged-in user
+        if ($action->id === 'get-element-content') {
             $this->enableCsrfValidation = false;
         }
 
@@ -146,14 +177,8 @@ class BespokenController extends Controller
     {
         // Step 1: Remove special characters and trim leading/trailing spaces
         $cleanText = preg_replace('/[^\w\s]/u', '', trim($text));
-//
-//        // REMOVED: Replace multiple spaces with a single hyphen
-//        $cleanText = preg_replace('/\s+/', '-', $cleanText);
-//
-//        // REMOVED: Convert to lowercase
-//        $cleanText = strtolower($cleanText);
-//
-//        // Step 2: If a limit is set, truncate the string to the limit
+
+        // Step 2: If a limit is set, truncate the string to the limit
         if (is_numeric($limit)) {
             $cleanText = substr($cleanText, 0, $limit);
         }

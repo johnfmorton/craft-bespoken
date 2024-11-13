@@ -8,16 +8,59 @@ export function _cleanTitle(text: string): string {
   return cleanText;
 }
 
+class array {
+}
+
+/*
+* _getFieldText
+* params: field: HTMLElement
+* description: This function retrieves the text content from a field element in the CMS.
+ */
+export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[]): Promise<string> {
+    try {
+        const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Check if the response is ok (status code 200-299)
+        if (!result.ok) {
+            throw new Error(`HTTP error! Status: ${result.status}`);
+        }
+
+        const responseData = await result.json();
+
+        // Check if responseData.element exists
+        if (!responseData.element) {
+            throw new Error('Missing element in response data');
+        }
+
+        // Look in the responseData.element for the existence of the fieldNames one by one
+        // Return the content of the first found field
+        for (let i = 0; i < fieldNames.length; i++) {
+            if (responseData.element[fieldNames[i]]) {
+                return responseData.element[fieldNames[i]];
+            }
+        }
+
+        // Return ' EMPTY FIELD ' if no field matches
+        return ' EMPTY FIELD ';
+    } catch (error) {
+        console.error('Error fetching element content:', error);
+        return ' EMPTY FIELD ';
+    }
+}
+
+
 export function _getFieldText(field: HTMLElement): string {
 
   let text = '';
-  if (field.getAttribute('data-type') === 'craft\\ckeditor\\Field') {
+
+  if (field.getAttribute('data-type') === 'craft\\ckeditor\\Field' ) {
 
     text = field.querySelector('textarea')?.value || '';
 
-    text = _removeFigureElements(text);
-
-    text = _stripTags(text)
+    text = _processCKEditorFields(text);
 
   } else if (field.getAttribute('data-type') === 'craft\\fields\\PlainText') {
 
@@ -28,6 +71,17 @@ export function _getFieldText(field: HTMLElement): string {
   }
   return text;
 }
+
+/*
+* clean up CKEditor fields
+ */
+
+function _processCKEditorFields(text: string): string {
+    text = _removeFigureElements(text);
+    text = _stripTags(text);
+    return text;
+}
+
 
 /*
 * _removeFigureElements

@@ -324,17 +324,23 @@ debugger;
     return text;
 }
 
-function _parseFieldHandles(input: string): (string | { [key: string]: string[] })[] {
-    const result: (string | { [key: string]: string[] })[] = [];
+// Define types for structured output
+type FieldHandle = string;
+type NestedFieldHandles = { [key: string]: FieldHandle[] };
+type ParsedFieldHandle = FieldHandle | NestedFieldHandles;
+
+function _parseFieldHandles(input: string): ParsedFieldHandle[] {
+    const result: ParsedFieldHandle[] = [];
     const regex = /(\w+)(?:\[(.*?)\])?/g;
-    let match;
+    let match: RegExpExecArray | null;
 
     while ((match = regex.exec(input)) !== null) {
-        const mainHandle = match[1];
-        const nestedHandles = match[2];
+        const mainHandle: FieldHandle = match[1];
+        const nestedHandles: string | undefined = match[2];
 
         if (nestedHandles) {
-            result.push({ [mainHandle]: nestedHandles.split(',').map(handle => handle.trim()) });
+            const nestedArray: FieldHandle[] = nestedHandles.split(',').map(handle => handle.trim());
+            result.push({ [mainHandle]: nestedArray });
         } else {
             result.push(mainHandle);
         }

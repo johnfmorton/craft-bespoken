@@ -161,6 +161,9 @@ function generateScript(targetFieldHandles: string, title: string | undefined): 
                 const titleToAdd = title.endsWith('.') ? title : title + '.';
                 text += (titleToAdd + " ");
             } else {
+                // The handle is not "title", so it's a field handle or an object with a field handle and nested field handles
+                // first, let's check if the handle is an object
+                // and if it is, we need to get the main handle and the nested handles
                 let nestedHandles = [];
                 if (handle instanceof Object) {
                     // if this is an object, it will look something like this:
@@ -172,12 +175,63 @@ function generateScript(targetFieldHandles: string, title: string | undefined): 
                     handle = mainHandle;
                 }
 
-                debugger;
+                // the handle is now a string, so we can use it to get the field
+                // we may also have nested handles. we only need those
+                // if the matrix view is not set to "inline-editable-elements"
+                // in that case, we will need to use the Craft API to get that data
+                // since it is not present in the DOM
 
+                // attempt to get the field element based on the handle
                 const targetField = document.getElementById(`fields-${handle}-field`) as HTMLElement | null;
 
+                // Were we able to get a target field by that handle?
                 if (targetField) {
-                    text += _getFieldText(targetField) + " ";
+                    // determine the type of field
+                    const fieldType = _getFieldType(targetField);
+
+                    // Switch on the field type
+                    switch (fieldType) {
+                        case "plain-text":
+                            // PlainText fields are scraped directly from the page
+                            text += _getFieldText(targetField) + " ";
+                            break;
+                        case "ckeditor":
+                            // CKEditor fields are scraped directly from the page
+                            text += _getFieldText(targetField) + " ";
+                            break;
+                        case "matrix":
+                            const viewTypeTest = _getMatrixViewType(targetField);
+                            switch (viewTypeTest) {
+                                case 'cards':
+                                    // Matrix fields displayed as cards are scraped via the API
+                                    text += "Matrix field displayed as cards goes here. ";
+                                    break;
+                                case 'inline-editable-elements':
+                                    // Matrix fields displayed as inline-editable-elements are scraped directly from the page
+
+                                    // look for .blocks (inline-editable-elements) in the targetField
+                                    let targetFieldInline = targetField.querySelector('.blocks');
+
+                                    // if the matrix field has nested elements then...
+                                    if (targetFieldInline) {
+
+
+                                    }
+
+
+
+                                    text += _getFieldText(targetField) + " TEXT FROM INLINE EDITABLE ELEMENTS ";
+                                    break;
+                                default:
+                                    // Matrix fields displayed as tables are scraped via the API
+                                    text += "Matrix field displayed as tables goes here. ";
+                            }
+                            break;
+                    }
+
+                    // debugger;
+
+
                 }
             }
         });

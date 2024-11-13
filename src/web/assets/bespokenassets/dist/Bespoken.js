@@ -725,6 +725,31 @@ function _ensureBlockFormatting(html, blockElements = ["p", "div", "h1", "h2", "
     return `<${tagName}${attributes}>${trimmedContent}</${tagName}>`;
   });
 }
+function _getFieldType(element) {
+  const entryType = element.getAttribute("data-type");
+  if (entryType === "craft\\fields\\PlainText") {
+    return "plain-text";
+  }
+  if (entryType === "craft\\ckeditor\\Field") {
+    return "ckeditor";
+  }
+  if (entryType === "craft\\fields\\Matrix") {
+    return "matrix";
+  }
+  return "invalid";
+}
+function _getMatrixViewType(element) {
+  if (element.querySelector(".nested-element-cards")) {
+    return "cards";
+  }
+  if (element.querySelector(".blocks")) {
+    return "inline-editable-elements";
+  }
+  if (element.querySelector(".element-index")) {
+    return "element-index";
+  }
+  return "unknown";
+}
 function _parseFieldHandles(input) {
   const result = [];
   const regex = /(\w+)(?:\[(.*?)\])?/g;
@@ -827,10 +852,33 @@ function generateScript(targetFieldHandles, title) {
           nestedHandles = handle[mainHandle];
           handle = mainHandle;
         }
-        debugger;
         const targetField = document.getElementById(`fields-${handle}-field`);
         if (targetField) {
-          text += _getFieldText(targetField) + " ";
+          const fieldType = _getFieldType(targetField);
+          switch (fieldType) {
+            case "plain-text":
+              text += _getFieldText(targetField) + " ";
+              break;
+            case "ckeditor":
+              text += _getFieldText(targetField) + " ";
+              break;
+            case "matrix":
+              const viewTypeTest = _getMatrixViewType(targetField);
+              switch (viewTypeTest) {
+                case "cards":
+                  text += "Matrix field displayed as cards goes here. ";
+                  break;
+                case "inline-editable-elements":
+                  let targetFieldInline = targetField.querySelector(".blocks");
+                  if (targetFieldInline) {
+                  }
+                  text += _getFieldText(targetField) + " TEXT FROM INLINE EDITABLE ELEMENTS ";
+                  break;
+                default:
+                  text += "Matrix field displayed as tables goes here. ";
+              }
+              break;
+          }
         }
       }
     });

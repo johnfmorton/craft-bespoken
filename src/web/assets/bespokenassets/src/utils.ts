@@ -18,6 +18,7 @@ class array {
  */
 export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[]): Promise<string> {
     try {
+        // TODO: get the ACTION verb from the CMS - will need to add this to the field itself in a data attribute
         const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }

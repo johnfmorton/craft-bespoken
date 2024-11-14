@@ -1,5 +1,9 @@
 # Release Notes for Bespoken
 
+## 5.0.7 - 2024-11-14
+### Added
+- Added support for Matrix fields that contain CKEditor and Plain Text fields. Read the documentation for details on how to use this feature. If the Matrix field view mode is set to "As cards" or "As element index," please review the documentation in detail for how these fields are processed.
+
 ## 5.0.6 - 2024-11-09
 ### Added
 - A new feature was added to allow users to preview the script that will be sent to the ElevenLabs API. This feature is helpful for debugging pronunciation issues and other potential problems. The preview can be accessed by clicking the "Preview" button in the Bespoken field in the entry editor. The preview button can also be disabled in the field settings if desired.

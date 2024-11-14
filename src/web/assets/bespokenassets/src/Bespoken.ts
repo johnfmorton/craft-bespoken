@@ -92,7 +92,7 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
     }
 
     // Text is now ready to be processed
-
+    // Get the action URL from the button's data-action-url attribute - used the generate the audio
     const actionUrl: string = button.getAttribute('data-action-url') || '';
 
     // What's going to happen next:
@@ -118,6 +118,9 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
 async function handlePreviewButtonClick(event: Event): Promise<void> {
     const button = (event.target as HTMLElement).closest('.bespoken-preview') as HTMLButtonElement | null;
 
+    // this action URL is used to get an element's field data from the Craft API if needed
+    const actionUrl: string = button.getAttribute('data-action-url') || '';
+
     if (!button) return;
 
     // Get the Element ID of the Element being edited in the CMS
@@ -129,7 +132,7 @@ async function handlePreviewButtonClick(event: Event): Promise<void> {
     const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
 
     // const text = generateScript(targetFieldHandles, title);
-    const text = await generateScript(targetFieldHandles, title);
+    const text = await generateScript(targetFieldHandles, title, actionUrl);
 
     const parentElement = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
 
@@ -144,7 +147,13 @@ async function handlePreviewButtonClick(event: Event): Promise<void> {
 
 }
 
-async function generateScript(targetFieldHandles: string, title: string | undefined): Promise<string> {
+/*
+    * Generate the script for the selected fields
+    * @param {string} targetFieldHandles - The field handles of the fields to generate the script from
+    * @param {string} title - The title of the element being edited in the CMS
+    * @param {string} actionUrl - The URL for the action to get an element's field data from the Craft API (if needed, for matrix fields)
+ */
+async function generateScript(targetFieldHandles: string, title: string, actionUrl: string | null =''): Promise<string> {
     console.log('Generating script for field handles:', targetFieldHandles);
 
     let text: string = '';
@@ -213,7 +222,7 @@ async function generateScript(targetFieldHandles: string, title: string | undefi
                                             const status = card.getAttribute('data-status');
                                             const id = card.getAttribute('data-id');
                                             if (status === 'live') {
-                                                const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                                                const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
                                                 text += newText + " ";
                                             }
                                         }
@@ -267,7 +276,7 @@ async function generateScript(targetFieldHandles: string, title: string | undefi
                                             const status = targetField.getAttribute('data-status');
                                             const id = targetField.getAttribute('data-id');
                                             if (status === 'live') {
-                                                const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                                                const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
                                                 text += newText + " ";
                                             }
                                         }

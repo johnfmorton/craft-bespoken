@@ -16,10 +16,18 @@ class array {
 * params: field: HTMLElement
 * description: This function retrieves the text content from a field element in the CMS.
  */
-export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[]): Promise<string> {
+export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[], actionUrl:string): Promise<string> {
     try {
-        // TODO: get the ACTION verb from the CMS - will need to add this to the field itself in a data attribute
-        const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
+        // TODO: use the actionUrl parameter to fetch the data from the correct endpoint
+
+        // add the elementId to the actionUrl
+        // this is a GET request
+        // since we can't be sure of the format of the actionUrl,
+        // we need to parse it as a URL and add the elementId as a search parameter
+        const actionUrlForElement = new URL(actionUrl);
+        actionUrlForElement.searchParams.set('elementId', elementId);
+
+        const result = await fetch(actionUrlForElement.toString(), {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });

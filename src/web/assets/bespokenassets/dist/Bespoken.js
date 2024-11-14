@@ -634,9 +634,11 @@ function _cleanTitle(text) {
   const cleanText = text.replace(/[^\w\s]/gi, "").trim();
   return cleanText;
 }
-async function _getFieldTextViaAPI(elementId, fieldNames) {
+async function _getFieldTextViaAPI(elementId, fieldNames, actionUrl) {
   try {
-    const result = await fetch(`/actions/bespoken/bespoken/get-element-content?elementId=${elementId}`, {
+    const actionUrlForElement = new URL(actionUrl);
+    actionUrlForElement.searchParams.set("elementId", elementId);
+    const result = await fetch(actionUrlForElement.toString(), {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });
@@ -858,11 +860,12 @@ async function handleGenerateButtonClick(event) {
 }
 async function handlePreviewButtonClick(event) {
   const button = event.target.closest(".bespoken-preview");
+  const actionUrl = button.getAttribute("data-action-url") || "";
   if (!button) return;
   const elementId = _getInputValue('input[name="elementId"]');
   const title = _cleanTitle(_getInputValue("#title") || elementId);
   const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-  const text = await generateScript(targetFieldHandles, title);
+  const text = await generateScript(targetFieldHandles, title, actionUrl);
   const parentElement = event.target.closest(".bespoken-fields");
   const modal = parentElement.querySelector(".bespoken-dialog");
   if (modal) {
@@ -870,7 +873,7 @@ async function handlePreviewButtonClick(event) {
     modal.open();
   }
 }
-async function generateScript(targetFieldHandles, title) {
+async function generateScript(targetFieldHandles, title, actionUrl = "") {
   console.log("Generating script for field handles:", targetFieldHandles);
   let text = "";
   if (targetFieldHandles) {
@@ -908,7 +911,7 @@ async function generateScript(targetFieldHandles, title) {
                       const status = card.getAttribute("data-status");
                       const id = card.getAttribute("data-id");
                       if (status === "live") {
-                        const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                        const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
                         text += newText + " ";
                       }
                     }
@@ -942,7 +945,7 @@ async function generateScript(targetFieldHandles, title) {
                       const status = targetField2.getAttribute("data-status");
                       const id = targetField2.getAttribute("data-id");
                       if (status === "live") {
-                        const newText = await _getFieldTextViaAPI(id, nestedHandles);
+                        const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
                         text += newText + " ";
                       }
                     }

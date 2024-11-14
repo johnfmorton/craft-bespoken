@@ -50,11 +50,11 @@ export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[
             }
         }
 
-        // Return ' EMPTY FIELD ' if no field matches
-        return ' EMPTY FIELD ';
+        // Return '' if no field matches
+        return '';
     } catch (error) {
         console.error('Error fetching element content:', error);
-        return ' EMPTY FIELD ';
+        return '';
     }
 }
 

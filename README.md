@@ -13,6 +13,7 @@ The [Bespoken Web Component](https://www.npmjs.com/package/bespoken-audio-player
 * Users can create audio narration of posts with a single click.
 * Customize the Bespoken field type to choose which fields to narrate. 
 * Bespoken supports CKEditor fields or Plain Text fields.
+* NEW: Bespoken supports Matrix fields that contain CKEditor or Plain Text fields.
 * Support for 32 languages.
 * Use any of ElevenLab's professional voice models.
 * Use Voice Cloning to create custom voice models for your Craft site. See the [ElevenLabs Voice Cloning page](https://elevenlabs.io/voice-cloning) for more information.
@@ -20,7 +21,7 @@ The [Bespoken Web Component](https://www.npmjs.com/package/bespoken-audio-player
 
 ## Requirements
 
-This plugin requires Craft CMS 5.3.0 or later, and PHP 8.2 or later.
+This plugin requires Craft CMS 5.5.0 or later, and PHP 8.2 or later.
 
 ## Installation
 

@@ -50,6 +50,8 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
     // Disable the button
     button.classList.add('disabled');
 
+    const actionUrlGetElementContent: string = button.getAttribute('data-get-element-content-action-url');
+
     const fieldGroup = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
     const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
 
@@ -74,7 +76,7 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
 
     const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
 
-    const text = await generateScript(targetFieldHandles, title);
+    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
 
     console.log('Generated script:',text);
 
@@ -92,8 +94,8 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
     }
 
     // Text is now ready to be processed
-    // Get the action URL from the button's data-action-url attribute - used the generate the audio
-    const actionUrl: string = button.getAttribute('data-action-url') || '';
+    // Get the action URL from the button's data-action-url attribute - used to generate the audio
+    const actionUrlProcessText: string = button.getAttribute('data-process-text-action-url') || '';
 
     // What's going to happen next:
     // Generate the audio by gathering all the required data and sending it to
@@ -112,14 +114,14 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
         textColor: 'rgb(89, 102, 115)'
     });
 
-    processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
+    processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText);
 }
 
 async function handlePreviewButtonClick(event: Event): Promise<void> {
     const button = (event.target as HTMLElement).closest('.bespoken-preview') as HTMLButtonElement | null;
 
     // this action URL is used to get an element's field data from the Craft API if needed
-    const actionUrl: string = button.getAttribute('data-action-url') || '';
+    const actionUrlGetElementContent: string = button.getAttribute('data-get-element-content-action-url');
 
     if (!button) return;
 
@@ -132,7 +134,7 @@ async function handlePreviewButtonClick(event: Event): Promise<void> {
     const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
 
     // const text = generateScript(targetFieldHandles, title);
-    const text = await generateScript(targetFieldHandles, title, actionUrl);
+    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
 
     const parentElement = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
 
@@ -291,145 +293,6 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                 }
             }
         }
-        text = text.trim();
-    }
-
-    return text;
-}
-
-
-function generateScriptOLD(targetFieldHandles: string, title: string | undefined): string {
-    console.log('Generating script for field handles:', targetFieldHandles);
-
-    let text: string = '';
-
-    if (targetFieldHandles) {
-        // const fieldHandlesArray = targetFieldHandles.split(',').map(handle => handle.trim());
-
-        const fieldHandlesArray = _parseFieldHandles(targetFieldHandles);
-
-        fieldHandlesArray.forEach(handle => {
-            // If "title" is one of the target fields, use the title of the element being edited in the CMS
-            // "title" is not technically a field handle in the CMS, but we treat it as one here
-            if (handle === 'title') {
-                // if title does not end with a period, add one
-                const titleToAdd = title.endsWith('.') ? title : title + '.';
-                text += (titleToAdd + " ");
-            } else {
-                // The handle is not "title", so it's a field handle or an object with a field handle and nested field handles
-                // first, let's check if the handle is an object
-                // and if it is, we need to get the main handle and the nested handles
-                let nestedHandles = [];
-                if (handle instanceof Object) {
-                    // if this is an object, it will look something like this:
-                    // { "mainHandle": ["nestedHandle1", "nestedHandle2"] }
-                    // we need to get the main handle and the nested handles
-                    const mainHandle = Object.keys(handle)[0];
-                    nestedHandles = handle[mainHandle];
-                    // set handle to the main handle
-                    handle = mainHandle;
-                }
-
-                // the handle is now a string, so we can use it to get the field
-                // we may also have nested handles. we only need those
-                // if the matrix view is not set to "inline-editable-elements"
-                // in that case, we will need to use the Craft API to get that data
-                // since it is not present in the DOM
-
-                // attempt to get the field element based on the handle
-                const targetField = document.getElementById(`fields-${handle}-field`) as HTMLElement | null;
-
-                // Were we able to get a target field by that handle?
-                if (targetField) {
-                    // determine the type of field
-                    const fieldType = _getFieldType(targetField);
-
-                    // Switch on the field type
-                    switch (fieldType) {
-                        case "plain-text":
-                            // PlainText fields are scraped directly from the page
-                            text += _getFieldText(targetField) + " ";
-                            break;
-                        case "ckeditor":
-                            // CKEditor fields are scraped directly from the page
-                            text += _getFieldText(targetField) + " ";
-                            break;
-                        case "matrix":
-                            const viewTypeTest = _getMatrixViewType(targetField);
-                            switch (viewTypeTest) {
-                                case 'cards':
-                                    // Matrix fields displayed as cards are scraped via the API
-                                    let targetFieldCards = targetField.querySelector('.nested-element-cards');
-                                    if (targetFieldCards) {
-                                        const cards = targetFieldCards.querySelectorAll('.card');
-                                        cards.forEach(async card => {
-                                            const status = card.getAttribute('data-status');
-                                            const id = card.getAttribute('data-id');
-
-                                            if (status === 'live') {
-                                                // arrayOfEntryIds.push(id);
-                                                const newText = await _getFieldTextViaAPI(id, nestedHandles);
-                                                text += newText + " ";
-                                            }
-                                        });
-                                    }
-
-
-                                    // text += "Matrix field displayed as cards goes here. ";
-                                    break;
-                                case 'inline-editable-elements':
-                                    // Matrix fields displayed as inline-editable-elements are scraped directly from the page
-
-                                    // look for .blocks (inline-editable-elements) in the targetField
-                                    let targetFieldInline = targetField.querySelector('.blocks');
-
-                                    // if the matrix field has nested elements then...
-                                    if (targetFieldInline) {
-                                        const blocks = targetFieldInline.querySelectorAll('.matrixblock');
-                                        blocks.forEach(block => {
-                                            const isDisabled = block.classList.contains('disabled-entry');
-                                            const id = block.getAttribute('data-id');
-                                            if (!isDisabled) {
-                                                // get the .fields element
-                                                const fields = block.querySelector('.fields');
-
-                                                // find the .field element
-                                                const field = fields.querySelector('.field');
-                                                // debugger;
-                                                text += _getFieldText(field as HTMLElement) + " ";
-
-                                            }
-                                        });
-
-                                    }
-                                    break;
-                                case 'element-index':
-                                    // Matrix fields displayed as element-index are scraped via the API
-                                    let targetFieldGrid = targetField.querySelector('.card-grid');
-
-                                    if (targetFieldGrid) {
-                                        const cards = targetFieldGrid.querySelectorAll('.card');
-                                        cards.forEach(async card => {
-                                            const status = card.getAttribute('data-status');
-                                            const id = card.getAttribute('data-id');
-                                            if (status === 'live') {
-                                                // arrayOfEntryIds.push(id);
-                                                // text += 'content from element ' + id + " ";
-                                                text +=  await _getFieldTextViaAPI(id, nestedHandles) + " ";
-                                            }
-                                        });
-                                    }
-                                    break;
-                                default:
-                                    // Matrix fields displayed as tables are scraped via the API
-                                    text += " There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ";
-                            }
-                            break;
-                    }
-                    // debugger;
-                }
-            }
-        });
         text = text.trim();
     }
     return text;

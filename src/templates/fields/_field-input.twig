@@ -67,7 +67,7 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
-                            'action-url': actionUrl('bespoken/bespoken/get-element-content')
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content')
                         }
                     }
                 }) }}
@@ -84,7 +84,8 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
-                            'action-url': actionUrl('bespoken/bespoken/process-text')
+                            'process-text-action-url': actionUrl('bespoken/bespoken/process-text'),
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content')
                         }
                     }
                 }) }}

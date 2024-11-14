@@ -513,6 +513,7 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
       }
     } catch (error) {
       console.error("Error fetching job status:", error);
+      console.error("Error mentioning 'toString' often mean the API call failed to ElevenLabs and do not indicate a problem with the job queue.");
       if (howManyTimes === 100) {
         clearInterval(interval);
         button.classList.remove("disabled");
@@ -824,6 +825,7 @@ async function handleGenerateButtonClick(event) {
   const button = event.target.closest(".bespoken-generate");
   if (!button) return;
   button.classList.add("disabled");
+  const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
   const fieldGroup = event.target.closest(".bespoken-fields");
   const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
   const elementId = _getInputValue('input[name="elementId"]');
@@ -837,7 +839,7 @@ async function handleGenerateButtonClick(event) {
     }
   });
   const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-  const text = await generateScript(targetFieldHandles, title);
+  const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
   console.log("Generated script:", text);
   if (text.length === 0) {
     button.classList.remove("disabled");
@@ -849,23 +851,23 @@ async function handleGenerateButtonClick(event) {
     });
     return;
   }
-  const actionUrl = button.getAttribute("data-action-url") || "";
+  const actionUrlProcessText = button.getAttribute("data-process-text-action-url") || "";
   updateProgressComponent(progressComponent, {
     progress: 0.1,
     success: true,
     message: "Preparing data",
     textColor: "rgb(89, 102, 115)"
   });
-  processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrl);
+  processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText);
 }
 async function handlePreviewButtonClick(event) {
   const button = event.target.closest(".bespoken-preview");
-  const actionUrl = button.getAttribute("data-action-url") || "";
+  const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
   if (!button) return;
   const elementId = _getInputValue('input[name="elementId"]');
   const title = _cleanTitle(_getInputValue("#title") || elementId);
   const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-  const text = await generateScript(targetFieldHandles, title, actionUrl);
+  const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
   const parentElement = event.target.closest(".bespoken-fields");
   const modal = parentElement.querySelector(".bespoken-dialog");
   if (modal) {

@@ -10,7 +10,6 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
     const interval = setInterval(async () => {
         howManyTimes++;
 
-
         try {
             const result = await fetch(actionUrlJobStatus, {
                 method: 'GET',
@@ -45,7 +44,10 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
             // I don't clear the interval here because I want to keep polling the API
             // because the first few requests might have failed because processing has not started yet
             // so the only clear the interval when the howManyTimes is 100
+
+            // check if error is a string
             console.error('Error fetching job status:', error);
+            console.error("Error mentioning 'toString' often mean the API call failed to ElevenLabs and do not indicate a problem with the job queue.");
             if (howManyTimes === 100) {
                 clearInterval(interval);
                 // Re-enable the button

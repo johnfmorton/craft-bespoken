@@ -20,29 +20,43 @@ Once the setup is complete. Create a Bespoken field for the Entry Type you want 
 
 1. Create a new field in Craft.
 2. Choose the Bespoken field type.
-3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken supports CKEditor fields and Plain Text fields. (See below for information on how the text from fields is processed.) Multiple field handles can be included, separated by commas. Consider including the `title` field as your first field.
+3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken supports CKEditor fields and Plain Text fields. These fields can be on the top level of your entry or within a Matrix field. Multiple field handles can be included, separated by commas. Consider including the `title` field as your first field. When using Matrix fields, include the field handles for the blocks in the Matrix field after the Matrix field handle within brackets. (See below for an example.) Field handles are case-sensitive.
 4. Optionally, you can provide a prefix for the filename of your audio file. This can be useful if there are multiple instances of Bespoken fields in your entry type.
 5. Choose at least one voice for the field. 
 
 ### Example of the settings for a Bespoken plugin
 
-![Bespoken field status](./documentation-assets/settings-page.png)
+![Bespoken settings page example](./documentation-assets/settings-page.png)
 
-### Example of the field set up for a Bespoken plugin
+### Example of a Bespoken field configuration without Matrix fields
 
-![Bespoken field status](./documentation-assets/field-setup.png)
+![Bespoken field setup without a Matrix field](./documentation-assets/field-setup.png)
+
+### Example of a Bespoken field configuration including a Matrix field and the field handles for the blocks in the Matrix field
+
+Setting up a Matrix field requires the field name of the Matrix field and the field handles of the blocks within the Matrix field. The field handles for the blocks are separated by commas and enclosed in brackets. For example, if you have a Matrix field with the handle `matrixFieldExample` and the field handles _within the blocks_ of the Matrix field are `fieldHandleForACKEditorField` and `fieldHandleForPlainTextField`, the field configuration would look like this:
+
+```
+title,matrixFieldExample[fieldHandleForACKEditorField,fieldHandleForPlainTextField]
+```
+
+In other words, the block handles themselves are not important. The important part is the field handles within the blocks. Behind the scenes, each field inside a block is queried separately and the field handles are accessed in the order you provide them in the field configuration. (If this is confusing, please reach out to me for clarification.)
+
+This is a screenshot of the field configuration for a Bespoken field that includes a Matrix field.
+
+![Bespoken field setup with a Matrix field](./documentation-assets/field-setup-with-matrix.png)
 
 The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message. 
 
 ### Example of a successful audio file creation
 
-![Bespoken field status](./documentation-assets/status-success.png)
+![Bespoken example of successful audio file creation](./documentation-assets/status-success.png)
 
 ### Example of an error audio file creation
 
 In this example, you can see that the audio file creation failed because there were not enough credits left in the ElevenLabs account to create the audio file.
 
-![Bespoken field status](./documentation-assets/status-error.png)
+![Bespoken example of failed audio file creation showing error message](./documentation-assets/status-error.png)
 
 
 ### How text is processed from a CKEditor field

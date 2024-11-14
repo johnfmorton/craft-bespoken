@@ -232,25 +232,40 @@ async function generateScript(targetFieldHandles: string, title: string | undefi
                                             const isDisabled = block.classList.contains('disabled-entry');
                                             if (!isDisabled) {
                                                 // get the .fields element
-                                                const fields = block.querySelector('.fields');
+                                                const fieldsContainerElement = block.querySelector('.fields');
 
                                                 // find the .field element
-                                                const field = fields.querySelector('.field');
-                                                text += _getFieldText(field as HTMLElement) + " ";
+                                                const fieldElements = Array.from(fieldsContainerElement.querySelectorAll('.field'));
+
+                                                // loop through the field elements
+                                                for (const field of fieldElements) {
+                                                    // this field's handle is in the data-attribute
+                                                    const fieldHandle = field.getAttribute('data-attribute');
+                                                    // Loop through the nestedHandle one by one, in order, looking for the fieldHandle of this field
+                                                    // If we find it, add the text to the script
+                                                    for (const nestedHandle of nestedHandles) {
+                                                        if (fieldHandle === nestedHandle) {
+                                                            text += _getFieldText(field as HTMLElement) + " ";
+                                                        }
+                                                    }
+                                                    // because the handles are provided in their order of
+                                                    // importance by the developer, we continue the loop getting
+                                                    // the text of all the fields in the matrix block in the
+                                                    // expected order of importance
+                                                }
                                             }
                                         });
                                     }
                                     break;
                                 case 'element-index':
                                     // Matrix fields displayed as element-index are scraped via the API
-                                    let targetFieldGrid = targetField.querySelector('.card-grid');
-                                    
-                                    if (targetFieldGrid) {
-                                        const cards =  Array.from(targetFieldGrid.querySelectorAll('.card'));
+                                    const targetFields = Array.from(targetField.querySelectorAll('[data-id]'));
 
-                                        for (const card of cards) {
-                                            const status = card.getAttribute('data-status');
-                                            const id = card.getAttribute('data-id');
+                                    if (targetFields) {
+
+                                        for (const targetField of targetFields) {
+                                            const status = targetField.getAttribute('data-status');
+                                            const id = targetField.getAttribute('data-id');
                                             if (status === 'live') {
                                                 const newText = await _getFieldTextViaAPI(id, nestedHandles);
                                                 text += newText + " ";

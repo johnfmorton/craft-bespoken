@@ -2,7 +2,7 @@
 
 ## 5.0.7 - 2024-11-14
 ### Added
-- Added support for Matrix fields that contain CKEditor and Plain Text fields. Read the documentation for details on how to use this feature. If the Matrix field view mode is set to "As cards" or "As element index," please review the documentation in detail for how these fields are processed.
+- Added support for Matrix fields that contain CKEditor and Plain Text fields. Read the documentation for details on how to use this feature. TLDR: To retrieve content from Matrix fields you must supply the field handles to look for inside your Matrix blocks in the order they should be processed.
 
 ## 5.0.6 - 2024-11-09
 ### Added

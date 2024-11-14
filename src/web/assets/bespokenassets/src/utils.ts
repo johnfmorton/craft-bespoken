@@ -36,22 +36,24 @@ export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[
             throw new Error('Missing element in response data');
         }
 
+        let text = '';
+
         // Look in the responseData.element for the existence of the fieldNames one by one
-        // Return the content of the first found field
+        // Return the content of the found field
         for (let i = 0; i < fieldNames.length; i++) {
             if (responseData.element[fieldNames[i]]) {
                 const returnedText: string = responseData.element[fieldNames[i]];
                 if (_isHTML(returnedText)) {
-                    return _processCKEditorFields(returnedText);
+                    text += _processCKEditorFields(returnedText) + ' ';
                 } else {
-                    return _processPlainTextField(returnedText);
+                    text += _processPlainTextField(returnedText) + ' ';
                 }
 
             }
         }
 
         // Return '' if no field matches
-        return '';
+        return text;
     } catch (error) {
         console.error('Error fetching element content:', error);
         return '';

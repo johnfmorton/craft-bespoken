@@ -647,20 +647,21 @@ async function _getFieldTextViaAPI(elementId, fieldNames) {
     if (!responseData.element) {
       throw new Error("Missing element in response data");
     }
+    let text = "";
     for (let i = 0; i < fieldNames.length; i++) {
       if (responseData.element[fieldNames[i]]) {
         const returnedText = responseData.element[fieldNames[i]];
         if (_isHTML(returnedText)) {
-          return _processCKEditorFields(returnedText);
+          text += _processCKEditorFields(returnedText) + " ";
         } else {
-          return _processPlainTextField(returnedText);
+          text += _processPlainTextField(returnedText) + " ";
         }
       }
     }
-    return " EMPTY FIELD ";
+    return text;
   } catch (error) {
     console.error("Error fetching element content:", error);
-    return " EMPTY FIELD ";
+    return "";
   }
 }
 function _getFieldText(field) {
@@ -920,20 +921,26 @@ async function generateScript(targetFieldHandles, title) {
                     blocks.forEach((block) => {
                       const isDisabled = block.classList.contains("disabled-entry");
                       if (!isDisabled) {
-                        const fields = block.querySelector(".fields");
-                        const field = fields.querySelector(".field");
-                        text += _getFieldText(field) + " ";
+                        const fieldsContainerElement = block.querySelector(".fields");
+                        const fieldElements = Array.from(fieldsContainerElement.querySelectorAll(".field"));
+                        for (const field of fieldElements) {
+                          const fieldHandle = field.getAttribute("data-attribute");
+                          for (const nestedHandle of nestedHandles) {
+                            if (fieldHandle === nestedHandle) {
+                              text += _getFieldText(field) + " ";
+                            }
+                          }
+                        }
                       }
                     });
                   }
                   break;
                 case "element-index":
-                  let targetFieldGrid = targetField.querySelector(".card-grid");
-                  if (targetFieldGrid) {
-                    const cards = Array.from(targetFieldGrid.querySelectorAll(".card"));
-                    for (const card of cards) {
-                      const status = card.getAttribute("data-status");
-                      const id = card.getAttribute("data-id");
+                  const targetFields = Array.from(targetField.querySelectorAll("[data-id]"));
+                  if (targetFields) {
+                    for (const targetField2 of targetFields) {
+                      const status = targetField2.getAttribute("data-status");
+                      const id = targetField2.getAttribute("data-id");
                       if (status === "live") {
                         const newText = await _getFieldTextViaAPI(id, nestedHandles);
                         text += newText + " ";

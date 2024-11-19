@@ -51,10 +51,15 @@ class GenerateAudio extends BaseJob
             $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to running. Line  ' . __LINE__ . ' in ' . __FILE__);
 
+            if (getenv('BESPOKEN_DEBUG') === 'true' || getenv('BESPOKEN_DEBUG') === '1') {
+                $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+                return;
+            }
+
             // Call the Eleven Labs API
-            //$this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
             // The following is a debugging process for the file save process
-            $this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            //$this->debugFileSaveProcess($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
@@ -294,7 +299,7 @@ sleep($this->sleepValue * 1);
             $this->setBespokeProgress($queue, $bespokenJobId, 0.9, 'Asset created with ID: ' . $asset->id);
             sleep($this->sleepValue * 1);
             Bespoken::info('Asset created with ID: ' . $asset->id);
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Filename: ' . $filename . ' saved to the assets');
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: '. $entryTitle . ' (audio) - ' . $filename );
 
         } catch (\Throwable $e) {
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());

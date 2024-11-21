@@ -81,7 +81,7 @@ class BespokenController extends Controller
         }
 
         // Retrieve the title of the element
-        $entryTitle = $this->_cleanTitle($element->title, 26);
+        $entryTitle = $this->_cleanTitle($element->title, 56);
 
         // call the sendTextToElevenLabsApi service method
         $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix);

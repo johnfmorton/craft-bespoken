@@ -126,8 +126,7 @@ class GenerateAudio extends BaseJob
     protected function setBespokeProgress($queue, $bespokenJobId, $progress, $message, $success = 1): void
     {
 
-
-        // create a data object to store the job success
+        // create a array to store the job success
         $data = compact('progress', 'message', 'success');
 
         // stringify the data object and set the cache

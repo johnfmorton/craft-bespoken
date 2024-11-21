@@ -132,6 +132,7 @@ class GenerateAudio extends BaseJob
         // stringify the data object and set the cache
         $data = json_encode($data, JSON_THROW_ON_ERROR);
 
+        // Set a cache for the job status using the bespokenJobId
         Craft::$app->cache->set((string)($bespokenJobId), $data, $this->cacheExpire);
 
         $queue->setProgress($progress, $message);

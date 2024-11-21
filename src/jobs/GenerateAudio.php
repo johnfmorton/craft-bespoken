@@ -239,7 +239,7 @@ class GenerateAudio extends BaseJob
      */
     private function saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId): void
     {
-//        $this->setProgress($queue, 0.75, 'Saving the file to the assets');
+        // $this->setProgress($queue, 0.75, 'Saving the file to the assets');
         $this->setBespokeProgress($queue, $bespokenJobId, 0.75, 'Saving the file to the assets');
 
         // Get the Bespoken plugin settings
@@ -256,7 +256,7 @@ class GenerateAudio extends BaseJob
         // If the volume is not found, log an error and return
         if (!$volume) {
             Bespoken::error('Volume not found with handle: ' . $volumeHandle);
-//            $this->setProgress($queue, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle);
+            // $this->setProgress($queue, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle);
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle, 0);
             return;
         }

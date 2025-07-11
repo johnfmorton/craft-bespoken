@@ -1,13 +1,14 @@
 {# @var plugin \johnfmorton\wellread\WellRead #}
 {# @var settings \johnfmorton\wellread\models\Settings #}
-
-<h2 class="first">ElevenLabs account details</h2>
+	<h2 class="first"> ElevenLabs account details</h2>
 
 {# TODO: put the following text into the translations file #}
 
-<p>The Bespoken plugin integrates your ElevenLabs account with Craft CMS. If you do not have an ElevenLabs account, sign up <a href="https://elevenlabs.io/?from=partnergomez2285">here</a>. This is a referral link which will help continue development of the plugin.</p>
+<p>The Bespoken plugin integrates your ElevenLabs account with Craft CMS. If you do not have an ElevenLabs account, sign up
+	<a href="https://elevenlabs.io/?from=partnergomez2285">here</a>. This is a referral link which will help continue development of the plugin.</p>
 
-<p>Once you have an account, you can find your API key by visiting the <a href="https://elevenlabs.io/app/sign-in">ElevenLabs site</a>, signing in, and viewing the My Account menu.</p>
+<p>Once you have an account, you can find your API key by visiting the
+	<a href="https://elevenlabs.io/app/sign-in">ElevenLabs site</a>, signing in, and viewing the My Account menu.</p>
 
 {% import '_includes/forms.twig' as forms %}
 
@@ -32,11 +33,12 @@
     name: 'voiceModel',
     value: settings['voiceModel'] ?? 'eleven_multilingual_v2',
     options: [
+        { label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
         { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
         { label: 'Turbo v2', value: 'eleven_turbo_v2' },
         { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
-        { label: 'English v1', value: 'eleven_monolingual_v1' },
-        { label: 'Multilingual v1', value: 'eleven_multilingual_v1' }
+        { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
+        { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
     ]
 }) }}
 {% endset %}
@@ -154,7 +156,7 @@
 
 {# Loop through the array #}
 {% for volume in craft.app.volumes.allVolumes %}
-    {% set craftAssetVolumes = craftAssetVolumes|merge([{label: volume.name, value: volume.handle}]) %}
+	{% set craftAssetVolumes = craftAssetVolumes|merge([{label: volume.name, value: volume.handle}]) %}
 {% endfor %}
 
 {{ forms.selectField(
@@ -173,8 +175,9 @@
 
 <h2>Advanced settings</h2>
 
-<p>All values below should be left at the defaults under most circumstances. For more information, read the <a
-            href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a></p>
+<p>All values below should be left at the defaults under most circumstances. For more information, read the
+	<a href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a>
+</p>
 
 {{ forms.textField(
     {
@@ -222,4 +225,3 @@
         errors: settings.getErrors('use_speaker_boost')
     }
 ) }}
-

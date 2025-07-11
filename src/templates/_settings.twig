@@ -26,6 +26,10 @@
 
 <h2>Voice configuration</h2>
 
+<pre>
+   Rework this so that each voice can have a different voice model and a different set of pronunciation rule set.
+</pre>
+
 
 {% set input %}
 {{ forms.radioGroup({
@@ -71,16 +75,51 @@
         voice: {
             heading: 'Voice name' | t('bespoken'),
             type: 'singleline',
-            width: '50%',
+            width: '25%',
             handle: 'voice',
             class: 'code'
         },
         voiceId: {
             heading: 'Voice ID' | t('bespoken'),
             type: 'singleline',
-            width: '50%',
+            width: '25%',
             handle: 'voiceId',
             class: 'code'
+        },
+        voiceModel: {
+            heading: 'Voice model' | t('bespoken'),
+            type: 'select',
+            width: '25%',
+            handle: 'voiceModel',
+            default: 'eleven_multilingual_v2',
+            class: 'code',
+            options: [
+                { label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
+                { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
+                { label: 'Turbo v2', value: 'eleven_turbo_v2' },
+                { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
+                { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
+                { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
+            ]
+        },
+        pronunciationRuleSet: {
+            heading: 'Pronunciation rule set' | t('bespoken'),
+            type: 'select',
+            width: '25%',
+            handle: 'pronunciationRuleSet',
+            class: 'code',
+            options: settings['pronunciationRuleSets'] ?? [
+                { label: 'Language 1', value: 'language1' },
+                { label: 'Language 2', value: 'language2' },
+                { label: 'Language 3', value: 'language3' },
+                { label: 'Language 4', value: 'language4' },
+                { label: 'Language 5', value: 'language5' },
+                { label: 'Language 6', value: 'language6' },
+                { label: 'Language 7', value: 'language7' },
+                { label: 'Language 8', value: 'language8' },
+                { label: 'Language 9', value: 'language9' },
+                { label: 'Language 10', value: 'language10' }
+            ]
         }
     },
     rows: settings['voices'] ?? [],
@@ -118,16 +157,35 @@
         word: {
             heading: 'Word' | t('bespoken'),
             type: 'singleline',
-            width: '50%',
+            width: '38%',
             handle: 'word',
             class: 'code'
         },
         pronunciation: {
             heading: 'Pronunciation' | t('bespoken'),
             type: 'singleline',
-            width: '50%',
+            width: '37%',
             handle: 'pronunciation',
             class: 'code'
+        },
+        pronunciationRuleSet: {
+            heading: 'Pronunciation rule set' | t('bespoken'),
+            type: 'select',
+            width: '25%',
+            handle: 'pronunciationRuleSet',
+            class: 'code',
+            options: settings['pronunciationRuleSets'] ?? [
+                { label: 'Language 1', value: 'language1' },
+                { label: 'Language 2', value: 'language2' },
+                { label: 'Language 3', value: 'language3' },
+                { label: 'Language 4', value: 'language4' },
+                { label: 'Language 5', value: 'language5' },
+                { label: 'Language 6', value: 'language6' },
+                { label: 'Language 7', value: 'language7' },
+                { label: 'Language 8', value: 'language8' },
+                { label: 'Language 9', value: 'language9' },
+                { label: 'Language 10', value: 'language10' }
+            ]
         }
     },
     rows: settings['pronunciations'] ?? [],

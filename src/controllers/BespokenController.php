@@ -48,13 +48,53 @@ class BespokenController extends Controller
 
         $text = $postData['text'];
 
-        // Get the list of pronunciations from the settings model
+        $voiceModel = $postData['voiceModel'];
+
+        $pronunciationRuleSet = $postData['pronunciationRuleSet'];
+
+        // Accomodate for users who have not updated their settings: If the voiceModel and pronunciationRuleSet values are not set, we need to use the default values.
+        if (!$voiceModel or $voiceModel == '') {
+            $voiceModel = 'multilingual_v2';
+        }
+        if (!$pronunciationRuleSet or $pronunciationRuleSet == '') {
+            $pronunciationRuleSet = 'language1';
+        }
+
+        // Get the full list of pronunciations from the settings model. This is the list of pronunciations that will be used to replace the words with the pronunciations.
         $pronunciations = BespokenPlugin::getInstance()->getSettings()->pronunciations;
 
-        // Loop through the pronunciations and replace the word with the pronunciation, regardless of case
-        foreach ($pronunciations as $pronunciation) {
+        BespokenPlugin::info('Pronunciations: ' . json_encode($pronunciations));
+
+        /* sample of legacy version of the pronunciations array:
+        [{"word":"DDEV","pronunciation":"deedev"},{"word":"colonel","pronunciation":"kernel"},{"word":"bologna","pronunciation":"baloney"},{"word":"fish","pronunciation":"bacon"}]
+        */
+
+        /* sample of the pronunciations array that is expected:
+        [{"word":"DDEV","pronunciation":"deedev","pronunciationRuleSet":"language1"},{"word":"colonel","pronunciation":"kernel","pronunciationRuleSet":"language1"},{"word":"bologna","pronunciation":"baloney","pronunciationRuleSet":"language1"},{"word":"fish","pronunciation":"bacon","pronunciationRuleSet":"language1"}]
+        */
+
+        // if the user still has the legacy version of the pronunciations array, we need to convert it to the new version and default the pronunciationRuleSet to language1
+        if (count($pronunciations) > 0 and count($pronunciations[0]) == 2) {
+            $pronunciations = array_map(function($pronunciation) {
+                return ['word' => $pronunciation['word'], 'pronunciation' => $pronunciation['pronunciation'], 'pronunciationRuleSet' => 'language1'];
+            }, $pronunciations);
+        }
+
+        // filter the pronunciations array to only include the values that match the pronunciationRuleSet value
+        $filteredPronunciations = array_filter($pronunciations, function($pronunciation) use ($pronunciationRuleSet) {
+            return $pronunciation['pronunciationRuleSet'] == $pronunciationRuleSet;
+        });
+
+        BespokenPlugin::info('Filtered pronunciations: ' . json_encode($filteredPronunciations));
+
+        // Loop through the pronunciations and replace the word with the pronunciation, regardless of case, using the filteredPronunciations array
+        // This allows different voices to have different pronunciations for the same word which is useful for multilingual sites.
+
+        foreach ($filteredPronunciations as $pronunciation) {
             $text = str_ireplace($pronunciation['word'], $pronunciation['pronunciation'], $text);
         }
+
+        BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
 
         // remove any   characters
         $text = str_replace(' ', ' ', $text);
@@ -63,7 +103,6 @@ class BespokenController extends Controller
         $text = preg_replace('/\s+/', ' ', $text);
 
         BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
-
 
         $voiceId = $postData['voiceId'];
         $fileNamePrefix = $postData['fileNamePrefix'];
@@ -84,7 +123,7 @@ class BespokenController extends Controller
         $entryTitle = $this->_cleanTitle($element->title, 56);
 
         // call the sendTextToElevenLabsApi service method
-        $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix);
+        $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix, $voiceModel);
 
         return $this->asJson($result);
     }

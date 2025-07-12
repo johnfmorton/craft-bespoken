@@ -1,118 +1,131 @@
 import {updateProgressComponent} from "./updateProgressComponent";
 import {ProgressComponent} from "./progress-component-v2";
 import {startJobMonitor} from "./startJobMonitor";
-
+// TODO: use the voiceModel and pronunciationRuleSet values to send to the API
 export function processText(
-    text: string,
-    voiceId: string,
-    elementId: string,
-    fileNamePrefix: string,
-    progressComponent: ProgressComponent,
-    button: HTMLButtonElement,
-    actionUrlProcessText: string
+  text: string,
+  voiceId: string,
+  elementId: string,
+  fileNamePrefix: string,
+  progressComponent: ProgressComponent,
+  button: HTMLButtonElement,
+  actionUrlProcessText: string,
+  pronunciationRuleSet: string,
+  voiceModel: string
 ): void {
+  updateProgressComponent(progressComponent, {
+    progress: 0.11,
+    success: true,
+    message: 'Data prepared for API call.',
+    textColor: 'rgb(89, 102, 115)',
+  });
 
-    // const actionUrlProcessText: string = `${actionUrlBase}/process-text`;
-
+  // check to see if the text is empty
+  if (!text) {
     updateProgressComponent(progressComponent, {
-        progress: 0.11,
-        success: true,
-        message: 'Data prepared for API call.',
-        textColor: 'rgb(89, 102, 115)'
+      progress: 0,
+      success: false,
+      message: 'No text to generate audio from.',
+      textColor: 'rgb(126,7,7)',
     });
+    button.classList.remove('disabled');
+    return;
+  }
 
-    // check to see if the text is empty
-    if (!text) {
-        updateProgressComponent(progressComponent, {
-            progress: 0,
-            success: false,
-            message: 'No text to generate audio from.',
-            textColor: 'rgb(126,7,7)'
-        });
-        button.classList.remove('disabled');
-        return;
-    }
-
-    // check to see if the actionUrl is empty
-    if (!actionUrlProcessText) {
-        updateProgressComponent(progressComponent, {
-            progress: 0,
-            success: false,
-            message: 'No action URL to send the text to.',
-            textColor: 'rgb(126,7,7)'
-        });
-        button.classList.remove('disabled');
-        return;
-    }
-
-    // check to see if the voiceId is empty
-    if (!voiceId) {
-        updateProgressComponent(progressComponent, {
-            progress: 0,
-            success: false,
-            message: 'No voice selected.',
-            textColor: 'rgb(126,7,7)'
-        });
-        button.classList.remove('disabled');
-        return;
-    }
-
-    const decodedText = _decodeHtml(text);
-
-    const data = {text: decodedText, voiceId, fileNamePrefix, elementId};
-
+  // check to see if the actionUrl is empty
+  if (!actionUrlProcessText) {
     updateProgressComponent(progressComponent, {
-        progress: 0.15,
-        success: true,
-        message: 'Starting audio generation job in queue system.',
-        textColor: 'rgb(89, 102, 115)'
+      progress: 0,
+      success: false,
+      message: 'No action URL to send the text to.',
+      textColor: 'rgb(126,7,7)',
     });
+    button.classList.remove('disabled');
+    return;
+  }
 
-    fetch(actionUrlProcessText, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data),
+  // check to see if the voiceId is empty
+  if (!voiceId) {
+    updateProgressComponent(progressComponent, {
+      progress: 0,
+      success: false,
+      message: 'No voice selected.',
+      textColor: 'rgb(126,7,7)',
+    });
+    button.classList.remove('disabled');
+    return;
+  }
+
+  const decodedText = _decodeHtml(text);
+
+  // Added the voiceModel and pronunciationRuleSet to the data object so that they can be sent to the API (12JUL2025)
+  const data = {
+    text: decodedText,
+    voiceId,
+    fileNamePrefix,
+    elementId,
+    voiceModel,
+    pronunciationRuleSet,
+  };
+
+  updateProgressComponent(progressComponent, {
+    progress: 0.15,
+    success: true,
+    message: 'Starting audio generation job in queue system.',
+    textColor: 'rgb(89, 102, 115)',
+  });
+
+  fetch(actionUrlProcessText, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      const { bespokenJobId, success, message } = data;
+
+      if (!success) {
+        updateProgressComponent(progressComponent, {
+          progress: 0,
+          success: false,
+          message: message || 'Error during API request.',
+          textColor: 'rgb(126,7,7)',
+        });
+        button.classList.remove('disabled');
+        return;
+      }
+
+      // we have the original Action URL of the process-text function
+      // it will look something like this:
+      // https://example.com/index.php/admin/actions/bespoken/bespoken/process-text?site=default
+      // https://example.com/index.php?p=admin/actions/bespoken/bespoken/process-text
+      // now add &jobId=${bespokenJobId} to the URL
+      // so it will look like this:
+      // https://example.com/index.php?p=admin/actions/bespoken/bespoken/job-status?jobId=${bespokenJobId}
+      // or https://example.com/index.php/admin/actions/bespoken/bespoken/job-status?site=default&jobId=40fc345e-76de-4df0-941b-34418b009ffa
+      const actionUrlJobStatus = _addJobIdToUrl(
+        _updateProcessTextActionUrl(actionUrlProcessText, `job-status`),
+        bespokenJobId
+      );
+
+      // look in the startJobMonitor function to see how
+      // the progress is updated
+      startJobMonitor(
+        bespokenJobId,
+        progressComponent,
+        button,
+        actionUrlJobStatus
+      );
     })
-        .then(response => response.json())
-        .then(data => {
-            const {bespokenJobId, success, message} = data;
-
-            if (!success) {
-                updateProgressComponent(progressComponent, {
-                    progress: 0,
-                    success: false,
-                    message: message || 'Error during API request.',
-                    textColor: 'rgb(126,7,7)'
-                });
-                button.classList.remove('disabled');
-                return;
-            }
-
-            // we have the original Action URL of the process-text function
-            // it will look something like this:
-            // https://example.com/index.php/admin/actions/bespoken/bespoken/process-text?site=default
-            // https://example.com/index.php?p=admin/actions/bespoken/bespoken/process-text
-            // now add &jobId=${bespokenJobId} to the URL
-            // so it will look like this:
-            // https://example.com/index.php?p=admin/actions/bespoken/bespoken/job-status?jobId=${bespokenJobId}
-            // or https://example.com/index.php/admin/actions/bespoken/bespoken/job-status?site=default&jobId=40fc345e-76de-4df0-941b-34418b009ffa
-            const actionUrlJobStatus = _addJobIdToUrl(_updateProcessTextActionUrl( actionUrlProcessText, `job-status`), bespokenJobId) ;
-
-
-            // look in the startJobMonitor function to see how
-            // the progress is updated
-            startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus);
-        })
-        .catch(error => {
-            updateProgressComponent(progressComponent, {
-                progress: 0,
-                success: false,
-                message: 'Error during API request.',
-                textColor: 'rgb(126,7,7)'
-            });
-            console.error('Error:', error);
-        });
-
+    .catch((error) => {
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: 'Error during API request.',
+        textColor: 'rgb(126,7,7)',
+      });
+      console.error('Error:', error);
+    });
 }
 
 function _updateProcessTextActionUrl(url: string, newString: string): string {
@@ -148,7 +161,6 @@ function _addJobIdToUrl(url: string, jobId: string): string {
     return url; // Return the original URL if there is an error
   }
 }
-
 
 // I need to swap out the HTML entities in the text before sending it to the API
 function _decodeHtml(html: string): string {

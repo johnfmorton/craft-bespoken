@@ -529,7 +529,7 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
-function processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText) {
+function processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, pronunciationRuleSet, voiceModel) {
   updateProgressComponent(progressComponent, {
     progress: 0.11,
     success: true,
@@ -567,7 +567,14 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
     return;
   }
   const decodedText = _decodeHtml(text);
-  const data = { text: decodedText, voiceId, fileNamePrefix, elementId };
+  const data = {
+    text: decodedText,
+    voiceId,
+    fileNamePrefix,
+    elementId,
+    voiceModel,
+    pronunciationRuleSet
+  };
   updateProgressComponent(progressComponent, {
     progress: 0.15,
     success: true,
@@ -590,8 +597,16 @@ function processText(text, voiceId, elementId, fileNamePrefix, progressComponent
       button.classList.remove("disabled");
       return;
     }
-    const actionUrlJobStatus = _addJobIdToUrl(_updateProcessTextActionUrl(actionUrlProcessText, `job-status`), bespokenJobId);
-    startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus);
+    const actionUrlJobStatus = _addJobIdToUrl(
+      _updateProcessTextActionUrl(actionUrlProcessText, `job-status`),
+      bespokenJobId
+    );
+    startJobMonitor(
+      bespokenJobId,
+      progressComponent,
+      button,
+      actionUrlJobStatus
+    );
   }).catch((error) => {
     updateProgressComponent(progressComponent, {
       progress: 0,
@@ -832,6 +847,14 @@ async function handleGenerateButtonClick(event) {
   const title = _cleanTitle(_getInputValue("#title") || elementId);
   const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
   const voiceId = voiceSelect.value;
+  const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]');
+  const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]');
+  const voiceModelKeyValuePairs = voiceModelField.value;
+  const pronunciationRuleSetKeyValuePairs = pronunciationRuleSetField.value;
+  const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
+  const pronunciationRuleSetKeyValuePairsObject = JSON.parse(pronunciationRuleSetKeyValuePairs);
+  const voiceModelSelected = voiceModelKeyValuePairsObject[voiceId];
+  const pronunciationRuleSetSelected = pronunciationRuleSetKeyValuePairsObject[voiceId];
   let fileNamePrefix = null;
   fieldGroup.querySelectorAll('input[type="hidden"]').forEach((input) => {
     if (input.name.includes("fileNamePrefix")) {
@@ -858,7 +881,7 @@ async function handleGenerateButtonClick(event) {
     message: "Preparing data",
     textColor: "rgb(89, 102, 115)"
   });
-  processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText);
+  processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, pronunciationRuleSetSelected, voiceModelSelected);
 }
 async function handlePreviewButtonClick(event) {
   const button = event.target.closest(".bespoken-preview");

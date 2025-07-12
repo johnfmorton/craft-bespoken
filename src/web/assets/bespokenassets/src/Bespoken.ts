@@ -65,6 +65,22 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
     const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement;
     const voiceId: string = voiceSelect.value;
 
+  // Get the voice model and pronunciation rule set from the voiceModeltoVoiceIdForField and pronunciationRuleSettoVoiceIdForField objects. The fields that are hidden and have a name containing 'voiceModel' and 'pronunciationRuleSet' are the ones we need to get the values from.
+
+const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement;
+const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]') as HTMLInputElement;
+
+const voiceModelKeyValuePairs = voiceModelField.value;
+const pronunciationRuleSetKeyValuePairs  = pronunciationRuleSetField.value;
+
+// parse the voiceModelKeyValuePairs and pronunciationRuleSetKeyValuePairs into objects
+const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
+  const pronunciationRuleSetKeyValuePairsObject = JSON.parse(pronunciationRuleSetKeyValuePairs);
+
+  // now we need to find the voiceId in the voiceModelKeyValuePairsObject and pronunciationRuleSetKeyValuePairsObject based on the voiceId
+  const voiceModelSelected = voiceModelKeyValuePairsObject[voiceId];
+  const pronunciationRuleSetSelected = pronunciationRuleSetKeyValuePairsObject[voiceId];
+
     // Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
     let fileNamePrefix: string | null = null;
     // Get all hidden input fields within the element with id 'my-fields' and loop through them.
@@ -79,6 +95,7 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
     const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
 
     console.log('Generated script:',text);
+
 
     if (text.length === 0) {
         // Re-enable the button
@@ -113,8 +130,9 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
         message: 'Preparing data',
         textColor: 'rgb(89, 102, 115)'
     });
+  // Get the pronunciation rule set and voice model from the button's data-attributes
 
-    processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText);
+    processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, pronunciationRuleSetSelected, voiceModelSelected);
 }
 
 async function handlePreviewButtonClick(event: Event): Promise<void> {

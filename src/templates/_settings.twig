@@ -12,6 +12,20 @@
 
 {% import '_includes/forms.twig' as forms %}
 
+{# Define pronunciation rule sets options once to avoid duplication #}
+{% set pronunciationRuleSetsOptions = settings['pronunciationRuleSets'] ?? [
+    { label: 'Language 1', value: 'language1' },
+    { label: 'Language 2', value: 'language2' },
+    { label: 'Language 3', value: 'language3' },
+    { label: 'Language 4', value: 'language4' },
+    { label: 'Language 5', value: 'language5' },
+    { label: 'Language 6', value: 'language6' },
+    { label: 'Language 7', value: 'language7' },
+    { label: 'Language 8', value: 'language8' },
+    { label: 'Language 9', value: 'language9' },
+    { label: 'Language 10', value: 'language10' }
+] %}
+
 {{  forms.autosuggestField({
     label: 'ElevenLabs API key' | t('bespoken'),
     instructions: 'ElevenLabs API Key instructions' | t('bespoken'),
@@ -26,38 +40,7 @@
 
 <h2>Voice configuration</h2>
 
-<pre>
-   Rework this so that each voice can have a different voice model and a different set of pronunciation rule set.
-</pre>
-
-
-{% set input %}
-{{ forms.radioGroup({
-    id: 'voiceModel',
-    name: 'voiceModel',
-    value: settings['voiceModel'] ?? 'eleven_multilingual_v2',
-    options: [
-        { label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
-        { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
-        { label: 'Turbo v2', value: 'eleven_turbo_v2' },
-        { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
-        { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
-        { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
-    ]
-}) }}
-{% endset %}
-
-{{ forms.field(
-    {
-        label: 'Voice model',
-        instructions: 'Voice model instructions' | t('bespoken'),
-        name: 'voiceModel',
-        id: 'voiceModel',
-        errors: settings.getErrors('voiceModel')
-    },
-    input
-) }}
-
+{# On 14JUL2025, for the voiceModel field, I added the default: true to the Multilingual v2 option. This is so that the default voice model is set to Multilingual v2 even though the new model, eleven_v3, is now available, but is in alpha. #}
 
 {% set input %}
 {{  forms.editableTable({
@@ -91,13 +74,11 @@
             type: 'select',
             width: '25%',
             handle: 'voiceModel',
-            default: 'eleven_multilingual_v2',
-            class: 'code',
             options: [
                 { label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
                 { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
                 { label: 'Turbo v2', value: 'eleven_turbo_v2' },
-                { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
+                { label: 'Multilingual v2', value: 'eleven_multilingual_v2', default: true },
                 { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
                 { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
             ]
@@ -108,18 +89,7 @@
             width: '25%',
             handle: 'pronunciationRuleSet',
             class: 'code',
-            options: settings['pronunciationRuleSets'] ?? [
-                { label: 'Language 1', value: 'language1' },
-                { label: 'Language 2', value: 'language2' },
-                { label: 'Language 3', value: 'language3' },
-                { label: 'Language 4', value: 'language4' },
-                { label: 'Language 5', value: 'language5' },
-                { label: 'Language 6', value: 'language6' },
-                { label: 'Language 7', value: 'language7' },
-                { label: 'Language 8', value: 'language8' },
-                { label: 'Language 9', value: 'language9' },
-                { label: 'Language 10', value: 'language10' }
-            ]
+            options: pronunciationRuleSetsOptions
         }
     },
     rows: settings['voices'] ?? [],
@@ -130,7 +100,7 @@
 
 {{ forms.field(
     {
-        label: 'Voices'|t('wellread'),
+        label: 'Voices'|t('bespoken'),
         instructions: 'Add voices instructions' | t('bespoken'),
         name: 'voices',
         id: 'voices',
@@ -174,18 +144,7 @@
             width: '25%',
             handle: 'pronunciationRuleSet',
             class: 'code',
-            options: settings['pronunciationRuleSets'] ?? [
-                { label: 'Language 1', value: 'language1' },
-                { label: 'Language 2', value: 'language2' },
-                { label: 'Language 3', value: 'language3' },
-                { label: 'Language 4', value: 'language4' },
-                { label: 'Language 5', value: 'language5' },
-                { label: 'Language 6', value: 'language6' },
-                { label: 'Language 7', value: 'language7' },
-                { label: 'Language 8', value: 'language8' },
-                { label: 'Language 9', value: 'language9' },
-                { label: 'Language 10', value: 'language10' }
-            ]
+            options: pronunciationRuleSetsOptions
         }
     },
     rows: settings['pronunciations'] ?? [],

@@ -14,31 +14,36 @@
 {% set fieldId = field.getInputId() %}
 
 {% set voiceIdNameOptionsForField = {} %}
+{% set voiceModeltoVoiceIdForField = {} %}
+{% set pronunciationRuleSettoVoiceIdForField = {} %}
+	{% for key in subsetOfVoiceIdsForField %}
+		{% for voiceOption in allVoiceOptionsForWellReadPlugin %}
 
-{% for key in subsetOfVoiceIdsForField %}
-    {% for voiceOption in allVoiceOptionsForWellReadPlugin %}
-        {% if voiceOption.voiceId == key %}
-            {% set voiceIdNameOptionsForField = voiceIdNameOptionsForField|merge({ (voiceOption.voiceId): voiceOption.voice }) %}
-        {% endif %}
-    {% endfor %}
+			{% if voiceOption.voiceId == key %}
+
+			{% set voiceIdNameOptionsForField = voiceIdNameOptionsForField|merge({ (voiceOption.voiceId): voiceOption.voice }) %}
+
+			{% set voiceModeltoVoiceIdForField = voiceModeltoVoiceIdForField|merge({ (voiceOption.voiceId): voiceOption.voiceModel }) %}
+
+		{% set pronunciationRuleSettoVoiceIdForField = pronunciationRuleSettoVoiceIdForField|merge({ (voiceOption.voiceId): voiceOption.pronunciationRuleSet }) %}
+
+	{% endif %}
+{% endfor %}
 {% endfor %}
 
 {% set environment = craft.app.config.env %}
-<div class="bespoken-fields">
+	<div class="bespoken-fields"> {% if voiceIdNameOptionsForField|length == 0 or fieldSettings.sourceField| length == 0 %}
 
-    {% if voiceIdNameOptionsForField|length == 0 or fieldSettings.sourceField| length == 0 %}
+		{% if voiceIdNameOptionsForField|length == 0 %}
+			<div class="bespoken-error">{{ 'No voice options available for field'|t('bespoken') }}</div>
+		{% endif %}
 
-        {% if voiceIdNameOptionsForField|length == 0 %}
-        <div class="bespoken-error">{{ 'No voice options available for field'|t('bespoken') }}</div>
-        {% endif %}
-
-        {% if fieldSettings.sourceField| length == 0 %}
-        <div class="bespoken-error">{{ 'No source set for this field'|t('bespoken') }}</div>
-        {% endif %}
-    {% else %}
-        <div class="mt-m">
-
-            {{ forms.selectField({
+		{% if fieldSettings.sourceField| length == 0 %}
+			<div class="bespoken-error">{{ 'No source set for this field'|t('bespoken') }}</div>
+		{% endif %}
+	{% else %}
+		<div class="mt-m">
+			{{ forms.selectField({
                 id: fieldId ~ '-voice',
                 label: 'Voice field select label'|t('bespoken'),
                 instructions: 'Voice field select instructions'|t('bespoken'),
@@ -48,16 +53,30 @@
                 value:  value['voice'] ?? '',
             }) }}
 
-            {{ forms.hidden({
+			{{ forms.hidden({
                 id: fieldId ~ '-fileNamePrefix',
                 name: name ~ "[fileNamePrefix]",
                 value:  fieldSettings.fileNamePrefix ?? '',
             }) }}
 
-            <div class=" group flex flex-row">
+			{# We stringify the values below so that they can be passed to the processText function #}
 
-                {%  if fieldSettings.showPreview %}
-                {{ forms.button({
+			{{ forms.hidden({
+                id: fieldId ~ '-pronunciationRuleSet',
+                name: name ~ "[pronunciationRuleSet]",
+                value:  pronunciationRuleSettoVoiceIdForField ?? ''|json_encode,
+            }) }}
+
+			{{ forms.hidden({
+                id: fieldId ~ '-voiceModel',
+                name: name ~ "[voiceModel]",
+                value:  voiceModeltoVoiceIdForField ?? ''|json_encode,
+            }) }}
+
+			<div class=" group flex flex-row">
+
+				{%  if fieldSettings.showPreview %}
+					{{ forms.button({
                     label: 'Preview Script button' | t('bespoken'),
                     class: [
                         'btn',
@@ -72,9 +91,9 @@
                     }
                 }) }}
 
-                {% endif %}
+				{% endif %}
 
-                {{ forms.button({
+				{{ forms.button({
                     label: 'Start Audio Job' | t('bespoken'),
                     class: [
                         'btn',
@@ -85,26 +104,28 @@
                         data: {
                             'target-field': field.sourceField,
                             'process-text-action-url': actionUrl('bespoken/bespoken/process-text'),
-                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content')
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content'),
+                            'pronunciation-rule-set': 'TEST',
+                            'voice-model': 'TEST',
                         }
                     }
                 }) }}
 
-                {%  if fieldSettings.showPreview %}
-                <modal-dialog class="bespoken-dialog" x-cloak>
-                  <div slot="title">{{ "Preview window title" | t('bespoken') }}</div>
-                  <div slot="description">{{ "Preview window description" | t('bespoken') }}</div>
-                  <div slot="content"></div>
-                </modal-dialog>
-                {% endif %}
+				{%  if fieldSettings.showPreview %}
+					<modal-dialog class="bespoken-dialog" x-cloak>
+						<div slot="title">{{ "Preview window title" | t('bespoken') }}</div>
+						<div slot="description">{{ "Preview window description" | t('bespoken') }}</div>
+						<div slot="content"></div>
+					</modal-dialog>
+				{% endif %}
 
-                <progress-component progress="0" size="24" message="Waiting to generate audio." class="bespoken-progress-component"></progress-component>
-            </div>
-        </div>
-    {% endif %}
+				<progress-component progress="0" size="24" message="Waiting to generate audio." class="bespoken-progress-component"></progress-component>
+			</div>
+		</div>
+	{% endif %}
 
-    {% css %}
-    [x-cloak] { display: none !important; }
-    {% endcss %}
+	{% css %}
+	[x-cloak] { display: none !important; }
+	{% endcss %}
 
 </div>

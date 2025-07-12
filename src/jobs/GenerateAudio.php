@@ -18,8 +18,11 @@ class GenerateAudio extends BaseJob
     public ?string $voiceId = '';
     public ?string $entryTitle = '';
     public ?string $filename = '';
+    public ?string $voiceModel = '';
+
     // for debugging purposes to mimic a long-running process
     private ?int $sleepValue = 1;
+
 
     protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
 
@@ -41,6 +44,8 @@ class GenerateAudio extends BaseJob
         $entryTitle = $this->entryTitle;
         // The filename to use for the audio file
         $filename = $this->filename;
+        // The voice model to use
+        $voiceModel = $this->voiceModel;
 
         $bespokenJobId = $this->bespokenJobId;
 
@@ -58,7 +63,7 @@ class GenerateAudio extends BaseJob
             }
 
             // Call the Eleven Labs API
-            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId);
+            $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel);
 
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
@@ -142,7 +147,7 @@ class GenerateAudio extends BaseJob
     /**
      * @throws \JsonException
      */
-    protected function elevenLabsApiCall($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId): void
+    protected function elevenLabsApiCall($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId, string $voiceModel): void
     {
         $settings = Bespoken::getInstance()->getSettings();
 
@@ -152,7 +157,11 @@ class GenerateAudio extends BaseJob
         $similarity_boost = $settings->similarity_boost;
         $style = $settings->style;
         $use_speaker_boost = $settings->use_speaker_boost;
-        $model_id = $settings->voiceModel;
+        $model_id = $voiceModel;
+
+
+        Bespoken::info('Voice model in elevenLabsApiCall: ' . $voiceModel);
+        die();
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Contacting ElevenLabs API. This may take a few minutes.');
 

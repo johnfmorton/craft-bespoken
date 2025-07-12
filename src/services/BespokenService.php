@@ -24,9 +24,10 @@ class BespokenService extends Component
      * @param string $fileNamePrefix
      * @return array
      */
-    public function sendTextToElevenLabsApi(int $elementId, string $text, string $voiceId, string $entryTitle, string $fileNamePrefix): array
+    public function sendTextToElevenLabsApi(int $elementId, string $text, string $voiceId, string $entryTitle, string $fileNamePrefix, string $voiceModel): array
     {
-        // Check the plugin settings to confirm that an API key is set
+
+      // Check the plugin settings to confirm that an API key is set
         $settings = BespokenPlugin::getInstance()->getSettings();
         // retrieve the API key from the plugin settings
         $apiKey = $settings->elevenlabsApiKey;
@@ -63,10 +64,11 @@ class BespokenService extends Component
                 'entryTitle' => $entryTitle,
                 'filename' => $filename,
                 'bespokenJobId' => $bespokenJobId,
+                'voiceModel' => $voiceModel,
             ]
         ));
 
-        BespokenPlugin::info('Job ID: ' . $jobId . ' - `' . $text . '` in ' . __METHOD__ . ' method in ' . __FILE__);
+        BespokenPlugin::info('Job ID: ' . $jobId . ' - `' . $text . '` in ' . __METHOD__ . ' method in ' . __FILE__ . ' line ' . __LINE__);
 
         // if the job ID is not valid, return an error
         if (!$jobId) {

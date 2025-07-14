@@ -8,21 +8,21 @@ Here are the basic steps in setting up the Bespoken plugin:
 
 1. [Create an account with ElevenLabs](https://elevenlabs.io/?from=partnergomez2285) and get your API key. This key is found in the [control panel](https://elevenlabs.io/app/speech-synthesis/text-to-speech) in the _My Account_ menu.
 2. Add your API key to the plugin settings page.
-3. Choose a voice model for your site. See the [ElevenLabs documentation](https://elevenlabs.io/docs/speech-synthesis/models) for more information about the models. 
-4. Customize the voices available on your site. You can include as many as you want. The voice ID in the Bespoken settings page is the ID from ElevenLabs in the [Voice Lab](https://elevenlabs.io/app/voice-lab). The Voice Lab page will also provide a name for the voice, but the name you use does not have to be the same.
-5. Create a set of custom pronunciations for unique words used in your site. This is optional but can be useful if you have a lot of unique words that the voice model may not pronounce correctly. Take the word DDEV, for example. The AI voice model may pronounce it as "d-d-e-v" instead of "dee dev". The pronunciation list swaps out the original word with a phonetic spelling that the voice model will pronounce correctly.  
+3. Customize the voices available on your site. You can include as many as you want. The voice ID in the Bespoken settings page is the ID from ElevenLabs in the [Voice Lab](https://elevenlabs.io/app/voice-lab). The Voice Lab page will also provide a name for the voice, but the name you use does not have to be the same.
+4. Choose a voice model for each voice. See the [ElevenLabs documentation](https://elevenlabs.io/docs/speech-synthesis/models) for more information about the models.
+5. Create a set of custom pronunciations for unique words used in your site. Pronunciations can be isolated to a rule set. This allows you to define pronunciations for each language used on your site. Defining pronunciations is optional but can be useful if you have a lot of unique words that the voice model may not pronounce correctly. Take the word DDEV, for example. The AI voice model may pronounce it as "d-d-e-v" instead of "dee dev". The pronunciation list swaps out the original word with a phonetic spelling that the voice model will pronounce correctly.
 6. Create an Asset volume to store the audio files and choose it in the plugin settings. This volume should have a publicly accessible URL. Since this is a normal [Craft CMS Asset](https://craftcms.com/docs/5.x/reference/element-types/assets.html) volume, the filesystem can be [local](https://craftcms.com/docs/5.x/reference/element-types/assets.html#local-filesystems) or [remote](https://craftcms.com/docs/5.x/reference/element-types/assets.html#remote-filesystems).
-7. Leave the Advanced settings as they are unless you have a specific need to change them.
+7. Leave the Advanced settings as they are unless you have a specific need to change them. (Tip: Don't change them.)
 
 ## Bespoken field
 
-Once the setup is complete. Create a Bespoken field for the Entry Type you want to narrate. 
+Once the setup is complete. Create a Bespoken field for the Entry Type you want to narrate.
 
 1. Create a new field in Craft.
 2. Choose the Bespoken field type.
 3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken supports CKEditor fields and Plain Text fields. These fields can be on the top level of your entry or within a Matrix field. Multiple field handles can be included, separated by commas. Consider including the `title` field as your first field. When using Matrix fields, include the field handles for the blocks in the Matrix field after the Matrix field handle within brackets. (See below for an example.) Field handles are case-sensitive.
 4. Optionally, you can provide a prefix for the filename of your audio file. This can be useful if there are multiple instances of Bespoken fields in your entry type.
-5. Choose at least one voice for the field. 
+5. Choose at least one voice for the field.
 
 ### Example of the settings for a Bespoken plugin
 
@@ -46,7 +46,7 @@ This is a screenshot of the field configuration for a Bespoken field that includ
 
 ![Bespoken field setup with a Matrix field](./documentation-assets/field-setup-with-matrix.png)
 
-The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message. 
+The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message.
 
 ### Example of a successful audio file creation
 
@@ -73,11 +73,11 @@ The Bespoken plugin processes text from a Plain Text field as is but without lin
 
 ## Excluding elements from the audio file
 
-The Bespoken plugin allows you to exclude elements from the audio file by adding the class `bespoken-exclude` to the element. This feature is useful for excluding elements like code blocks from the audio file. 
+The Bespoken plugin allows you to exclude elements from the audio file by adding the class `bespoken-exclude` to the element. This feature is useful for excluding elements like code blocks from the audio file.
 
 ### Example of excluding elements from the audio file with a CKEditor field
 
-For this example, imagine you have a CKEditor field with the following content. 
+For this example, imagine you have a CKEditor field with the following content.
 
 ![Bespoken CKEditor article body example](./documentation-assets/ckeditor-article-body.png)
 
@@ -187,7 +187,7 @@ This is how they'll look in the CKEditor field.
 
 ![Example of CKEditor field with custom styles](./documentation-assets/ckeditor-example.gif)
 
-For the frontend of your site, you will need to add CSS styles to hide the elements with the `bespoken-exclude` class. 
+For the frontend of your site, you will need to add CSS styles to hide the elements with the `bespoken-exclude` class.
 
 ```css
 .bespoken-exclude {
@@ -203,6 +203,6 @@ The Bespoken plugin uses the Craft CMS queue to process the audio files. Read mo
 
 Relying on the queue system means that the audio files are created in the background and may take some time to appear in your Asset volume. If your queue is not running, the audio files will not be created.
 
-If your queue is running automatically in the background via [CRON job or daemon](https://craftcms.com/docs/5.x/system/queue.html#queue-runners), the field type will update with the status of your audio file. 
+If your queue is running automatically in the background via [CRON job or daemon](https://craftcms.com/docs/5.x/system/queue.html#queue-runners), the field type will update with the status of your audio file.
 
 If the queue is run only on [HTTP](https://craftcms.com/docs/5.x/system/queue.html#http), the queue may not run until you refresh the page.

@@ -18,15 +18,18 @@
 {% set pronunciationRuleSettoVoiceIdForField = {} %}
 	{% for key in subsetOfVoiceIdsForField %}
 		{% for voiceOption in allVoiceOptionsForWellReadPlugin %}
-
 			{% if voiceOption.voiceId == key %}
+			{% set voiceIdNameOptionsForField = voiceIdNameOptionsForField|merge({
+				(voiceOption.voiceId): voiceOption.voice
+			}) %}
 
-			{% set voiceIdNameOptionsForField = voiceIdNameOptionsForField|merge({ (voiceOption.voiceId): voiceOption.voice }) %}
+			{% set voiceModeltoVoiceIdForField = voiceModeltoVoiceIdForField|merge({
+				(voiceOption.voiceId): voiceOption.voiceModel ?? 'eleven_multilingual_v2'
+			}) %}
 
-			{% set voiceModeltoVoiceIdForField = voiceModeltoVoiceIdForField|merge({ (voiceOption.voiceId): voiceOption.voiceModel }) %}
-
-		{% set pronunciationRuleSettoVoiceIdForField = pronunciationRuleSettoVoiceIdForField|merge({ (voiceOption.voiceId): voiceOption.pronunciationRuleSet }) %}
-
+		{% set pronunciationRuleSettoVoiceIdForField = pronunciationRuleSettoVoiceIdForField|merge({
+				(voiceOption.voiceId): voiceOption.pronunciationRuleSet ?? 'language1'
+			}) %}
 	{% endif %}
 {% endfor %}
 {% endfor %}

@@ -1,5 +1,11 @@
 # Release Notes for Bespoken
 
+## 5.0.8 - 2025-07-14
+### Added
+- This release redefines how voices and pronunciation rules are configured for the plugin.
+- Each voice can have a different voice model. Visit the settings page after installation to select the voice model for each voice. Until a new voice model is selected for each voice, it will default to `eleven_multilingual_v2`.
+- Pronunciation rules can now be created for multiple languages. When defining a voice, you choose which pronunciation rule set to use. This allows for Bespok
+
 ## 5.0.7 - 2024-11-14
 ### Added
 - Added support for Matrix fields that contain CKEditor and Plain Text fields. Read the documentation for details on how to use this feature. TLDR: To retrieve content from Matrix fields you supply Matrix field handle and the *handles of the fields* to look for inside the blocks within the Matrix field.

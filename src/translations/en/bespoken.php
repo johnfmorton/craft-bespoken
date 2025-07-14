@@ -18,18 +18,17 @@ return [
     'Voice options instructions' => 'Below are all of the voices available in the plugin. Select the voices you would like to use to read the source field aloud.',
     'Voice field select label' => 'Select a voice',
     'Voice field select instructions' => 'Choose the voice that will be used to create the audio file.',
-    'Voice configuration instructions' => "<p>See the
+    'Voice configuration instructions' => "<p>Define the voices you would like to use to create audio files in Bespoken. Visit the
 	<a href=\"https://elevenlabs.io/app/voice-lab\">Voice Lab</a>
 	section in the ElevenLabs control panel to determine the voices you'd like to use. You may use any of the voices in the ElevenLabs library or create your own voice. You will need the
-	<b>Voice ID</b>. The
+	<b>Voice ID</b> from the ElevenLabs control panel. The
 	<b>Voice Name</b>
 	can be anything you want and is used to identify the voice in the Bespoken plugin for your users.</p>
-<p>Each voice can have a different
+<p>Each voice can use a different
 	<b>Voice Model</b>
 	. This allows you to use different pronunciations for different voices. For example, you can use different pronunciations for the same word in different languages.</p>
 <p>ElevenLabs has multiple voice model options.
-	<b>Eleven v3 (alpha)</b>
-	is the latest model, but, as the name suggests, is still in alpha, but you can use it. The default model for Bespoken is
+	The default model for Bespoken is
 	<b>Multilingual v2</b>. For more information read
 	<a href='https://elevenlabs.io/docs/speech-synthesis/models'>ElevenLabs Models documentation</a>
 	and the article,
@@ -37,7 +36,7 @@ return [
 		<i>What models do you offer and what is the difference between them?</i>
 	</a>
 </p>
-<p>You can also choose a <b>Pronunciation rule set</b> for each voice. This allows you to assign pronunciation rules and apply them to only some voices. For example, you can define pronunciation for a voice on a per language basis.</p>
+<p>You can define a <b>Pronunciation rule set</b> for each voice. This allows you to customize how words are pronounced on a per-voice or per-language basis.</p>
 ",
     'Voice lab instructions' => '<p>All values below should be left at the defaults under most circumstances. For more information, read the <a
             href="https://elevenlabs.io/docs/speech-synthesis/voice-settings" target="_blank">ElevenLabs documentation for voice settings.</a></p>',
@@ -55,4 +54,17 @@ return [
     'Pronunciations instructions' => '<i>(Optional)</i> Add words and alternate spellings that reflects their pronunciation to help the AI pronounce specific words.',
     'Preview window title' => 'Preview of the narration script',
     'Preview window description' => 'Correct any errors in your entry before generating the audio.',
+    'ElevenLabs account details instructions' => '<h2 class="first"> ElevenLabs account details</h2>  <p>The Bespoken plugin integrates your ElevenLabs account with Craft CMS. If you do not have an ElevenLabs account, sign up
+	<a href="https://elevenlabs.io/?from=partnergomez2285">here</a>. This is a referral link which will help continue development of the plugin.</p>
+
+<p>Once you have an account, you can find your API key by visiting the
+	<a href="https://elevenlabs.io/app/sign-in">ElevenLabs site</a>, signing in, and viewing the <i>My Account</i> menu.</p>',
+    'File save options instructions' => '<h2>File save options</h2>
+
+<p>Bespoken will save the audio files it creates as native Craft CMS Assets. The filesystem can be local or a cloud provider.</p>',
+    'Advanced settings instructions' => '<h2>Advanced settings</h2>
+
+<p>All values below should be left at the defaults under most circumstances. For more information, read the
+	<a href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a>
+</p>',
 ];

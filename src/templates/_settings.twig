@@ -1,19 +1,11 @@
 {# @var plugin \johnfmorton\wellread\WellRead #}
 {# @var settings \johnfmorton\wellread\models\Settings #}
-	<h2 class="first"> ElevenLabs account details</h2>
 
-{# TODO: put the following text into the translations file #}
+{# All of the text for the instructions are in the translations file. #}
 
-<p>The Bespoken plugin integrates your ElevenLabs account with Craft CMS. If you do not have an ElevenLabs account, sign up
-	<a href="https://elevenlabs.io/?from=partnergomez2285">here</a>. This is a referral link which will help continue development of the plugin.</p>
+{{ 'ElevenLabs account details instructions' | t('bespoken') | raw }}{% import '_includes/forms.twig' as forms %}
 
-<p>Once you have an account, you can find your API key by visiting the
-	<a href="https://elevenlabs.io/app/sign-in">ElevenLabs site</a>, signing in, and viewing the My Account menu.</p>
-
-{% import '_includes/forms.twig' as forms %}
-
-{# Define pronunciation rule sets options once to avoid duplication #}
-{% set pronunciationRuleSetsOptions = settings['pronunciationRuleSets'] ?? [
+{# Define pronunciation rule sets options once to avoid duplication #}{% set pronunciationRuleSetsOptions = settings['pronunciationRuleSets'] ?? [
     { label: 'Language 1', value: 'language1' },
     { label: 'Language 2', value: 'language2' },
     { label: 'Language 3', value: 'language3' },
@@ -25,7 +17,6 @@
     { label: 'Language 9', value: 'language9' },
     { label: 'Language 10', value: 'language10' }
 ] %}
-
 {{  forms.autosuggestField({
     label: 'ElevenLabs API key' | t('bespoken'),
     instructions: 'ElevenLabs API Key instructions' | t('bespoken'),
@@ -35,14 +26,16 @@
     first: false,
     value: settings['elevenlabsApiKey']})
 }}
-
 <hr>
-
-<h2>Voice configuration</h2>
+	<h2>
+Voice configuration
+</h2>
 
 {{ 'Voice configuration instructions' | t('bespoken') | raw }}
 
-{# On 14JUL2025, for the voiceModel field, I added the default: true to the Multilingual v2 option. This is so that the default voice model is set to Multilingual v2 even though the new model, eleven_v3, is now available, but is in alpha. #}
+{# On 14JUL2025, for the voiceModel field, I added the default: true to the Multilingual v2 option. This is so that the default voice model is set to Multilingual v2. There is a new voice model, eleven_v3, that is in alpha, but is not yet available for use in the API so it is not included in the options.
+{ label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
+#}
 
 {% set input %}
 {{  forms.editableTable({
@@ -77,10 +70,9 @@
             width: '25%',
             handle: 'voiceModel',
             options: [
-                { label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
+                { label: 'Multilingual v2', value: 'eleven_multilingual_v2', default: true },
                 { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
                 { label: 'Turbo v2', value: 'eleven_turbo_v2' },
-                { label: 'Multilingual v2', value: 'eleven_multilingual_v2', default: true },
                 { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
                 { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
             ]
@@ -167,15 +159,13 @@
 
 <hr>
 
-<h2>File save options</h2>
-
-<p>Bespoken will save the audio files it creates as native Craft CMS Assets. The filesystem can be local or a cloud provider.</p>
+{{ 'File save options instructions' | t('bespoken') | raw }}
 
 {% set craftAssetVolumes =  [] %}
 
 {# Loop through the array #}
-{% for volume in craft.app.volumes.allVolumes %}
-	{% set craftAssetVolumes = craftAssetVolumes|merge([{label: volume.name, value: volume.handle}]) %}
+	{% for volume in craft.app.volumes.allVolumes %}
+{% set craftAssetVolumes = craftAssetVolumes|merge([{label: volume.name, value: volume.handle}]) %}
 {% endfor %}
 
 {{ forms.selectField(
@@ -192,11 +182,7 @@
 
 <hr>
 
-<h2>Advanced settings</h2>
-
-<p>All values below should be left at the defaults under most circumstances. For more information, read the
-	<a href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a>
-</p>
+{{ 'Advanced settings instructions' | t('bespoken') | raw }}
 
 {{ forms.textField(
     {

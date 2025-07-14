@@ -1,6 +1,6 @@
 # Bespoken Documentation
 
-The Bespoken plugin for Craft CMS allows you to create audio files from text fields in your Craft CMS entries. The instructions for setting it up are included inline within the plugin itself. This document provides a single page version to help give a consolidated view of the plugin's features and how to set it up.
+The Bespoken plugin for Craft CMS allows you to create audio files from text fields in your Craft CMS entries. Instructions for setting it up are included directly within the plugin. This document provides a consolidated, single-page overview of the plugin’s features and setup.
 
 ## Set up the plugin
 
@@ -8,10 +8,10 @@ Here are the basic steps in setting up the Bespoken plugin:
 
 1. [Create an account with ElevenLabs](https://elevenlabs.io/?from=partnergomez2285) and get your API key. This key is found in the [control panel](https://elevenlabs.io/app/speech-synthesis/text-to-speech) in the _My Account_ menu.
 2. Add your API key to the plugin settings page.
-3. Customize the voices available on your site. You can include as many as you want. The voice ID in the Bespoken settings page is the ID from ElevenLabs in the [Voice Lab](https://elevenlabs.io/app/voice-lab). The Voice Lab page will also provide a name for the voice, but the name you use does not have to be the same.
+3. Customize the voices available on your site. You can include as many as you want. The Voice ID entered in the Bespoken settings must match the ID from the ElevenLabs Voice Lab. The Voice Lab page also provides a voice name, but you can use any name you prefer within Bespoken.
 4. Choose a voice model for each voice. See the [ElevenLabs documentation](https://elevenlabs.io/docs/speech-synthesis/models) for more information about the models.
-5. Create a set of custom pronunciations for unique words used in your site. Pronunciations can be isolated to a rule set. This allows you to define pronunciations for each language used on your site. Defining pronunciations is optional but can be useful if you have a lot of unique words that the voice model may not pronounce correctly. Take the word DDEV, for example. The AI voice model may pronounce it as "d-d-e-v" instead of "dee dev". The pronunciation list swaps out the original word with a phonetic spelling that the voice model will pronounce correctly.
-6. Create an Asset volume to store the audio files and choose it in the plugin settings. This volume should have a publicly accessible URL. Since this is a normal [Craft CMS Asset](https://craftcms.com/docs/5.x/reference/element-types/assets.html) volume, the filesystem can be [local](https://craftcms.com/docs/5.x/reference/element-types/assets.html#local-filesystems) or [remote](https://craftcms.com/docs/5.x/reference/element-types/assets.html#remote-filesystems).
+5. Create a set of custom pronunciations for unique words used in your site. Pronunciations can be isolated to a rule set. This lets you define language-specific pronunciations for your site. Defining pronunciations is optional but can be useful if you have a lot of unique words that the voice model may not pronounce correctly. For example, the AI model might pronounce “DDEV” as “d-d-e-v” instead of “dee dev.”
+6. Create an Asset volume to store the audio files and select it in the plugin settings. This volume should have a publicly accessible URL. Since this is a normal [Craft CMS Asset](https://craftcms.com/docs/5.x/reference/element-types/assets.html) volume, the filesystem can be [local](https://craftcms.com/docs/5.x/reference/element-types/assets.html#local-filesystems) or [remote](https://craftcms.com/docs/5.x/reference/element-types/assets.html#remote-filesystems).
 7. Leave the Advanced settings as they are unless you have a specific need to change them. (Tip: Don't change them.)
 
 ## Bespoken field
@@ -61,7 +61,7 @@ In this example, you can see that the audio file creation failed because there w
 
 ### How text is processed from a CKEditor field
 
-The Bespoken plugin processes text from a CKEditor field by stripping out the HTML tags added by the CKEditor field and converting the text to plain text. This means that the audio file will not include any HTML tags.
+The Bespoken plugin strips out HTML tags from CKEditor fields, converting them into plain text. As a result, the audio file does not contain any HTML tags.
 
 Only the text content of the CKEditor field is processed. Any other content, such as images or links, will not be included in the audio file.
 
@@ -69,7 +69,7 @@ If there are embedded entries or assets in the CKEditor field, the Bespoken plug
 
 ### How text is processed from a Plain Text field
 
-The Bespoken plugin processes text from a Plain Text field as is but without line breaks. Since line breaks visually indicate a pause, the Bespoken plugin will add a period to line breaks that do not end with a period. This will help the AI voice model to pause at the end of a line of text.
+The Bespoken plugin processes text from a Plain Text field as is but without line breaks. To simulate pauses, the plugin adds a period at line breaks that don’t already end with one. This will help the AI voice model to pause at the end of a line of text.
 
 ## Excluding elements from the audio file
 
@@ -100,7 +100,7 @@ The HTML for this content would look like this.
 <p>This is another paragraph.</p>
 ```
 
-To accomplish our goals, we want to add the class `bespoken-exclude` to the code block and the class `bespoken-only` to the first paragraph. That would result in HTML that looks like this.
+To accomplish our goals, we want to add the class `bespoken-exclude` to the code block and the class `bespoken-only` to the first paragraph. The resulting HTML would look like this:
 
 ```html
 <p class="bespoken-only">This is a paragraph.</p>
@@ -118,7 +118,7 @@ Instead, we'll create a CKEditor Config that adds a button to the CKEditor toolb
 
 ![Bespoken CKEditor Toolbar example showing an added Style button](./documentation-assets/ckeditor-toolbar.png)
 
-In the _Config Options_, define two new style rules. One for the `bespoken-exclude` class and one for the `bespoken-only` class. In this example, only `pre` elements can have the `bespoken-exclude` class, and only `p` elements can have the `bespoken-only` class.
+In the **Config Options**, define two new style rules. One for the `bespoken-exclude` class and one for the `bespoken-only` class. In this example, only `pre` elements can have the `bespoken-exclude` class, and only `p` elements can have the `bespoken-only` class.
 
 ```json
 {
@@ -143,7 +143,7 @@ In the _Config Options_, define two new style rules. One for the `bespoken-exclu
 }
 ```
 
-In the _Custom Styles_ section, define the styles for the `bespoken-exclude` and `bespoken-only` classes. In this example, the `bespoken-exclude` class will have a background color of red, and the `bespoken-only` class will have a background color of blue. We use the `::before` pseudo-element to add a label to the excluded elements.
+In the **Custom Styles** section, define the styles for the `bespoken-exclude` and `bespoken-only` classes. In this example, the `bespoken-exclude` class will have a background color of red, and the `bespoken-only` class will have a background color of blue. We use the `::before` pseudo-element to add a label to the excluded elements.
 
 ```css
 .ck.ck-content .bespoken-exclude * {
@@ -199,7 +199,7 @@ These classes give your content authors a visual indication of which elements ar
 
 ## About the Craft CMS queue and Bespoken audio file creation
 
-The Bespoken plugin uses the Craft CMS queue to process the audio files. Read more about the Craft CMS Queue system in the Craft [https://craftcms.com/docs/5.x/system/queue.html). Ideally, the queue should be set up to run automatically in the background.
+The Bespoken plugin uses the Craft CMS queue to process audio files. Learn more in the [Craft CMS Queue documentation](https://craftcms.com/docs/5.x/system/queue.html). Ideally, the queue should be set up to run automatically in the background.
 
 Relying on the queue system means that the audio files are created in the background and may take some time to appear in your Asset volume. If your queue is not running, the audio files will not be created.
 

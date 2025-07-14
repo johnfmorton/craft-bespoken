@@ -159,9 +159,7 @@ class GenerateAudio extends BaseJob
         $use_speaker_boost = $settings->use_speaker_boost;
         $model_id = $voiceModel;
 
-
         Bespoken::info('Voice model in elevenLabsApiCall: ' . $voiceModel);
-        die();
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Contacting ElevenLabs API. This may take a few minutes.');
 

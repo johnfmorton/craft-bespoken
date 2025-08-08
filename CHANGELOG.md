@@ -1,10 +1,17 @@
 # Release Notes for Bespoken
 
+## 5.0.9 - 2025-08-08
+
+### Added
+
+- Added support for legacy Redactor fields in Craft CMS version 5. Text in Redactor fields work exactly like CKEditor fields.
+
+
 ## 5.0.8 - 2025-07-14
 
 > [!NOTE]
 > Resave **Bespoken** settings in the control panel to take advantage of the new voice options after installation.
->
+
 ### Added
 
 - This release redefines how voices and pronunciation rules are configured for the plugin.

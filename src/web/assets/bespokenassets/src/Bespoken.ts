@@ -179,7 +179,6 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
     let text: string = '';
 
     if (targetFieldHandles) {
-        // const fieldHandlesArray = targetFieldHandles.split(',').map(handle => handle.trim());
 
         const fieldHandlesArray = _parseFieldHandles(targetFieldHandles);
 
@@ -229,6 +228,10 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                         case "ckeditor":
                             // CKEditor fields are scraped directly from the page
                             text += _getFieldText(targetField) + " ";
+                            break;
+                        case "redactor":
+                            // Redactor fields are scraped directly from the page
+                            text += _getFieldText(targetField)  + " ";
                             break;
                         case "matrix":
                             const viewTypeTest = _getMatrixViewType(targetField);

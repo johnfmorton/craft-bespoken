@@ -18,8 +18,6 @@ class array {
  */
 export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[], actionUrl:string): Promise<string> {
     try {
-        // TODO: use the actionUrl parameter to fetch the data from the correct endpoint
-
         // add the elementId to the actionUrl
         // this is a GET request
         // since we can't be sure of the format of the actionUrl,
@@ -74,6 +72,12 @@ export function _getFieldText(field: HTMLElement): string {
   let text = '';
 
   if (field.getAttribute('data-type') === 'craft\\ckeditor\\Field' ) {
+
+    text = field.querySelector('textarea')?.value || '';
+
+    text = _processCKEditorFields(text);
+
+  } else if (field.getAttribute('data-type') === 'craft\\redactor\\Field'){
 
     text = field.querySelector('textarea')?.value || '';
 
@@ -302,7 +306,7 @@ function _ensureBlockFormatting(
 *
 * The function returns a string representing the type of the field.
  */
-export function _getFieldType(element: HTMLElement): 'plain-text' | 'ckeditor' | 'matrix' | 'invalid' {
+export function _getFieldType(element: HTMLElement): 'plain-text' | 'ckeditor' | 'matrix' | 'redactor' | 'invalid' {
     const entryType = element.getAttribute('data-type');
 
     if (entryType === 'craft\\fields\\PlainText') {
@@ -312,9 +316,14 @@ export function _getFieldType(element: HTMLElement): 'plain-text' | 'ckeditor' |
         return 'ckeditor';
     }
 
+    if ( entryType === 'craft\\redactor\\Field') {
+      return 'redactor';
+    }
+
     if (entryType === 'craft\\fields\\Matrix') {
         return 'matrix';
     }
+
     return 'invalid';
 }
 

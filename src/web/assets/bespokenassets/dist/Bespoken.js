@@ -687,6 +687,9 @@ function _getFieldText(field) {
   if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
     text = field.querySelector("textarea")?.value || "";
     text = _processCKEditorFields(text);
+  } else if (field.getAttribute("data-type") === "craft\\redactor\\Field") {
+    text = field.querySelector("textarea")?.value || "";
+    text = _processCKEditorFields(text);
   } else if (field.getAttribute("data-type") === "craft\\fields\\PlainText") {
     text = _processPlainTextField(_getFieldValue(field));
   }
@@ -780,6 +783,9 @@ function _getFieldType(element) {
   }
   if (entryType === "craft\\ckeditor\\Field") {
     return "ckeditor";
+  }
+  if (entryType === "craft\\redactor\\Field") {
+    return "redactor";
   }
   if (entryType === "craft\\fields\\Matrix") {
     return "matrix";
@@ -923,6 +929,9 @@ async function generateScript(targetFieldHandles, title, actionUrl = "") {
               text += _getFieldText(targetField) + " ";
               break;
             case "ckeditor":
+              text += _getFieldText(targetField) + " ";
+              break;
+            case "redactor":
               text += _getFieldText(targetField) + " ";
               break;
             case "matrix":

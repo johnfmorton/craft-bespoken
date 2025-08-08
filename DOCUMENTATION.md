@@ -20,7 +20,7 @@ Once the setup is complete. Create a Bespoken field for the Entry Type you want 
 
 1. Create a new field in Craft.
 2. Choose the Bespoken field type.
-3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken supports CKEditor fields and Plain Text fields. These fields can be on the top level of your entry or within a Matrix field. Multiple field handles can be included, separated by commas. Consider including the `title` field as your first field. When using Matrix fields, include the field handles for the blocks in the Matrix field after the Matrix field handle within brackets. (See below for an example.) Field handles are case-sensitive.
+3. Choose at least one `fieldHandle` from the entry type to narrate. Bespoken supports CKEditor fields, Redactor fields, and Plain Text fields. These fields can be on the top level of your entry or within a Matrix field. Multiple field handles can be included, separated by commas. Consider including the `title` field as your first field. When using Matrix fields, include the field handles for the blocks in the Matrix field after the Matrix field handle within brackets. (See below for an example.) Field handles are case-sensitive.
 4. Optionally, you can provide a prefix for the filename of your audio file. This can be useful if there are multiple instances of Bespoken fields in your entry type.
 5. Choose at least one voice for the field.
 
@@ -59,13 +59,13 @@ In this example, you can see that the audio file creation failed because there w
 ![Bespoken example of failed audio file creation showing error message](./documentation-assets/status-error.png)
 
 
-### How text is processed from a CKEditor field
+### How text is processed from CKEditor and Redactor fields
 
-The Bespoken plugin strips out HTML tags from CKEditor fields, converting them into plain text. As a result, the audio file does not contain any HTML tags.
+The Bespoken plugin strips out HTML tags from CKEditor and Redactor fields, converting them into plain text. As a result, the audio file does not contain any HTML tags.
 
-Only the text content of the CKEditor field is processed. Any other content, such as images or links, will not be included in the audio file.
+Only the text content of the field is processed. Any other content, such as images or links, will not be included in the audio file.
 
-If there are embedded entries or assets in the CKEditor field, the Bespoken plugin will not process them. The audio file will only include the text content of the CKEditor field.
+If there are embedded entries or assets in the field, the Bespoken plugin will not process them. The audio file will only include the text content of the field.
 
 ### How text is processed from a Plain Text field
 

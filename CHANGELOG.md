@@ -4,7 +4,7 @@
 
 ### Added
 
-- Added support for legacy Redactor fields in Craft CMS version 5. Text in Redactor fields work exactly like CKEditor fields.
+- Added support for legacy Redactor fields in Craft CMS version 5. Text parsing in Redactor fields works exactly like CKEditor fields.
 
 
 ## 5.0.8 - 2025-07-14

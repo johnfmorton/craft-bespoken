@@ -52,7 +52,7 @@ class BespokenController extends Controller
 
         $pronunciationRuleSet = $postData['pronunciationRuleSet'];
 
-        // Accomodate for users who have not updated their settings: If the voiceModel and pronunciationRuleSet values are not set, we need to use the default values.
+        // Accommodate for users who have not updated their settings: If the voiceModel and pronunciationRuleSet values are not set, we need to use the default values.
         if (!$voiceModel or $voiceModel == '') {
             $voiceModel = 'multilingual_v2';
         }

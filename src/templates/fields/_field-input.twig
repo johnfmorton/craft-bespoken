@@ -114,6 +114,20 @@
                     }
                 }) }}
 
+				{{ forms.button({
+                    label: 'View History' | t('bespoken'),
+                    class: [
+                        'btn',
+                        'bespoken-button',
+                        'bespoken-history',
+                    ],
+                    attributes: {
+                        data: {
+                            'generation-history-action-url': actionUrl('bespoken/bespoken/generation-history'),
+                        }
+                    }
+                }) }}
+
 				{%  if fieldSettings.showPreview %}
 					<modal-dialog class="bespoken-dialog" x-cloak>
 						<div slot="title">{{ "Preview window title" | t('bespoken') }}</div>

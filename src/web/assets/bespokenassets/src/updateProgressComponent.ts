@@ -7,7 +7,9 @@ export function updateProgressComponent(progressComponent: ProgressComponent, { 
         textColor = 'rgb(89, 102, 115)';
     }
 
-  progressComponent.setAttribute('progress', progress.toString());
+  // Defensive check: ensure progress is a valid number (belt and suspenders)
+  const safeProgress = typeof progress === 'number' && Number.isFinite(progress) ? progress : 0;
+  progressComponent.setAttribute('progress', safeProgress.toString());
   progressComponent.setAttribute('success', success);
   progressComponent.setAttribute('message', message);
 

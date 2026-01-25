@@ -145,6 +145,26 @@ class BespokenController extends Controller
     }
 
     /**
+     * Action to get the generation history for an element
+     *
+     * @return Response
+     */
+    public function actionGenerationHistory(): Response
+    {
+        $this->requireLogin();
+        $elementId = Craft::$app->request->get('elementId');
+
+        $history = BespokenPlugin::getInstance()->bespokenService->getGenerationHistory(
+            $elementId ? (int)$elementId : null
+        );
+
+        return $this->asJson([
+            'success' => true,
+            'generations' => $history,
+        ]);
+    }
+
+    /**
      * Action to get the content of an Element by its ID
      * @return Response
      */
@@ -188,6 +208,12 @@ class BespokenController extends Controller
         // Don't require a CSRF token for the get-element-content action
         // The action already requires a logged-in user
         if ($action->id === 'get-element-content') {
+            $this->enableCsrfValidation = false;
+        }
+
+        // Don't require a CSRF token for the generation-history action
+        // The action already requires a logged-in user
+        if ($action->id === 'generation-history') {
             $this->enableCsrfValidation = false;
         }
 

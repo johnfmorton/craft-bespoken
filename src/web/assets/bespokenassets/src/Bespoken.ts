@@ -41,6 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
     previewButtons.forEach(button => {
         button.addEventListener('click', handlePreviewButtonClick);
     });
+
+    const historyButtons: NodeListOf<HTMLButtonElement> = document.querySelectorAll('.bespoken-history');
+    historyButtons.forEach(button => {
+        button.addEventListener('click', handleHistoryButtonClick);
+    });
 });
 
 async function handleGenerateButtonClick(event: Event): Promise<void> {
@@ -65,21 +70,22 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
     const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement;
     const voiceId: string = voiceSelect.value;
 
-  // Get the voice model and pronunciation rule set from the voiceModeltoVoiceIdForField and pronunciationRuleSettoVoiceIdForField objects. The fields that are hidden and have a name containing 'voiceModel' and 'pronunciationRuleSet' are the ones we need to get the values from.
+    // Get the voice model and pronunciation rule set from the voiceModeltoVoiceIdForField and pronunciationRuleSettoVoiceIdForField objects.
+    // The fields that are hidden and have a name containing 'voiceModel' and 'pronunciationRuleSet' are the ones we need to get the values from.
 
-const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement;
-const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]') as HTMLInputElement;
+    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement;
+    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]') as HTMLInputElement;
 
-const voiceModelKeyValuePairs = voiceModelField.value;
-const pronunciationRuleSetKeyValuePairs  = pronunciationRuleSetField.value;
+    const voiceModelKeyValuePairs = voiceModelField.value;
+    const pronunciationRuleSetKeyValuePairs  = pronunciationRuleSetField.value;
 
-// parse the voiceModelKeyValuePairs and pronunciationRuleSetKeyValuePairs into objects
-const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
-  const pronunciationRuleSetKeyValuePairsObject = JSON.parse(pronunciationRuleSetKeyValuePairs);
+    // parse the voiceModelKeyValuePairs and pronunciationRuleSetKeyValuePairs into objects
+    const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
+    const pronunciationRuleSetKeyValuePairsObject = JSON.parse(pronunciationRuleSetKeyValuePairs);
 
-  // now we need to find the voiceId in the voiceModelKeyValuePairsObject and pronunciationRuleSetKeyValuePairsObject based on the voiceId
-  const voiceModelSelected = voiceModelKeyValuePairsObject[voiceId];
-  const pronunciationRuleSetSelected = pronunciationRuleSetKeyValuePairsObject[voiceId];
+    // now we need to find the voiceId in the voiceModelKeyValuePairsObject and pronunciationRuleSetKeyValuePairsObject based on the voiceId
+    const voiceModelSelected = voiceModelKeyValuePairsObject[voiceId];
+    const pronunciationRuleSetSelected = pronunciationRuleSetKeyValuePairsObject[voiceId];
 
     // Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
     let fileNamePrefix: string | null = null;
@@ -130,7 +136,6 @@ const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
         message: 'Preparing data',
         textColor: 'rgb(89, 102, 115)'
     });
-  // Get the pronunciation rule set and voice model from the button's data-attributes
 
     processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, pronunciationRuleSetSelected, voiceModelSelected);
 }
@@ -165,6 +170,190 @@ async function handlePreviewButtonClick(event: Event): Promise<void> {
         modal.open();
     }
 
+}
+
+async function handleHistoryButtonClick(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const button = (event.target as HTMLElement).closest('.bespoken-history') as HTMLButtonElement | null;
+
+    if (!button) {
+        console.error('History button not found');
+        return;
+    }
+
+    // Get the Element ID of the Element being edited in the CMS
+    const elementId: string = _getInputValue('input[name="elementId"]');
+
+    // Get the history action URL from the button's data attribute
+    const actionUrl: string = button.getAttribute('data-generation-history-action-url') || '';
+
+    if (!actionUrl) {
+        console.error('History action URL not found');
+        return;
+    }
+
+    // Find the parent element first
+    const parentElement = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
+    if (!parentElement) {
+        console.error('Parent .bespoken-fields element not found');
+        return;
+    }
+
+    try {
+        // Fetch the generation history
+        // Check if URL already has query params (contains ?)
+        const separator = actionUrl.includes('?') ? '&' : '?';
+        const response = await fetch(`${actionUrl}${separator}elementId=${elementId}`, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.message || 'Failed to fetch history');
+        }
+
+        // Create the history content
+        const historyContent = createHistoryContent(data.generations);
+
+        // Find or create modal for history
+        let modal = parentElement.querySelector('.bespoken-history-dialog') as ModalDialog | null;
+
+        if (!modal) {
+            // Create a new modal for history if one doesn't exist
+            modal = document.createElement('modal-dialog') as ModalDialog;
+            modal.classList.add('bespoken-history-dialog');
+
+            const titleSlot = document.createElement('div');
+            titleSlot.slot = 'title';
+            titleSlot.textContent = 'Generation History';
+            modal.appendChild(titleSlot);
+
+            const descSlot = document.createElement('div');
+            descSlot.slot = 'description';
+            descSlot.textContent = 'Past audio generation jobs for this entry';
+            modal.appendChild(descSlot);
+
+            const contentSlot = document.createElement('div');
+            contentSlot.slot = 'content';
+            modal.appendChild(contentSlot);
+
+            parentElement.appendChild(modal);
+
+            // Wait for the custom element to be upgraded and connected
+            await customElements.whenDefined('modal-dialog');
+            // Give the browser a moment to fully initialize the element
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        modal.setContent(historyContent);
+        modal.open();
+
+    } catch (error) {
+        console.error('Error fetching generation history:', error);
+    }
+}
+
+function createHistoryContent(generations: any[]): HTMLElement {
+    const container = document.createElement('div');
+    container.style.cssText = 'font-size: 14px;';
+
+    if (!generations || generations.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.textContent = 'No generation history found for this entry.';
+        emptyMessage.style.cssText = 'color: #666; font-style: italic;';
+        container.appendChild(emptyMessage);
+        return container;
+    }
+
+    const table = document.createElement('table');
+    table.style.cssText = 'width: 100%; border-collapse: collapse; font-size: 13px;';
+
+    // Header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.style.cssText = 'background: #f5f5f5; text-align: left;';
+
+    ['Date', 'Status', 'Filename'].forEach(headerText => {
+        const th = document.createElement('th');
+        th.style.cssText = 'padding: 8px; border-bottom: 1px solid #ddd;';
+        th.textContent = headerText;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement('tbody');
+
+    generations.slice(0, 20).forEach((gen) => {
+        const row = document.createElement('tr');
+
+        // Format date
+        const date = new Date(gen.dateCreated);
+        const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        // Status badge color
+        let statusColor = '#888';
+        let statusBg = '#f0f0f0';
+        if (gen.status === 'completed') {
+            statusColor = '#2e7d32';
+            statusBg = '#e8f5e9';
+        } else if (gen.status === 'failed') {
+            statusColor = '#c62828';
+            statusBg = '#ffebee';
+        } else if (gen.status === 'running') {
+            statusColor = '#1565c0';
+            statusBg = '#e3f2fd';
+        } else if (gen.status === 'pending') {
+            statusColor = '#f57c00';
+            statusBg = '#fff3e0';
+        }
+
+        // Filename - use CSS for ellipsis instead of manual truncation
+        const filename = gen.filename || 'N/A';
+
+        // Date cell
+        const dateCell = document.createElement('td');
+        dateCell.style.cssText = 'padding: 8px; border-bottom: 1px solid #eee;';
+        dateCell.textContent = dateStr;
+        row.appendChild(dateCell);
+
+        // Status cell
+        const statusCell = document.createElement('td');
+        statusCell.style.cssText = 'padding: 8px; border-bottom: 1px solid #eee;';
+        const statusBadge = document.createElement('span');
+        statusBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusBg}; color: ${statusColor}; font-size: 12px;`;
+        statusBadge.textContent = gen.status;
+        statusCell.appendChild(statusBadge);
+        row.appendChild(statusCell);
+
+        // Filename cell - full filename shown with word wrap
+        const filenameCell = document.createElement('td');
+        filenameCell.style.cssText = 'padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 11px; word-break: break-all;';
+        filenameCell.textContent = filename;
+        row.appendChild(filenameCell);
+
+        tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+
+    if (generations.length > 20) {
+        const moreNote = document.createElement('p');
+        moreNote.textContent = `Showing 20 of ${generations.length} generations`;
+        moreNote.style.cssText = 'color: #666; font-style: italic; margin-top: 10px; font-size: 12px;';
+        container.appendChild(moreNote);
+    }
+
+    return container;
 }
 
 /*

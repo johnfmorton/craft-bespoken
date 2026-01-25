@@ -7,6 +7,7 @@ use craft\elements\Asset;
 use craft\helpers\App;
 use craft\queue\BaseJob;
 use johnfmorton\bespoken\Bespoken;
+use johnfmorton\bespoken\records\AudioGenerationRecord;
 
 /**
  * Generate Audio queue job
@@ -67,7 +68,7 @@ class GenerateAudio extends BaseJob
 
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());
             Bespoken::info('Job status updated to error');
         }
     }
@@ -96,7 +97,7 @@ class GenerateAudio extends BaseJob
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         // set curl timeout to 5 minutes, 300 seconds
         curl_setopt($ch, CURLOPT_TIMEOUT, 300); // note we're using CURLOPT_TIMEOUT, not CURLOPT_TIMEOUT_MS, which would be in milliseconds
-        $data = curl_exec($ch);
+        curl_exec($ch);
         curl_close($ch);
         fclose($fp);
         // add a pause to simulate a long-running process
@@ -116,32 +117,51 @@ class GenerateAudio extends BaseJob
     /*
      * Set the progress of the job
      * @param $queue
+     * @param $bespokenJobId
      * @param $progress
      * @param $message
+     * @param $success
+     * @param $status
+     * @param $errorDetails
      *
      * @description This function simplifies the process of setting the progress of the job
      * 1. Set the progress of the job for the Craft Job Queue
-     * 2. It also sets the cache using the bespokenJobID for the job status
+     * 2. It updates the database record for persistent tracking
+     * 3. It also sets the cache using the bespokenJobID for backwards compatibility
      *
      * @return void
      */
     /**
      * @throws \JsonException
      */
-    protected function setBespokeProgress($queue, $bespokenJobId, $progress, $message, $success = 1): void
+    protected function setBespokeProgress($queue, $bespokenJobId, $progress, $message, $success = 1, $status = null, $errorDetails = null): void
     {
+        // Determine status based on progress if not explicitly set
+        if ($status === null) {
+            if ($progress >= 1 && $success) {
+                $status = AudioGenerationRecord::STATUS_COMPLETED;
+            } elseif ($progress >= 1 && !$success) {
+                $status = AudioGenerationRecord::STATUS_FAILED;
+            } else {
+                $status = AudioGenerationRecord::STATUS_RUNNING;
+            }
+        }
 
-        // create a array to store the job success
-        $data = compact('progress', 'message', 'success');
+        // Update the database record
+        Bespoken::getInstance()->bespokenService->updateAudioGeneration($bespokenJobId, [
+            'progress' => $progress,
+            'message' => $message,
+            'success' => (bool)$success,
+            'status' => $status,
+            'errorDetails' => $errorDetails,
+        ]);
 
-        // stringify the data object and set the cache
+        // Also update cache for backwards compatibility during transition
+        $data = compact('progress', 'message', 'success', 'status');
         $data = json_encode($data, JSON_THROW_ON_ERROR);
-
-        // Set a cache for the job status using the bespokenJobId
         Craft::$app->cache->set((string)($bespokenJobId), $data, $this->cacheExpire);
 
         $queue->setProgress($progress, $message);
-
     }
 
     /**
@@ -170,7 +190,7 @@ class GenerateAudio extends BaseJob
         ];
 
         // Set up the request parameters, if any
-        $data = json_encode([
+        $requestData = json_encode([
             'text' => $text,
             'voice_id' => $voiceId,
             'model_id' => $model_id,
@@ -192,7 +212,7 @@ class GenerateAudio extends BaseJob
             CURLOPT_TIMEOUT => 300, // 300 seconds = 5 min,  note we're using CURLOPT_TIMEOUT, not CURLOPT_TIMEOUT_MS, which would be in milliseconds
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "POST",
-            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_POSTFIELDS => $requestData,
             CURLOPT_HTTPHEADER => $headers,
         ]);
 
@@ -203,22 +223,22 @@ class GenerateAudio extends BaseJob
 
         if ($err) {
             Bespoken::error('cURL Error #:' . $err);
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . print_r($err, true), 0);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . print_r($err, true), 0, AudioGenerationRecord::STATUS_FAILED, $err);
         } else {
             $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Processing the audio file');
 
             // is response a JSON string? Don't throw an erorr
             try {
-                $response = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+                $decodedResponse = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
                 // If json_decode doesn't throw an error, then it is a JSON response
-                if ($response) {
-                    Bespoken::info('Response from ElevenLabs API: ' . print_r($response, true));
-                    if (is_array($response) && isset($response['detail']['message'])) {
-                        $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . $response['detail']['message'], 0);
+                if ($decodedResponse) {
+                    Bespoken::info('Response from ElevenLabs API: ' . print_r($decodedResponse, true));
+                    if (is_array($decodedResponse) && isset($decodedResponse['detail']['message'])) {
+                        $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . $decodedResponse['detail']['message'], 0, AudioGenerationRecord::STATUS_FAILED, $decodedResponse['detail']['message']);
                         return;
                     }
 
-                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . print_r($response, true), 0);
+                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . print_r($decodedResponse, true), 0, AudioGenerationRecord::STATUS_FAILED, print_r($decodedResponse, true));
                     return;
                 }
             } catch (\JsonException $e) {
@@ -265,7 +285,7 @@ class GenerateAudio extends BaseJob
         if (!$volume) {
             Bespoken::error('Volume not found with handle: ' . $volumeHandle);
             // $this->setProgress($queue, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle);
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle, 0);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Volume not found with handle: ' . $volumeHandle, 0, AudioGenerationRecord::STATUS_FAILED, 'Volume not found: ' . $volumeHandle);
             return;
         }
 
@@ -276,7 +296,7 @@ class GenerateAudio extends BaseJob
 
         if (!$folder) {
             Bespoken::error('Folder not found with volume ID: ' . $volumeId);
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Folder not found with volume ID: ' . $volumeId, 0);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets. Folder not found with volume ID: ' . $volumeId, 0, AudioGenerationRecord::STATUS_FAILED, 'Folder not found for volume ID: ' . $volumeId);
             return;
         }
         $folderId = $folder->id;
@@ -302,17 +322,23 @@ sleep($this->sleepValue * 1);
 sleep($this->sleepValue * 1);
         // Save the audio file to the volume
         try {
-            $result = Craft::$app->getElements()->saveElement(
+            Craft::$app->getElements()->saveElement(
                 $asset, false
             );
             $this->setBespokeProgress($queue, $bespokenJobId, 0.9, 'Asset created with ID: ' . $asset->id);
             sleep($this->sleepValue * 1);
             Bespoken::info('Asset created with ID: ' . $asset->id);
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: '. $entryTitle . ' (audio) - ' . $filename );
+
+            // Store the asset ID in the database record
+            Bespoken::getInstance()->bespokenService->updateAudioGeneration($bespokenJobId, [
+                'assetId' => $asset->id,
+            ]);
+
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: '. $entryTitle . ' (audio) - ' . $filename, 1, AudioGenerationRecord::STATUS_COMPLETED);
 
         } catch (\Throwable $e) {
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage(), 0);
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());
         }
     }
 

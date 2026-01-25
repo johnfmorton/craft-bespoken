@@ -1,5 +1,22 @@
 # Release Notes for Bespoken
 
+## 5.1.0 - 2026-01-25
+
+### Added
+
+- **Persistent job tracking**: Audio generation job status is now stored in the database instead of cache. This means job progress survives page reloads and provides reliable tracking even when the queue is delayed.
+- **Generation history**: Added a "View History" button to see past audio generation jobs for each entry, including status, filename, and timestamp.
+- **Improved queue tolerance**: The frontend now gracefully waits up to 3 minutes for jobs to start processing in the queue, with a user-friendly "Waiting for queue to process job..." message.
+
+### Fixed
+
+- Fixed a race condition where polling would fail with a `progress.toString()` error when the queue hadn't started processing the job yet. The API now always returns a `progress` field.
+- Fixed error handling to properly display "pending" status instead of treating delayed queue jobs as errors.
+
+### Changed
+
+- Schema version updated to 1.1.0. A database migration will run automatically to create the new `bespoken_audiogenerations` table.
+
 ## 5.0.9 - 2025-08-08
 
 ### Added

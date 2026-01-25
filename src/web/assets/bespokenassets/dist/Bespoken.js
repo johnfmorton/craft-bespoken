@@ -30,7 +30,7 @@ var ModalDialog = class extends HTMLElement {
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        max-width: 500px;
+        max-width: 700px;
         width: 90%;
         max-height: 85vh;
         box-sizing: border-box;
@@ -475,7 +475,8 @@ function updateProgressComponent(progressComponent, { progress, success, message
   if (!textColor) {
     textColor = "rgb(89, 102, 115)";
   }
-  progressComponent.setAttribute("progress", progress.toString());
+  const safeProgress = typeof progress === "number" && Number.isFinite(progress) ? progress : 0;
+  progressComponent.setAttribute("progress", safeProgress.toString());
   progressComponent.setAttribute("success", success);
   progressComponent.setAttribute("message", message);
   if (!textColor) {
@@ -486,9 +487,16 @@ function updateProgressComponent(progressComponent, { progress, success, message
 
 // src/web/assets/bespokenassets/src/startJobMonitor.ts
 var pollingInterval = 1e3;
+var maxPendingWaitTime = 18e4;
+var maxRunningPolls = 100;
 var howManyTimes = 0;
+var pendingStartTime = null;
+var runningPollCount = 0;
 function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus) {
   console.log("startJobMonitor", bespokenJobId);
+  howManyTimes = 0;
+  pendingStartTime = null;
+  runningPollCount = 0;
   const interval = setInterval(async () => {
     howManyTimes++;
     try {
@@ -501,19 +509,71 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
       }
       const responseData = await result.json();
       console.log("Audio creation status:", responseData);
-      updateProgressComponent(progressComponent, {
-        progress: responseData.progress,
-        success: responseData.success,
-        message: responseData.message,
-        textColor: "rgb(89, 102, 115)"
-      });
-      if (responseData.progress === 1) {
+      const rawProgress = responseData?.progress;
+      const normalizedProgress = typeof rawProgress === "number" ? rawProgress : Number(rawProgress ?? 0);
+      const safeProgress = Number.isFinite(normalizedProgress) ? normalizedProgress : 0;
+      const safeSuccess = Boolean(responseData?.success);
+      const rawMessage = responseData?.message;
+      const safeMessage = rawMessage == null ? "" : String(rawMessage);
+      const status = responseData?.status ?? "unknown";
+      if (status === "pending") {
+        if (pendingStartTime === null) {
+          pendingStartTime = Date.now();
+        }
+        const pendingDuration = Date.now() - pendingStartTime;
+        try {
+          updateProgressComponent(progressComponent, {
+            progress: 0,
+            success: true,
+            message: "Waiting for queue to process job...",
+            textColor: "rgb(89, 102, 115)"
+          });
+        } catch (e) {
+          console.error(`updateProgressComponent failed: ${_toMessage(e)}`);
+        }
+        if (pendingDuration > maxPendingWaitTime) {
+          clearInterval(interval);
+          button.classList.remove("disabled");
+          updateProgressComponent(progressComponent, {
+            progress: 0,
+            success: false,
+            message: "Job timed out waiting in queue. Please check your queue listener.",
+            textColor: "rgb(126,7,7)"
+          });
+        }
+        return;
+      }
+      if (pendingStartTime !== null) {
+        pendingStartTime = null;
+      }
+      runningPollCount++;
+      try {
+        updateProgressComponent(progressComponent, {
+          progress: safeProgress,
+          success: safeSuccess,
+          message: safeMessage,
+          textColor: safeSuccess ? "rgb(89, 102, 115)" : "rgb(126,7,7)"
+        });
+      } catch (e) {
+        console.error(`updateProgressComponent failed: ${_toMessage(e)}`);
+      }
+      if (safeProgress >= 1) {
         clearInterval(interval);
         button.classList.remove("disabled");
       }
+      if (runningPollCount >= maxRunningPolls && safeProgress < 1) {
+        clearInterval(interval);
+        button.classList.remove("disabled");
+        updateProgressComponent(progressComponent, {
+          progress: safeProgress,
+          success: false,
+          message: "Job monitoring timed out. The job may still be processing.",
+          textColor: "rgb(126,7,7)"
+        });
+      }
     } catch (error) {
-      console.error("Error fetching job status:", error);
-      console.error("Error mentioning 'toString' often mean the API call failed to ElevenLabs and do not indicate a problem with the job queue.");
+      console.error(`Error fetching job status: ${_toMessage(error)}`);
+      console.error("Error mentioning 'toString' often mean the API call failed to ElevenLabs and does not indicate a problem with the job queue.");
       if (howManyTimes === 100) {
         clearInterval(interval);
         button.classList.remove("disabled");
@@ -526,6 +586,22 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
       }
     }
   }, pollingInterval);
+}
+function _toMessage(err) {
+  if (err instanceof Error) return err.stack ?? err.message;
+  if (typeof err === "string") return err;
+  if (err === null) return "null";
+  if (typeof err === "undefined") return "undefined";
+  try {
+    const json = JSON.stringify(err);
+    return typeof json === "string" ? json : String(err);
+  } catch {
+    try {
+      return String(err);
+    } catch {
+      return "[Unstringifiable error]";
+    }
+  }
 }
 
 // src/web/assets/bespokenassets/src/processText.ts
@@ -841,6 +917,10 @@ document.addEventListener("DOMContentLoaded", () => {
   previewButtons.forEach((button) => {
     button.addEventListener("click", handlePreviewButtonClick);
   });
+  const historyButtons = document.querySelectorAll(".bespoken-history");
+  historyButtons.forEach((button) => {
+    button.addEventListener("click", handleHistoryButtonClick);
+  });
 });
 async function handleGenerateButtonClick(event) {
   const button = event.target.closest(".bespoken-generate");
@@ -903,6 +983,134 @@ async function handlePreviewButtonClick(event) {
     modal.setContent(text);
     modal.open();
   }
+}
+async function handleHistoryButtonClick(event) {
+  event.preventDefault();
+  const button = event.target.closest(".bespoken-history");
+  if (!button) {
+    console.error("History button not found");
+    return;
+  }
+  const elementId = _getInputValue('input[name="elementId"]');
+  const actionUrl = button.getAttribute("data-generation-history-action-url") || "";
+  if (!actionUrl) {
+    console.error("History action URL not found");
+    return;
+  }
+  const parentElement = event.target.closest(".bespoken-fields");
+  if (!parentElement) {
+    console.error("Parent .bespoken-fields element not found");
+    return;
+  }
+  try {
+    const separator = actionUrl.includes("?") ? "&" : "?";
+    const response = await fetch(`${actionUrl}${separator}elementId=${elementId}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || "Failed to fetch history");
+    }
+    const historyContent = createHistoryContent(data.generations);
+    let modal = parentElement.querySelector(".bespoken-history-dialog");
+    if (!modal) {
+      modal = document.createElement("modal-dialog");
+      modal.classList.add("bespoken-history-dialog");
+      const titleSlot = document.createElement("div");
+      titleSlot.slot = "title";
+      titleSlot.textContent = "Generation History";
+      modal.appendChild(titleSlot);
+      const descSlot = document.createElement("div");
+      descSlot.slot = "description";
+      descSlot.textContent = "Past audio generation jobs for this entry";
+      modal.appendChild(descSlot);
+      const contentSlot = document.createElement("div");
+      contentSlot.slot = "content";
+      modal.appendChild(contentSlot);
+      parentElement.appendChild(modal);
+      await customElements.whenDefined("modal-dialog");
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    modal.setContent(historyContent);
+    modal.open();
+  } catch (error) {
+    console.error("Error fetching generation history:", error);
+  }
+}
+function createHistoryContent(generations) {
+  const container = document.createElement("div");
+  container.style.cssText = "font-size: 14px;";
+  if (!generations || generations.length === 0) {
+    const emptyMessage = document.createElement("p");
+    emptyMessage.textContent = "No generation history found for this entry.";
+    emptyMessage.style.cssText = "color: #666; font-style: italic;";
+    container.appendChild(emptyMessage);
+    return container;
+  }
+  const table = document.createElement("table");
+  table.style.cssText = "width: 100%; border-collapse: collapse; font-size: 13px;";
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headerRow.style.cssText = "background: #f5f5f5; text-align: left;";
+  ["Date", "Status", "Filename"].forEach((headerText) => {
+    const th = document.createElement("th");
+    th.style.cssText = "padding: 8px; border-bottom: 1px solid #ddd;";
+    th.textContent = headerText;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  generations.slice(0, 20).forEach((gen) => {
+    const row = document.createElement("tr");
+    const date = new Date(gen.dateCreated);
+    const dateStr = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    let statusColor = "#888";
+    let statusBg = "#f0f0f0";
+    if (gen.status === "completed") {
+      statusColor = "#2e7d32";
+      statusBg = "#e8f5e9";
+    } else if (gen.status === "failed") {
+      statusColor = "#c62828";
+      statusBg = "#ffebee";
+    } else if (gen.status === "running") {
+      statusColor = "#1565c0";
+      statusBg = "#e3f2fd";
+    } else if (gen.status === "pending") {
+      statusColor = "#f57c00";
+      statusBg = "#fff3e0";
+    }
+    const filename = gen.filename || "N/A";
+    const dateCell = document.createElement("td");
+    dateCell.style.cssText = "padding: 8px; border-bottom: 1px solid #eee;";
+    dateCell.textContent = dateStr;
+    row.appendChild(dateCell);
+    const statusCell = document.createElement("td");
+    statusCell.style.cssText = "padding: 8px; border-bottom: 1px solid #eee;";
+    const statusBadge = document.createElement("span");
+    statusBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusBg}; color: ${statusColor}; font-size: 12px;`;
+    statusBadge.textContent = gen.status;
+    statusCell.appendChild(statusBadge);
+    row.appendChild(statusCell);
+    const filenameCell = document.createElement("td");
+    filenameCell.style.cssText = "padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 11px; word-break: break-all;";
+    filenameCell.textContent = filename;
+    row.appendChild(filenameCell);
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+  container.appendChild(table);
+  if (generations.length > 20) {
+    const moreNote = document.createElement("p");
+    moreNote.textContent = `Showing 20 of ${generations.length} generations`;
+    moreNote.style.cssText = "color: #666; font-style: italic; margin-top: 10px; font-size: 12px;";
+    container.appendChild(moreNote);
+  }
+  return container;
 }
 async function generateScript(targetFieldHandles, title, actionUrl = "") {
   console.log("Generating script for field handles:", targetFieldHandles);

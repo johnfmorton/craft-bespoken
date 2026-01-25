@@ -5,6 +5,7 @@ namespace johnfmorton\bespoken\services;
 use Craft;
 use DateTime;
 use johnfmorton\bespoken\jobs\GenerateAudio;
+use johnfmorton\bespoken\records\AudioGenerationRecord;
 use Ramsey\Uuid\Uuid;
 use yii\base\Component;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
@@ -35,6 +36,7 @@ class BespokenService extends Component
         if (!$apiKey) {
             return [
                 'success' => false,
+                'progress' => 0,
                 'message' => 'Eleven Labs API key is not set in the plugin settings.',
             ];
         }
@@ -74,19 +76,36 @@ class BespokenService extends Component
         if (!$jobId) {
             return [
                 'success' => false,
+                'progress' => 0,
                 'message' => 'Job ID is not valid',
             ];
         }
 
+        // Create persistent database record for job tracking
+        $this->createAudioGeneration([
+            'bespokenJobId' => $bespokenJobId,
+            'craftQueueJobId' => $jobId,
+            'elementId' => $elementId,
+            'voiceId' => $voiceId,
+            'voiceModel' => $voiceModel,
+            'filename' => $filename,
+            'entryTitle' => $entryTitle,
+        ]);
+
         return [
             'jobId' => $jobId,
             'success' => true,
+            'progress' => 0,
             'filename' => $filename,
             'bespokenJobId' => $bespokenJobId,
         ];
     }
 
     /**
+     * Monitor job status - queries database first, falls back to cache
+     *
+     * @param string|null $jobId The bespokenJobId to monitor
+     * @return array Always includes 'progress' field
      * @throws \JsonException
      */
     public function jobMonitor($jobId): array
@@ -94,21 +113,163 @@ class BespokenService extends Component
         if (!$jobId) {
             return [
                 'success' => false,
+                'progress' => 0,
                 'message' => 'Job ID is required',
+                'status' => 'error',
             ];
         }
 
+        // First, try to find the job in the database
+        $record = AudioGenerationRecord::find()
+            ->where(['bespokenJobId' => $jobId])
+            ->one();
+
+        if ($record) {
+            return [
+                'success' => (bool)$record->success,
+                'progress' => (float)$record->progress,
+                'message' => $record->message ?? '',
+                'status' => $record->status,
+                'assetId' => $record->assetId,
+            ];
+        }
+
+        // Fallback to cache for backwards compatibility during transition
         $status = Craft::$app->cache->get($jobId);
 
         if ($status) {
             // the status will be a string, so we need to convert it to an array
-            return json_decode($status, true, 512, JSON_THROW_ON_ERROR);
-        } else {
-            return [
-                'success' => false,
-                'message' => 'Job ID not found in cache',
-            ];
+            $data = json_decode($status, true, 512, JSON_THROW_ON_ERROR);
+            // Ensure progress is always present
+            $data['progress'] = $data['progress'] ?? 0;
+            $data['status'] = $data['status'] ?? 'running';
+            return $data;
         }
+
+        // Job not found anywhere - return pending state (NOT an error)
+        // This handles the race condition where the queue hasn't started the job yet
+        return [
+            'success' => true,
+            'progress' => 0,
+            'message' => 'Waiting for job to start...',
+            'status' => AudioGenerationRecord::STATUS_PENDING,
+        ];
+    }
+
+    /**
+     * Create a new audio generation record in the database
+     *
+     * @param array $params
+     * @return AudioGenerationRecord|null
+     */
+    public function createAudioGeneration(array $params): ?AudioGenerationRecord
+    {
+        $record = new AudioGenerationRecord();
+        $record->bespokenJobId = $params['bespokenJobId'];
+        $record->craftQueueJobId = $params['craftQueueJobId'] ?? null;
+        $record->elementId = $params['elementId'] ?? null;
+        $record->siteId = $params['siteId'] ?? Craft::$app->sites->currentSite->id;
+        $record->status = AudioGenerationRecord::STATUS_PENDING;
+        $record->progress = 0;
+        $record->message = 'Queued for processing';
+        $record->success = true;
+        $record->voiceId = $params['voiceId'] ?? null;
+        $record->voiceModel = $params['voiceModel'] ?? null;
+        $record->filename = $params['filename'] ?? null;
+        $record->entryTitle = $params['entryTitle'] ?? null;
+
+        if ($record->save()) {
+            BespokenPlugin::info('Created audio generation record for job: ' . $params['bespokenJobId']);
+            return $record;
+        }
+
+        BespokenPlugin::error('Failed to create audio generation record: ' . json_encode($record->errors));
+        return null;
+    }
+
+    /**
+     * Update an existing audio generation record
+     *
+     * @param string $bespokenJobId
+     * @param array $data
+     * @return bool
+     */
+    public function updateAudioGeneration(string $bespokenJobId, array $data): bool
+    {
+        $record = AudioGenerationRecord::find()
+            ->where(['bespokenJobId' => $bespokenJobId])
+            ->one();
+
+        if (!$record) {
+            BespokenPlugin::warning('Audio generation record not found for job: ' . $bespokenJobId);
+            return false;
+        }
+
+        // Update allowed fields
+        if (isset($data['status'])) {
+            $record->status = $data['status'];
+        }
+        if (isset($data['progress'])) {
+            $record->progress = $data['progress'];
+        }
+        if (isset($data['message'])) {
+            $record->message = $data['message'];
+        }
+        if (isset($data['success'])) {
+            $record->success = $data['success'];
+        }
+        if (isset($data['assetId'])) {
+            $record->assetId = $data['assetId'];
+        }
+        if (isset($data['errorDetails'])) {
+            $record->errorDetails = $data['errorDetails'];
+        }
+
+        if ($record->save()) {
+            return true;
+        }
+
+        BespokenPlugin::error('Failed to update audio generation record: ' . json_encode($record->errors));
+        return false;
+    }
+
+    /**
+     * Get generation history, optionally filtered by element ID
+     *
+     * @param int|null $elementId Filter by element ID (entry)
+     * @param int $limit Maximum number of records to return
+     * @return array
+     */
+    public function getGenerationHistory(?int $elementId = null, int $limit = 50): array
+    {
+        $query = AudioGenerationRecord::find()
+            ->orderBy(['dateCreated' => SORT_DESC])
+            ->limit($limit);
+
+        if ($elementId !== null) {
+            $query->where(['elementId' => $elementId]);
+        }
+
+        $records = $query->all();
+
+        return array_map(function ($record) {
+            return [
+                'id' => $record->id,
+                'bespokenJobId' => $record->bespokenJobId,
+                'elementId' => $record->elementId,
+                'status' => $record->status,
+                'progress' => (float)$record->progress,
+                'message' => $record->message,
+                'success' => (bool)$record->success,
+                'voiceId' => $record->voiceId,
+                'voiceModel' => $record->voiceModel,
+                'filename' => $record->filename,
+                'entryTitle' => $record->entryTitle,
+                'assetId' => $record->assetId,
+                'dateCreated' => $record->dateCreated,
+                'dateUpdated' => $record->dateUpdated,
+            ];
+        }, $records);
     }
 
     /**

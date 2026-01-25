@@ -206,3 +206,29 @@ Relying on the queue system means that the audio files are created in the backgr
 If your queue is running automatically in the background via [CRON job or daemon](https://craftcms.com/docs/5.x/system/queue.html#queue-runners), the field type will update with the status of your audio file.
 
 If the queue is run only on [HTTP](https://craftcms.com/docs/5.x/system/queue.html#http), the queue may not run until you refresh the page.
+
+### Queue tolerance and job tracking
+
+As of version 5.1.0, Bespoken stores job status in the database rather than the cache. This provides several benefits:
+
+- **Page reload resilience**: If you refresh the page while an audio file is being generated, the progress indicator will restore its state and continue showing the job's progress.
+- **Delayed queue tolerance**: If your queue runner doesn't start immediately (e.g., CRON-based queues that run every minute), the interface will display "Waiting for queue to process job..." and wait up to 3 minutes for the job to begin processing.
+- **Generation history**: You can view past audio generation jobs for any entry (see below).
+
+## Generation History
+
+The Bespoken field includes a **View History** button that displays a list of past audio generation jobs for the current entry. This is useful for:
+
+- Seeing when audio files were last generated
+- Checking the status of previous generation attempts (completed, failed, pending)
+- Viewing the filenames of generated audio files
+
+Click the **View History** button in any Bespoken field to open the history modal. The history shows:
+
+| Column | Description |
+|--------|-------------|
+| Date | When the generation job was created |
+| Status | Current status: `completed`, `failed`, `running`, or `pending` |
+| Filename | The name of the generated audio file |
+
+The history is stored per-entry, so each entry maintains its own record of audio generation attempts.

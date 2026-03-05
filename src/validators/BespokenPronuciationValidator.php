@@ -32,9 +32,9 @@ class BespokenPronuciationValidator extends Validator
                 return [Craft::t('app', '"word" and "pronunciation" must be strings.'), []];
             }
 
-            // Check if 'voice' and 'voiceId' values are not empty
-            if (empty($item['word']) || empty($item['pronunciation'])) {
-                return [Craft::t('app', '"Word" and "Pronunciation" cannot be empty.'), []];
+            // Check if 'word' value is not empty (pronunciation can be empty to remove a word)
+            if (empty($item['word'])) {
+                return [Craft::t('app', '"Word" cannot be empty.'), []];
             }
         }
 

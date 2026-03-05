@@ -229,3 +229,101 @@ Voice configuration
         errors: settings.getErrors('use_speaker_boost')
     }
 ) }}
+
+<style>
+.bespoken-hint {
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    line-height: 1;
+    margin: 4px 7px 0;
+    padding: 3px 6px;
+    border-radius: 3px;
+    display: inline-block;
+    letter-spacing: 0.01em;
+}
+.bespoken-mirror {
+    color: #92600a;
+    background: #fef3cd;
+    border: 1px solid #f0dfa0;
+}
+.bespoken-empty-hint {
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    font-style: italic;
+}
+</style>
+
+<script>
+(function() {
+    function updateMirror(input, mirror, isWord) {
+        var val = input.value;
+        if (!isWord && val === '') {
+            mirror.className = 'bespoken-hint bespoken-empty-hint';
+            mirror.textContent = 'word will be removed';
+            mirror.style.display = '';
+            return;
+        }
+        if (val && (val.startsWith(' ') || val.endsWith(' ') || val.indexOf('  ') !== -1)) {
+            mirror.className = 'bespoken-hint bespoken-mirror';
+            mirror.textContent = val.replace(/ /g, '\u00B7');
+            mirror.style.display = '';
+        } else {
+            mirror.style.display = 'none';
+            mirror.textContent = '';
+        }
+    }
+
+    function initRow(row) {
+        if (row._bespokenInit) return;
+        row._bespokenInit = true;
+
+        var cells = row.querySelectorAll('td');
+        var textCells = [];
+        cells.forEach(function(td) {
+            var input = td.classList.contains('singleline-cell') ? td.querySelector('textarea') : null;
+            if (input) textCells.push({ td: td, input: input });
+        });
+        if (textCells.length < 2) return;
+
+        var wordTd = textCells[0];
+        var pronTd = textCells[1];
+
+        [{ cell: wordTd, isWord: true }, { cell: pronTd, isWord: false }].forEach(function(item) {
+            var mirror = document.createElement('div');
+            mirror.style.display = 'none';
+            item.cell.td.appendChild(mirror);
+            updateMirror(item.cell.input, mirror, item.isWord);
+            item.cell.input.addEventListener('input', function() {
+                updateMirror(item.cell.input, mirror, item.isWord);
+            });
+        });
+    }
+
+    function initTable() {
+        var wrapper = document.querySelector('[id$="-pronunciations"], #pronunciations');
+        if (!wrapper) return;
+        var tbody = wrapper.tagName === 'TABLE' ? wrapper.querySelector('tbody') : wrapper.querySelector('table tbody');
+        if (!tbody) return;
+
+        tbody.querySelectorAll('tr').forEach(initRow);
+
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                m.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1 && node.tagName === 'TR') {
+                        initRow(node);
+                    }
+                });
+            });
+        });
+        observer.observe(tbody, { childList: true });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTable);
+    } else {
+        initTable();
+    }
+})();
+</script>

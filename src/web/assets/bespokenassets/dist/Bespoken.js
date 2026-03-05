@@ -790,8 +790,14 @@ function _stripTags(text) {
   text = text.replace(/&nbsp;/g, " ");
   text = _ensureBlockFormatting(text);
   text = text.replace(/<[^>]*>/g, "");
+  text = _decodeHtmlEntities(text);
   text = text.replace(/\s{2,}/g, " ");
   return text;
+}
+function _decodeHtmlEntities(text) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, "text/html");
+  return doc.body.textContent || "";
 }
 function _getFieldValue(element) {
   const inputElement = element.querySelector('input[name^="fields["], textarea[name^="fields["]');

@@ -1,5 +1,19 @@
 # Release Notes for Bespoken
 
+## 5.2.0 - 2026-03-05
+
+### Added
+
+- **Word removal via pronunciation rules**: Leave the pronunciation field empty to remove a word entirely from the narration script (e.g., remove `->` from text).
+- **Auto-padded pronunciation replacements**: Spaces are now automatically added around pronunciation values, so users no longer need to manually pad with spaces.
+- **Visual indicators in settings**: Pronunciation fields now show subtle pill-style hints — an amber space visualizer (middle-dot characters) when values contain leading/trailing spaces, and a slate "word will be removed" badge when the pronunciation is empty.
+- **HTML entity decoding**: Text from CKEditor fields is now properly decoded before pronunciation rules are applied, fixing issues where encoded characters like `&gt;` would prevent matches.
+
+### Fixed
+
+- Fixed pronunciation rules not matching special characters (e.g., `->`) when CKEditor encoded them as HTML entities.
+- Fixed narration script preview showing raw HTML entities instead of decoded characters.
+
 ## 5.1.1 - 2026-03-05
 
 ### Changed

@@ -146,12 +146,20 @@ function _stripTags(text: string) {
   // remove any remaining HTML tags
   text = text.replace(/<[^>]*>/g, '');
 
+  // Decode HTML entities (e.g., &gt; → >, &amp; → &) so pronunciation rules match actual characters
+  text = _decodeHtmlEntities(text);
+
   // remove any remaining double spaces
   text = text.replace(/\s{2,}/g, ' ');
 
   return text;
 }
 
+function _decodeHtmlEntities(text: string): string {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    return doc.body.textContent || '';
+}
 
 /*
 * _getFieldValue

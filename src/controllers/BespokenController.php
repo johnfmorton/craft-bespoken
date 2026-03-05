@@ -87,11 +87,24 @@ class BespokenController extends Controller
 
         BespokenPlugin::info('Filtered pronunciations: ' . json_encode($filteredPronunciations));
 
+        // Decode HTML entities so pronunciation rules match the actual characters
+        // (e.g., CKEditor encodes "->" as "-&gt;")
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
         // Loop through the pronunciations and replace the word with the pronunciation, regardless of case, using the filteredPronunciations array
         // This allows different voices to have different pronunciations for the same word which is useful for multilingual sites.
 
         foreach ($filteredPronunciations as $pronunciation) {
-            $text = str_ireplace($pronunciation['word'], $pronunciation['pronunciation'], $text);
+            $word = trim($pronunciation['word']);
+            $replacement = trim($pronunciation['pronunciation']);
+
+            if ($word === '') {
+                continue;
+            }
+
+            // Pad with spaces: non-empty gets surrounding spaces, empty gets a single space (word removal)
+            $paddedReplacement = $replacement !== '' ? ' ' . $replacement . ' ' : ' ';
+            $text = str_ireplace($word, $paddedReplacement, $text);
         }
 
         BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
@@ -101,6 +114,9 @@ class BespokenController extends Controller
 
         // remove all double spaces and replace them with a single space
         $text = preg_replace('/\s+/', ' ', $text);
+
+        // trim leading/trailing spaces that padding may have introduced
+        $text = trim($text);
 
         BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
 

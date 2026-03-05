@@ -9,6 +9,8 @@
 - **Dynamic queue timeout**: The queue job's time-to-reserve now scales with text length and chunk count, preventing the queue runner from killing long-running generation jobs.
 - **Stale job detection**: Jobs stuck in "running" status for over 10 minutes are automatically marked as failed when viewing generation history, fixing false "running" indicators from killed processes.
 - **Chunk progress reporting**: The progress UI now shows which chunk is being generated (e.g., "Generating audio: chunk 3 of 7").
+- **ElevenLabs credit display**: The field now shows remaining ElevenLabs credits, reset date, and a usage bar — fetched from the ElevenLabs subscription API on page load.
+- **Model-aware cost estimates**: Estimated credit cost is calculated automatically based on text length and the selected voice's model (1× for v3/multilingual, 0.5× for turbo/flash), with a warning when the estimate exceeds remaining credits.
 
 ### Changed
 

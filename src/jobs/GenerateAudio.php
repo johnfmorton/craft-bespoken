@@ -27,6 +27,18 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     // for debugging purposes to mimic a long-running process
     private ?int $sleepValue = 1;
 
+    /** Models that support request stitching for seamless chunk transitions */
+    private const STITCHING_SUPPORTED_MODELS = [
+        'eleven_multilingual_v2',
+        'eleven_multilingual_v1',
+        'eleven_turbo_v2',
+        'eleven_turbo_v2_5',
+        'eleven_flash_v2',
+        'eleven_flash_v2_5',
+        'eleven_english_sts_v2',
+        'eleven_english_sts_v1',
+    ];
+
 
     protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
 
@@ -168,13 +180,20 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     }
 
     /**
-     * Make a single ElevenLabs API request and return the binary audio data.
+     * Make a single ElevenLabs API request and return the audio data and request ID.
      *
+     * @return array{audio: string, requestId: ?string}
      * @throws \RuntimeException On cURL error or API error response
      * @throws \JsonException
      */
-    private function makeElevenLabsRequest(string $text, string $voiceId, string $voiceModel): string
-    {
+    private function makeElevenLabsRequest(
+        string $text,
+        string $voiceId,
+        string $voiceModel,
+        ?string $previousText = null,
+        ?string $nextText = null,
+        array $previousRequestIds = []
+    ): array {
         $settings = Bespoken::getInstance()->getSettings();
 
         $api_key = App::parseEnv($settings->elevenlabsApiKey);
@@ -188,7 +207,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             "xi-api-key: $api_key"
         ];
 
-        $requestData = json_encode([
+        $requestBody = [
             'text' => $text,
             'voice_id' => $voiceId,
             'model_id' => $voiceModel,
@@ -198,12 +217,25 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                 'style' => $style,
                 'use_speaker_boost' => $use_speaker_boost
             ]
-        ], JSON_THROW_ON_ERROR);
+        ];
+
+        if ($previousText !== null) {
+            $requestBody['previous_text'] = $previousText;
+        }
+        if ($nextText !== null) {
+            $requestBody['next_text'] = $nextText;
+        }
+        if (!empty($previousRequestIds)) {
+            $requestBody['previous_request_ids'] = array_slice($previousRequestIds, -3);
+        }
+
+        $requestData = json_encode($requestBody, JSON_THROW_ON_ERROR);
 
         $curl = curl_init();
         curl_setopt_array($curl, [
             CURLOPT_URL => $this->url . $voiceId,
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER => true,
             CURLOPT_ENCODING => "",
             CURLOPT_MAXREDIRS => 10,
             CURLOPT_TIMEOUT => 300,
@@ -215,15 +247,26 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         $response = curl_exec($curl);
         $err = curl_error($curl);
+        $headerSize = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
         curl_close($curl);
 
         if ($err) {
             throw new \RuntimeException('cURL Error: ' . $err);
         }
 
-        // Check if response is JSON (which indicates an error from the API)
+        // Split response into headers and body
+        $responseHeaders = substr($response, 0, $headerSize);
+        $responseBody = substr($response, $headerSize);
+
+        // Extract request-id from response headers
+        $requestId = null;
+        if (preg_match('/^request-id:\s*(.+)$/mi', $responseHeaders, $matches)) {
+            $requestId = trim($matches[1]);
+        }
+
+        // Check if response body is JSON (which indicates an error from the API)
         try {
-            $decodedResponse = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+            $decodedResponse = json_decode($responseBody, true, 512, JSON_THROW_ON_ERROR);
             if ($decodedResponse) {
                 Bespoken::info('Response from ElevenLabs API: ' . print_r($decodedResponse, true));
                 if (is_array($decodedResponse) && isset($decodedResponse['detail']['message'])) {
@@ -236,7 +279,10 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             Bespoken::info('Response from ElevenLabs API is not JSON, which is expected for an audio file');
         }
 
-        return $response;
+        return [
+            'audio' => $responseBody,
+            'requestId' => $requestId,
+        ];
     }
 
     /**
@@ -262,6 +308,14 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             // Progress range for API calls: 0.10 to 0.60
             $progressPerChunk = 0.50 / $totalChunks;
 
+            // Determine if request stitching is supported for this model
+            $supportsStitching = in_array($voiceModel, self::STITCHING_SUPPORTED_MODELS, true);
+            $previousRequestIds = [];
+
+            if ($supportsStitching && $totalChunks > 1) {
+                Bespoken::info('Request stitching enabled for model: ' . $voiceModel . ' with ' . $totalChunks . ' chunks');
+            }
+
             foreach ($chunks as $i => $chunk) {
                 $chunkNum = $i + 1;
                 $this->setBespokeProgress(
@@ -273,8 +327,22 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                         : 'Generating audio...'
                 );
 
+                // Build stitching context for supported models with multiple chunks
+                $previousText = null;
+                $nextText = null;
+                $requestIdsForCall = [];
+
+                if ($supportsStitching && $totalChunks > 1) {
+                    $previousText = $i > 0 ? $chunks[$i - 1] : null;
+                    $nextText = $i < $totalChunks - 1 ? $chunks[$i + 1] : null;
+                    $requestIdsForCall = array_slice($previousRequestIds, -3);
+                }
+
                 try {
-                    $audioData = $this->makeElevenLabsRequest($chunk, $voiceId, $voiceModel);
+                    $result = $this->makeElevenLabsRequest(
+                        $chunk, $voiceId, $voiceModel,
+                        $previousText, $nextText, $requestIdsForCall
+                    );
                 } catch (\RuntimeException $e) {
                     $errorMsg = $totalChunks > 1
                         ? "Failed on chunk {$chunkNum} of {$totalChunks}: " . $e->getMessage()
@@ -284,8 +352,14 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                     return;
                 }
 
+                // Track request IDs for stitching subsequent chunks
+                if ($result['requestId']) {
+                    $previousRequestIds[] = $result['requestId'];
+                    Bespoken::info('Captured request-id for chunk ' . $chunkNum . ': ' . $result['requestId']);
+                }
+
                 $chunkPath = $tempDir . '/audio-' . $timestamp . '-chunk-' . $chunkNum . '.mp3';
-                file_put_contents($chunkPath, $audioData);
+                file_put_contents($chunkPath, $result['audio']);
                 $chunkPaths[] = $chunkPath;
 
                 // Small delay between API calls to avoid rate limiting

@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Request stitching for seamless chunk transitions**: Multi-chunk audio now uses ElevenLabs' request stitching (`previous_text`, `next_text`, `previous_request_ids`) to condition each chunk on surrounding context, producing smoother prosody and voice consistency across chunk boundaries. Automatically disabled for `eleven_v3` (unsupported) and single-chunk generations.
 - **Text chunking for long content**: Text is now automatically split into chunks at paragraph and sentence boundaries before sending to ElevenLabs, preventing failures when text exceeds model character limits and improving audio quality on longer texts.
 - **Audio concatenation**: Multiple audio chunks are stitched into a single MP3 using ffmpeg (with binary fallback), so the final output is seamless.
 - **Dynamic queue timeout**: The queue job's time-to-reserve now scales with text length and chunk count, preventing the queue runner from killing long-running generation jobs.

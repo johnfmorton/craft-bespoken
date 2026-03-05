@@ -1,5 +1,13 @@
 # Release Notes for Bespoken
 
+## 5.1.1 - 2026-03-05
+
+### Changed
+
+- Updated voice model options to include Eleven v3, Flash v2.5, and Flash v2.
+- Changed the default voice model from Multilingual v2 to Eleven v3.
+- Updated ElevenLabs documentation links to current URLs.
+
 ## 5.1.0 - 2026-01-25
 
 ### Added

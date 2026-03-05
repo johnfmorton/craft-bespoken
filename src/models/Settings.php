@@ -94,9 +94,9 @@ class Settings extends Model
      * @var string
      * The voice model to use for the audio file.
      *
-     * https://elevenlabs.io/docs/speech-synthesis/models
+     * https://elevenlabs.io/docs/overview/models
      */
-   public string $voiceModel = 'eleven_multilingual_v2';
+   public string $voiceModel = 'eleven_v3';
 
     /**
      * Asset Volume Handle
@@ -120,7 +120,7 @@ class Settings extends Model
             ['voices', BespokenVoicesValidator::class],
             ['pronunciations', BespokenPronuciationValidator::class],
             ['voiceModel', 'string'],
-            ['voiceModel', 'default', 'value' => 'eleven_multilingual_v2'],
+            ['voiceModel', 'default', 'value' => 'eleven_v3'],
             ['model_id', 'string'],
             ['model_id', 'default', 'value' => null],
             ['stability', BespokenSettingZeroToOneValidator::class],

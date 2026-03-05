@@ -29,12 +29,8 @@ return [
 	. This allows you to use different pronunciations for different voices. For example, you can use different pronunciations for the same word in different languages.</p>
 <p>ElevenLabs has multiple voice model options.
 	The default model for Bespoken is
-	<b>Multilingual v2</b>. For more information read
-	<a href='https://elevenlabs.io/docs/speech-synthesis/models'>ElevenLabs Models documentation</a>
-	and the article,
-	<a href='https://help.elevenlabs.io/hc/en-us/articles/17883183930129-What-models-do-you-offer-and-what-is-the-difference-between-them'>
-		<i>What models do you offer and what is the difference between them?</i>
-	</a>
+	<b>Eleven v3</b>. For more information read the
+	<a href='https://elevenlabs.io/docs/overview/models'>ElevenLabs Models documentation</a>
 </p>
 <p>You can define a <b>Pronunciation rule set</b> for each voice. This allows you to customize how words are pronounced on a per-voice or per-language basis.</p>
 ",

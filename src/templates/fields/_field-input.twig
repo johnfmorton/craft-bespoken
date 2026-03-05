@@ -24,7 +24,7 @@
 			}) %}
 
 			{% set voiceModeltoVoiceIdForField = voiceModeltoVoiceIdForField|merge({
-				(voiceOption.voiceId): voiceOption.voiceModel ?? 'eleven_multilingual_v2'
+				(voiceOption.voiceId): voiceOption.voiceModel ?? 'eleven_v3'
 			}) %}
 
 		{% set pronunciationRuleSettoVoiceIdForField = pronunciationRuleSettoVoiceIdForField|merge({

@@ -33,10 +33,6 @@ Voice configuration
 
 {{ 'Voice configuration instructions' | t('bespoken') | raw }}
 
-{# On 14JUL2025, for the voiceModel field, I added the default: true to the Multilingual v2 option. This is so that the default voice model is set to Multilingual v2. There is a new voice model, eleven_v3, that is in alpha, but is not yet available for use in the API so it is not included in the options.
-{ label: 'Eleven v3 (alpha)', value: 'eleven_v3' },
-#}
-
 {% set input %}
 {{  forms.editableTable({
     id: 'voices',
@@ -70,7 +66,10 @@ Voice configuration
             width: '25%',
             handle: 'voiceModel',
             options: [
-                { label: 'Multilingual v2', value: 'eleven_multilingual_v2', default: true },
+                { label: 'Eleven v3', value: 'eleven_v3', default: true },
+                { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
+                { label: 'Flash v2.5', value: 'eleven_flash_v2_5' },
+                { label: 'Flash v2', value: 'eleven_flash_v2' },
                 { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
                 { label: 'Turbo v2', value: 'eleven_turbo_v2' },
                 { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },

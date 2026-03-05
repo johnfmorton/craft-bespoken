@@ -242,6 +242,25 @@ class BespokenService extends Component
      */
     public function getGenerationHistory(?int $elementId = null, int $limit = 50): array
     {
+        // First, mark stale "running" jobs as failed.
+        // If a job hasn't been updated in 10+ minutes and is still "running",
+        // the queue process was killed before the job could update its own status.
+        $staleThreshold = (new \DateTime())->modify('-10 minutes')->format('Y-m-d H:i:s');
+        $staleQuery = AudioGenerationRecord::find()
+            ->where(['status' => AudioGenerationRecord::STATUS_RUNNING])
+            ->andWhere(['<', 'dateUpdated', $staleThreshold]);
+
+        if ($elementId !== null) {
+            $staleQuery->andWhere(['elementId' => $elementId]);
+        }
+
+        foreach ($staleQuery->all() as $staleRecord) {
+            $staleRecord->status = AudioGenerationRecord::STATUS_FAILED;
+            $staleRecord->success = false;
+            $staleRecord->message = 'Job timed out — the queue process was terminated before completion.';
+            $staleRecord->save(false);
+        }
+
         $query = AudioGenerationRecord::find()
             ->orderBy(['dateCreated' => SORT_DESC])
             ->limit($limit);

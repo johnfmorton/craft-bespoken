@@ -112,8 +112,10 @@ class BespokenController extends Controller
         // remove any   characters
         $text = str_replace(' ', ' ', $text);
 
-        // remove all double spaces and replace them with a single space
-        $text = preg_replace('/\s+/', ' ', $text);
+        // Collapse horizontal whitespace (spaces, tabs, nbsp) but preserve paragraph markers (\n\n)
+        $text = preg_replace('/[^\S\n]+/', ' ', $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+        $text = preg_replace('/\n([^\n])/', "\n\n$1", $text);
 
         // trim leading/trailing spaces that padding may have introduced
         $text = trim($text);

@@ -7,12 +7,15 @@ use craft\elements\Asset;
 use craft\helpers\App;
 use craft\queue\BaseJob;
 use johnfmorton\bespoken\Bespoken;
+use johnfmorton\bespoken\helpers\AudioConcatenator;
+use johnfmorton\bespoken\helpers\TextChunker;
 use johnfmorton\bespoken\records\AudioGenerationRecord;
+use yii\queue\RetryableJobInterface;
 
 /**
  * Generate Audio queue job
  */
-class GenerateAudio extends BaseJob
+class GenerateAudio extends BaseJob implements RetryableJobInterface
 {
     public ?string $elementId = '';
     public ?string $text = '';
@@ -165,35 +168,30 @@ class GenerateAudio extends BaseJob
     }
 
     /**
+     * Make a single ElevenLabs API request and return the binary audio data.
+     *
+     * @throws \RuntimeException On cURL error or API error response
      * @throws \JsonException
      */
-    protected function elevenLabsApiCall($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId, string $voiceModel): void
+    private function makeElevenLabsRequest(string $text, string $voiceId, string $voiceModel): string
     {
         $settings = Bespoken::getInstance()->getSettings();
 
-        // ElevenLabs API settings set in the plugin settings
         $api_key = App::parseEnv($settings->elevenlabsApiKey);
         $stability = $settings->stability;
         $similarity_boost = $settings->similarity_boost;
         $style = $settings->style;
         $use_speaker_boost = $settings->use_speaker_boost;
-        $model_id = $voiceModel;
 
-        Bespoken::info('Voice model in elevenLabsApiCall: ' . $voiceModel);
-
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Contacting ElevenLabs API. This may take a few minutes.');
-
-        // Set up the request headers
         $headers = [
             "Content-Type: application/json",
             "xi-api-key: $api_key"
         ];
 
-        // Set up the request parameters, if any
         $requestData = json_encode([
             'text' => $text,
             'voice_id' => $voiceId,
-            'model_id' => $model_id,
+            'model_id' => $voiceModel,
             'voice_settings' => [
                 'stability' => $stability,
                 'similarity_boost' => $similarity_boost,
@@ -202,14 +200,13 @@ class GenerateAudio extends BaseJob
             ]
         ], JSON_THROW_ON_ERROR);
 
-        // Ready to send the request to the ElevenLabs API
         $curl = curl_init();
         curl_setopt_array($curl, [
             CURLOPT_URL => $this->url . $voiceId,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
             CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 300, // 300 seconds = 5 min,  note we're using CURLOPT_TIMEOUT, not CURLOPT_TIMEOUT_MS, which would be in milliseconds
+            CURLOPT_TIMEOUT => 300,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "POST",
             CURLOPT_POSTFIELDS => $requestData,
@@ -218,47 +215,107 @@ class GenerateAudio extends BaseJob
 
         $response = curl_exec($curl);
         $err = curl_error($curl);
-
         curl_close($curl);
 
         if ($err) {
-            Bespoken::error('cURL Error #:' . $err);
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . print_r($err, true), 0, AudioGenerationRecord::STATUS_FAILED, $err);
-        } else {
-            $this->setBespokeProgress($queue, $bespokenJobId, 0.5, 'Processing the audio file');
+            throw new \RuntimeException('cURL Error: ' . $err);
+        }
 
-            // is response a JSON string? Don't throw an erorr
-            try {
-                $decodedResponse = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
-                // If json_decode doesn't throw an error, then it is a JSON response
-                if ($decodedResponse) {
-                    Bespoken::info('Response from ElevenLabs API: ' . print_r($decodedResponse, true));
-                    if (is_array($decodedResponse) && isset($decodedResponse['detail']['message'])) {
-                        $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . $decodedResponse['detail']['message'], 0, AudioGenerationRecord::STATUS_FAILED, $decodedResponse['detail']['message']);
-                        return;
-                    }
+        // Check if response is JSON (which indicates an error from the API)
+        try {
+            $decodedResponse = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+            if ($decodedResponse) {
+                Bespoken::info('Response from ElevenLabs API: ' . print_r($decodedResponse, true));
+                if (is_array($decodedResponse) && isset($decodedResponse['detail']['message'])) {
+                    throw new \RuntimeException('ElevenLabs API error: ' . $decodedResponse['detail']['message']);
+                }
+                throw new \RuntimeException('ElevenLabs API error: ' . print_r($decodedResponse, true));
+            }
+        } catch (\JsonException $e) {
+            // Not valid JSON = binary MP3 data, which is expected
+            Bespoken::info('Response from ElevenLabs API is not JSON, which is expected for an audio file');
+        }
 
-                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error in response from ElevenLabs API: ' . print_r($decodedResponse, true), 0, AudioGenerationRecord::STATUS_FAILED, print_r($decodedResponse, true));
+        return $response;
+    }
+
+    /**
+     * @throws \JsonException
+     */
+    protected function elevenLabsApiCall($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId, string $voiceModel): void
+    {
+        Bespoken::info('Voice model in elevenLabsApiCall: ' . $voiceModel);
+
+        // Split text into chunks
+        $targetSize = TextChunker::getTargetSize($voiceModel);
+        $chunks = TextChunker::splitText($text, $targetSize);
+        $totalChunks = count($chunks);
+
+        Bespoken::info('Text split into ' . $totalChunks . ' chunk(s) (target size: ' . $targetSize . ' chars)');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Contacting ElevenLabs API. This may take a few minutes.');
+
+        $tempDir = $this->getTempDirectory();
+        $timestamp = time();
+        $chunkPaths = [];
+
+        try {
+            // Progress range for API calls: 0.10 to 0.60
+            $progressPerChunk = 0.50 / $totalChunks;
+
+            foreach ($chunks as $i => $chunk) {
+                $chunkNum = $i + 1;
+                $this->setBespokeProgress(
+                    $queue,
+                    $bespokenJobId,
+                    0.10 + ($i * $progressPerChunk),
+                    $totalChunks > 1
+                        ? "Generating audio: chunk {$chunkNum} of {$totalChunks}"
+                        : 'Generating audio...'
+                );
+
+                try {
+                    $audioData = $this->makeElevenLabsRequest($chunk, $voiceId, $voiceModel);
+                } catch (\RuntimeException $e) {
+                    $errorMsg = $totalChunks > 1
+                        ? "Failed on chunk {$chunkNum} of {$totalChunks}: " . $e->getMessage()
+                        : $e->getMessage();
+                    Bespoken::error($errorMsg);
+                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . $errorMsg, 0, AudioGenerationRecord::STATUS_FAILED, $errorMsg);
                     return;
                 }
-            } catch (\JsonException $e) {
-                // If a JsonException is thrown, it means the response is not valid JSON,
-                // which is expected if it's a binary MP3 file, so we continue processing
-                Bespoken::info('Response from ElevenLabs API is not JSON, which is expected for an audio file');
+
+                $chunkPath = $tempDir . '/audio-' . $timestamp . '-chunk-' . $chunkNum . '.mp3';
+                file_put_contents($chunkPath, $audioData);
+                $chunkPaths[] = $chunkPath;
+
+                // Small delay between API calls to avoid rate limiting
+                if ($chunkNum < $totalChunks) {
+                    usleep(500000); // 0.5 seconds
+                }
             }
 
-            // A valid response includes the audio stream.
-            $audio_stream = $response;
+            // Concatenate chunks if multiple
+            $finalPath = $tempDir . '/audio-' . $timestamp . '.mp3';
+            if ($totalChunks > 1) {
+                $this->setBespokeProgress($queue, $bespokenJobId, 0.60, 'Concatenating ' . $totalChunks . ' audio chunks');
+                AudioConcatenator::concatenate($chunkPaths, $finalPath);
+            } else {
+                // Single chunk — just move it
+                rename($chunkPaths[0], $finalPath);
+                $chunkPaths = []; // Already moved, don't clean up
+            }
 
-            // Save the audio stream to a file add a time stamp to the file name
-            $timestamp = time();
-            $audio_file = $this->getTempDirectory() . '/audio-' . $timestamp . '.mp3';
-
-            file_put_contents($audio_file, $audio_stream);
             $this->setBespokeProgress($queue, $bespokenJobId, 0.65, 'Audio file processed in temporary directory');
 
             // Save the audio file to the Craft CMS assets
-            $this->saveToCraftAssets($queue, $audio_file, $filename, $entryTitle, $bespokenJobId);
+            $this->saveToCraftAssets($queue, $finalPath, $filename, $entryTitle, $bespokenJobId);
+        } finally {
+            // Clean up chunk temp files
+            foreach ($chunkPaths as $chunkPath) {
+                if (file_exists($chunkPath)) {
+                    @unlink($chunkPath);
+                }
+            }
         }
     }
 
@@ -340,6 +397,40 @@ sleep($this->sleepValue * 1);
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());
         }
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Dynamically calculate time-to-reserve based on actual chunk count.
+     * Uses TextChunker to split the text the same way execute() will,
+     * so the TTR matches the real workload.
+     *
+     * Base: 120s for startup, concatenation, and asset saving.
+     * Per chunk: 120s for API call + processing (ElevenLabs can take 60-90s per chunk).
+     * Minimum: 300s (5 min).
+     */
+    public function getTtr(): int
+    {
+        $text = $this->text ?? '';
+        $voiceModel = $this->voiceModel ?? '';
+
+        $targetSize = TextChunker::getTargetSize($voiceModel);
+        $chunks = TextChunker::splitText($text, $targetSize);
+        $chunkCount = max(1, count($chunks));
+
+        // 120s base + 120s per chunk, minimum 300s
+        return max(300, 120 + ($chunkCount * 120));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function canRetry($attempt, $error): bool
+    {
+        // Do not auto-retry — failed API calls or concatenation errors
+        // should be surfaced to the user, not silently retried
+        return false;
     }
 
     protected function defaultDescription(): ?string

@@ -1,5 +1,20 @@
 # Release Notes for Bespoken
 
+## Unreleased
+
+### Added
+
+- **Text chunking for long content**: Text is now automatically split into chunks at paragraph and sentence boundaries before sending to ElevenLabs, preventing failures when text exceeds model character limits and improving audio quality on longer texts.
+- **Audio concatenation**: Multiple audio chunks are stitched into a single MP3 using ffmpeg (with binary fallback), so the final output is seamless.
+- **Dynamic queue timeout**: The queue job's time-to-reserve now scales with text length and chunk count, preventing the queue runner from killing long-running generation jobs.
+- **Stale job detection**: Jobs stuck in "running" status for over 10 minutes are automatically marked as failed when viewing generation history, fixing false "running" indicators from killed processes.
+- **Chunk progress reporting**: The progress UI now shows which chunk is being generated (e.g., "Generating audio: chunk 3 of 7").
+
+### Changed
+
+- **Paragraph markers preserved**: The text processing pipeline now preserves `\n\n` paragraph boundaries through both the frontend (TypeScript) and backend (PHP), enabling natural chunk splitting points.
+- **Smarter job monitor timeout**: The frontend job monitor now uses a stall-based timeout (3 minutes of no progress change) instead of a fixed poll count, so long multi-chunk jobs no longer falsely report timeouts while actively progressing.
+
 ## 5.2.0 - 2026-03-05
 
 ### Added

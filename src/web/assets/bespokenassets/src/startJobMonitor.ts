@@ -5,12 +5,13 @@ const pollingInterval = 1000;
 
 // Maximum time to wait for a pending job to start (3 minutes)
 const maxPendingWaitTime = 180000;
-// Maximum number of polls after job has started running (100 polls = ~100 seconds)
-const maxRunningPolls = 100;
+// Maximum time with no progress change before timing out (3 minutes)
+const maxStallTime = 180000;
 
 let howManyTimes = 0;
 let pendingStartTime: number | null = null;
-let runningPollCount = 0;
+let lastProgress: number = -1;
+let lastProgressChangeTime: number = Date.now();
 
 export function startJobMonitor(bespokenJobId: string, progressComponent: ProgressComponent, button: HTMLButtonElement, actionUrlJobStatus: string){
     console.log('startJobMonitor', bespokenJobId);
@@ -18,7 +19,8 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
     // Reset counters for new job
     howManyTimes = 0;
     pendingStartTime = null;
-    runningPollCount = 0;
+    lastProgress = -1;
+    lastProgressChangeTime = Date.now();
 
     const interval = setInterval(async () => {
         howManyTimes++;
@@ -91,7 +93,12 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
             if (pendingStartTime !== null) {
                 pendingStartTime = null;
             }
-            runningPollCount++;
+
+            // Track progress changes to detect stalls
+            if (safeProgress !== lastProgress) {
+                lastProgress = safeProgress;
+                lastProgressChangeTime = Date.now();
+            }
 
             try {
               updateProgressComponent(progressComponent, {
@@ -111,14 +118,14 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
                 button.classList.remove('disabled');
             }
 
-            // Check for running poll limit (only counts after job starts running)
-            if (runningPollCount >= maxRunningPolls && safeProgress < 1) {
+            // Check for stalled progress (no change for maxStallTime)
+            if (safeProgress < 1 && (Date.now() - lastProgressChangeTime) > maxStallTime) {
                 clearInterval(interval);
                 button.classList.remove('disabled');
                 updateProgressComponent(progressComponent, {
                     progress: safeProgress,
                     success: false,
-                    message: 'Job monitoring timed out. The job may still be processing.',
+                    message: 'Job monitoring timed out — no progress for 3 minutes. The job may still be processing.',
                     textColor: 'rgb(126,7,7)'
                 });
             }

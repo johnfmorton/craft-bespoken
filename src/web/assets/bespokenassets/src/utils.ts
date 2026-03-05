@@ -143,14 +143,22 @@ function _stripTags(text: string) {
 
   text = _ensureBlockFormatting(text);
 
+  // Replace closing block tags with paragraph markers before stripping all tags
+  const blockTags = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'li', 'blockquote'];
+  blockTags.forEach(tag => {
+    const regex = new RegExp(`</${tag}>`, 'gi');
+    text = text.replace(regex, '\n\n');
+  });
+
   // remove any remaining HTML tags
   text = text.replace(/<[^>]*>/g, '');
 
   // Decode HTML entities (e.g., &gt; → >, &amp; → &) so pronunciation rules match actual characters
   text = _decodeHtmlEntities(text);
 
-  // remove any remaining double spaces
-  text = text.replace(/\s{2,}/g, ' ');
+  // Collapse horizontal whitespace but preserve paragraph markers (\n\n)
+  text = text.replace(/[^\S\n]+/g, ' ');
+  text = text.replace(/\n{3,}/g, '\n\n');
 
   return text;
 }

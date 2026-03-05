@@ -488,15 +488,17 @@ function updateProgressComponent(progressComponent, { progress, success, message
 // src/web/assets/bespokenassets/src/startJobMonitor.ts
 var pollingInterval = 1e3;
 var maxPendingWaitTime = 18e4;
-var maxRunningPolls = 100;
+var maxStallTime = 18e4;
 var howManyTimes = 0;
 var pendingStartTime = null;
-var runningPollCount = 0;
+var lastProgress = -1;
+var lastProgressChangeTime = Date.now();
 function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus) {
   console.log("startJobMonitor", bespokenJobId);
   howManyTimes = 0;
   pendingStartTime = null;
-  runningPollCount = 0;
+  lastProgress = -1;
+  lastProgressChangeTime = Date.now();
   const interval = setInterval(async () => {
     howManyTimes++;
     try {
@@ -546,7 +548,10 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
       if (pendingStartTime !== null) {
         pendingStartTime = null;
       }
-      runningPollCount++;
+      if (safeProgress !== lastProgress) {
+        lastProgress = safeProgress;
+        lastProgressChangeTime = Date.now();
+      }
       try {
         updateProgressComponent(progressComponent, {
           progress: safeProgress,
@@ -561,13 +566,13 @@ function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobS
         clearInterval(interval);
         button.classList.remove("disabled");
       }
-      if (runningPollCount >= maxRunningPolls && safeProgress < 1) {
+      if (safeProgress < 1 && Date.now() - lastProgressChangeTime > maxStallTime) {
         clearInterval(interval);
         button.classList.remove("disabled");
         updateProgressComponent(progressComponent, {
           progress: safeProgress,
           success: false,
-          message: "Job monitoring timed out. The job may still be processing.",
+          message: "Job monitoring timed out \u2014 no progress for 3 minutes. The job may still be processing.",
           textColor: "rgb(126,7,7)"
         });
       }
@@ -789,9 +794,15 @@ function _stripTags(text) {
   text = _removeTags(text, tagsToRemove);
   text = text.replace(/&nbsp;/g, " ");
   text = _ensureBlockFormatting(text);
+  const blockTags = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "li", "blockquote"];
+  blockTags.forEach((tag) => {
+    const regex = new RegExp(`</${tag}>`, "gi");
+    text = text.replace(regex, "\n\n");
+  });
   text = text.replace(/<[^>]*>/g, "");
   text = _decodeHtmlEntities(text);
-  text = text.replace(/\s{2,}/g, " ");
+  text = text.replace(/[^\S\n]+/g, " ");
+  text = text.replace(/\n{3,}/g, "\n\n");
   return text;
 }
 function _decodeHtmlEntities(text) {

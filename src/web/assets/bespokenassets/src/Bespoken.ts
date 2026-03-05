@@ -46,6 +46,24 @@ document.addEventListener('DOMContentLoaded', () => {
     historyButtons.forEach(button => {
         button.addEventListener('click', handleHistoryButtonClick);
     });
+
+    // Fetch credit info then calculate estimate for each field group
+    const fieldGroups: NodeListOf<HTMLElement> = document.querySelectorAll('.bespoken-fields');
+    fieldGroups.forEach(fieldGroup => {
+        const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
+        if (creditInfoEl) {
+            // Fetch credit info first, then calculate estimate
+            fetchCreditInfo(creditInfoEl).then(() => {
+                updateCreditEstimate(fieldGroup);
+            });
+        }
+
+        // Recalculate estimate when voice selection changes
+        const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
+        if (voiceSelect) {
+            voiceSelect.addEventListener('change', () => updateCreditEstimate(fieldGroup));
+        }
+    });
 });
 
 async function handleGenerateButtonClick(event: Event): Promise<void> {
@@ -102,6 +120,9 @@ async function handleGenerateButtonClick(event: Event): Promise<void> {
 
     console.log('Generated script:',text);
 
+    // Show estimated credit cost
+    const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
+    showCreditEstimate(text.length, creditInfoEl, voiceModelSelected);
 
     if (text.length === 0) {
         // Re-enable the button
@@ -159,7 +180,21 @@ async function handlePreviewButtonClick(event: Event): Promise<void> {
     // const text = generateScript(targetFieldHandles, title);
     const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
 
+    // Show estimated credit cost on preview too
     const parentElement = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
+    const creditInfoEl = parentElement.querySelector('.bespoken-credit-info') as HTMLElement | null;
+
+    // Get voice model for the selected voice
+    const voiceSelect = parentElement.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
+    const voiceModelField = parentElement.querySelector('input[name*="voiceModel"]') as HTMLInputElement | null;
+    let previewVoiceModel = '';
+    if (voiceSelect && voiceModelField) {
+        try {
+            const voiceModelMap = JSON.parse(voiceModelField.value);
+            previewVoiceModel = voiceModelMap[voiceSelect.value] || '';
+        } catch (e) { /* ignore */ }
+    }
+    showCreditEstimate(text.length, creditInfoEl, previewVoiceModel);
 
     // find .bespoken-dialog in the parentElement
     const modal = parentElement.querySelector('.bespoken-dialog') as ModalDialog | null;
@@ -354,6 +389,219 @@ function createHistoryContent(generations: any[]): HTMLElement {
     }
 
     return container;
+}
+
+async function updateCreditEstimate(fieldGroup: HTMLElement): Promise<void> {
+    const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
+    if (!creditInfoEl) return;
+
+    // Get the action URL for fetching element content (needed for matrix fields)
+    const generateButton = fieldGroup.querySelector('.bespoken-generate') as HTMLButtonElement | null;
+    const actionUrlGetElementContent = generateButton?.getAttribute('data-get-element-content-action-url') || '';
+    const targetFieldHandles = generateButton?.getAttribute('data-target-field') || '';
+
+    // Get current voice model for the selected voice
+    const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
+    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement | null;
+
+    let voiceModelName = '';
+    if (voiceSelect && voiceModelField) {
+        try {
+            const voiceModelMap = JSON.parse(voiceModelField.value);
+            voiceModelName = voiceModelMap[voiceSelect.value] || '';
+        } catch (e) {
+            // ignore parse errors
+        }
+    }
+
+    // Get the title
+    const elementId: string = _getInputValue('input[name="elementId"]');
+    const title: string = _cleanTitle(_getInputValue('#title') || elementId);
+
+    try {
+        const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
+        showCreditEstimate(text.length, creditInfoEl, voiceModelName);
+    } catch (e) {
+        console.error('Failed to calculate credit estimate:', e);
+    }
+}
+
+async function fetchCreditInfo(el: HTMLElement): Promise<void> {
+    const url = el.getAttribute('data-credit-info-url');
+    if (!url) return;
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        if (!data.success) {
+            el.textContent = '';
+            return;
+        }
+
+        const used = data.characterCount as number;
+        const limit = data.characterLimit as number;
+        const remaining = limit - used;
+        const percentage = limit > 0 ? Math.round((used / limit) * 100) : 0;
+
+        // Store data for estimate comparison
+        el.setAttribute('data-credits-remaining', String(remaining));
+        el.setAttribute('data-credits-limit', String(limit));
+        el.setAttribute('data-credits-percentage', String(percentage));
+        if (data.nextResetUnix) {
+            el.setAttribute('data-credits-reset', String(data.nextResetUnix));
+        }
+
+        // Build the balance row
+        renderCreditPanel(el);
+    } catch (e) {
+        console.error('Failed to fetch credit info:', e);
+    }
+}
+
+function renderCreditPanel(el: HTMLElement): void {
+    el.textContent = '';
+
+    const remaining = parseInt(el.getAttribute('data-credits-remaining') || '0', 10);
+    const limit = parseInt(el.getAttribute('data-credits-limit') || '0', 10);
+    const percentage = parseInt(el.getAttribute('data-credits-percentage') || '0', 10);
+    const resetUnix = el.getAttribute('data-credits-reset');
+
+    if (limit === 0) return;
+
+    // Determine bar color based on usage
+    let barColor = '#4a9f6e'; // green
+    if (percentage >= 90) barColor = '#c62828';
+    else if (percentage >= 75) barColor = '#f57c00';
+
+    // Balance row
+    const balanceRow = document.createElement('div');
+    balanceRow.classList.add('bespoken-credit-row', 'bespoken-credit-row--balance');
+
+    const balanceLabel = document.createElement('span');
+    balanceLabel.classList.add('bespoken-credit-label');
+    balanceLabel.textContent = 'Balance';
+    balanceRow.appendChild(balanceLabel);
+
+    const balanceValue = document.createElement('span');
+    balanceValue.classList.add('bespoken-credit-value');
+    if (percentage >= 90) balanceValue.style.color = '#c62828';
+    else if (percentage >= 75) balanceValue.style.color = '#f57c00';
+    balanceValue.textContent = remaining.toLocaleString();
+    balanceRow.appendChild(balanceValue);
+
+    balanceRow.appendChild(document.createTextNode(` / ${limit.toLocaleString()} credits`));
+
+    if (resetUnix) {
+        const resetDate = new Date(parseInt(resetUnix, 10) * 1000);
+        const resetSpan = document.createElement('span');
+        resetSpan.classList.add('bespoken-credit-reset');
+        resetSpan.textContent = `Resets ${resetDate.toLocaleDateString()}`;
+        balanceRow.appendChild(resetSpan);
+    }
+
+    el.appendChild(balanceRow);
+
+    // Usage bar
+    const bar = document.createElement('div');
+    bar.classList.add('bespoken-credit-bar');
+    const fill = document.createElement('div');
+    fill.classList.add('bespoken-credit-bar-fill');
+    fill.style.width = `${Math.min(percentage, 100)}%`;
+    fill.style.background = barColor;
+    bar.appendChild(fill);
+    el.appendChild(bar);
+}
+
+// Credit cost per character varies by model
+const MODEL_CREDIT_MULTIPLIERS: Record<string, number> = {
+    'eleven_v3': 1,
+    'eleven_multilingual_v2': 1,
+    'eleven_multilingual_v1': 1,
+    'eleven_english_sts_v2': 1,
+    'eleven_english_sts_v1': 1,
+    'eleven_turbo_v2': 0.5,
+    'eleven_turbo_v2_5': 0.5,
+    'eleven_flash_v2': 0.5,
+    'eleven_flash_v2_5': 0.5,
+};
+
+function getCreditsForText(textLength: number, voiceModel: string): number {
+    const multiplier = MODEL_CREDIT_MULTIPLIERS[voiceModel] ?? 1;
+    return Math.ceil(textLength * multiplier);
+}
+
+// Friendly display names for voice models
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+    'eleven_v3': 'Eleven v3 · 1×',
+    'eleven_multilingual_v2': 'Multilingual v2 · 1×',
+    'eleven_multilingual_v1': 'Multilingual v1 · 1×',
+    'eleven_english_sts_v2': 'English STS v2 · 1×',
+    'eleven_english_sts_v1': 'English STS v1 · 1×',
+    'eleven_turbo_v2': 'Turbo v2 · 0.5×',
+    'eleven_turbo_v2_5': 'Turbo v2.5 · 0.5×',
+    'eleven_flash_v2': 'Flash v2 · 0.5×',
+    'eleven_flash_v2_5': 'Flash v2.5 · 0.5×',
+};
+
+function showCreditEstimate(textLength: number, creditInfoEl: HTMLElement | null, voiceModel: string = ''): void {
+    if (!creditInfoEl) return;
+
+    // Remove any previous estimate row
+    const existing = creditInfoEl.querySelector('.bespoken-credit-row--estimate');
+    if (existing) existing.remove();
+
+    if (textLength === 0) return;
+
+    const estimatedCredits = getCreditsForText(textLength, voiceModel);
+    const remaining = parseInt(creditInfoEl.getAttribute('data-credits-remaining') || '0', 10);
+    const willExceed = remaining > 0 && estimatedCredits > remaining;
+
+    // Build estimate row
+    const row = document.createElement('div');
+    row.classList.add('bespoken-credit-row', 'bespoken-credit-row--estimate');
+    if (willExceed) row.classList.add('bespoken-credit-row--warning');
+
+    const label = document.createElement('span');
+    label.classList.add('bespoken-credit-label');
+    label.textContent = 'Estimate';
+    row.appendChild(label);
+
+    row.appendChild(document.createTextNode('~'));
+    const value = document.createElement('span');
+    value.classList.add('bespoken-credit-value');
+    value.textContent = estimatedCredits.toLocaleString();
+    row.appendChild(value);
+    row.appendChild(document.createTextNode(' credits'));
+
+    if (voiceModel) {
+        const displayName = MODEL_DISPLAY_NAMES[voiceModel] || voiceModel;
+        const modelSpan = document.createElement('span');
+        modelSpan.classList.add('bespoken-credit-model');
+        modelSpan.textContent = displayName;
+        row.appendChild(modelSpan);
+    }
+
+    if (willExceed) {
+        const warning = document.createElement('span');
+        warning.classList.add('bespoken-credit-warning');
+        warning.textContent = 'Exceeds remaining';
+        row.appendChild(warning);
+    }
+
+    // Insert estimate row before the balance row
+    const balanceRow = creditInfoEl.querySelector('.bespoken-credit-row--balance');
+    if (balanceRow) {
+        creditInfoEl.insertBefore(row, balanceRow);
+    } else {
+        creditInfoEl.appendChild(row);
+    }
 }
 
 /*

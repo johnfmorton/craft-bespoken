@@ -76,6 +76,8 @@
                 value:  voiceModeltoVoiceIdForField ?? ''|json_encode,
             }) }}
 
+			<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info') }}"></div>
+
 			<div class=" group flex flex-row">
 
 				{%  if fieldSettings.showPreview %}

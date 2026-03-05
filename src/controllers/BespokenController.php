@@ -3,6 +3,7 @@
 namespace johnfmorton\bespoken\controllers;
 
 use Craft;
+use craft\helpers\App;
 use craft\web\Controller;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
 use yii\web\MethodNotAllowedHttpException;
@@ -209,6 +210,68 @@ class BespokenController extends Controller
         ]);
     }
 
+    /**
+     * Action to get the user's ElevenLabs credit/character usage info
+     */
+    public function actionGetCreditInfo(): Response
+    {
+        $this->requireLogin();
+
+        $settings = BespokenPlugin::getInstance()->getSettings();
+        $apiKey = App::parseEnv($settings->elevenlabsApiKey);
+
+        if (!$apiKey) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'ElevenLabs API key not configured',
+            ]);
+        }
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => 'https://api.elevenlabs.io/v1/user/subscription',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_HTTPHEADER => [
+                'xi-api-key: ' . $apiKey,
+            ],
+        ]);
+
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        curl_close($curl);
+
+        if ($err) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Failed to contact ElevenLabs API',
+            ]);
+        }
+
+        try {
+            $data = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Invalid response from ElevenLabs API',
+            ]);
+        }
+
+        if (isset($data['detail'])) {
+            return $this->asJson([
+                'success' => false,
+                'message' => $data['detail']['message'] ?? 'ElevenLabs API error',
+            ]);
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'characterCount' => $data['character_count'] ?? 0,
+            'characterLimit' => $data['character_limit'] ?? 0,
+            'nextResetUnix' => $data['next_character_count_reset_unix'] ?? null,
+        ]);
+    }
+
     public function beforeAction($action): bool
     {
         // Don’t require a CSRF token for the process-text action
@@ -232,6 +295,12 @@ class BespokenController extends Controller
         // Don't require a CSRF token for the generation-history action
         // The action already requires a logged-in user
         if ($action->id === 'generation-history') {
+            $this->enableCsrfValidation = false;
+        }
+
+        // Don't require a CSRF token for the get-credit-info action
+        // The action already requires a logged-in user
+        if ($action->id === 'get-credit-info') {
             $this->enableCsrfValidation = false;
         }
 

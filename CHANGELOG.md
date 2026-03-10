@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0), making the component easier to maintain and share across projects.
+- **Build system switched to browser platform**: esbuild now uses `--platform=browser --format=iife` instead of `--platform=node`, correctly bundling browser dependencies like Lit.
+- **Progress component layout**: The progress indicator now renders on its own full-width row below the action buttons instead of inline.
+
 ### Added
 
 - **Request stitching for seamless chunk transitions**: Multi-chunk audio now uses ElevenLabs' request stitching (`previous_text`, `next_text`, `previous_request_ids`) to condition each chunk on surrounding context, producing smoother prosody and voice consistency across chunk boundaries. Automatically disabled for `eleven_v3` (unsupported) and single-chunk generations.

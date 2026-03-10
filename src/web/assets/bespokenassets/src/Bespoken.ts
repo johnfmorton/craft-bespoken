@@ -5,7 +5,8 @@ import ModalDialog  from './bespoken-modal';
 
 
 // Import the custom element, the progress indicator
-import { ProgressComponent } from "./progress-component-v2";
+import "progress-component";
+import type { ProgressComponent } from "progress-component";
 import {updateProgressComponent} from "./updateProgressComponent";
 
 import {processText} from "./processText";
@@ -22,12 +23,7 @@ import {
 } from "./utils";
 
 document.addEventListener('DOMContentLoaded', () => {
-    // If the custom element has not been defined, define it
-    if (!customElements.get('progress-component')) {
-        customElements.define('progress-component', ProgressComponent);
-    }
-
-    // If the custom element has not been defined, define it
+    // progress-component is auto-registered via its @customElement decorator on import
     if (!customElements.get('modal-dialog')) {
         customElements.define('modal-dialog', ModalDialog);
     }

@@ -34,7 +34,10 @@
 }
 
 .bespoken-progress-component {
-    margin-top: 0.25rem;
+    margin-top: 10px;
+    --border-radius: 3px;
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
 }
 
 /* Credit info panel */

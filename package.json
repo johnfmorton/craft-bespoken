@@ -5,12 +5,13 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "esbuild ./src/web/assets/bespokenassets/src/Bespoken.ts --bundle --platform=node --outfile=./src/web/assets/bespokenassets/dist/Bespoken.js",
-    "watch": "esbuild ./src/web/assets/bespokenassets/src/Bespoken.ts --bundle --platform=node --outfile=./src/web/assets/bespokenassets/dist/Bespoken.js --watch"
+    "build": "esbuild ./src/web/assets/bespokenassets/src/Bespoken.ts --bundle --platform=browser --format=iife --outfile=./src/web/assets/bespokenassets/dist/Bespoken.js",
+    "watch": "esbuild ./src/web/assets/bespokenassets/src/Bespoken.ts --bundle --platform=browser --format=iife --outfile=./src/web/assets/bespokenassets/dist/Bespoken.js --watch"
   },
   "author": "John F Morton",
   "license": "ISC",
   "dependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "progress-component": "github:johnfmorton/progress-component"
   }
 }

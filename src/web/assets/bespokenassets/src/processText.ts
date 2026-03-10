@@ -1,5 +1,5 @@
 import {updateProgressComponent} from "./updateProgressComponent";
-import {ProgressComponent} from "./progress-component-v2";
+import type {ProgressComponent} from "progress-component";
 import {startJobMonitor} from "./startJobMonitor";
 // TODO: use the voiceModel and pronunciationRuleSet values to send to the API
 export function processText(

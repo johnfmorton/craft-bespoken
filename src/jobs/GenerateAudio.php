@@ -79,6 +79,9 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                 return;
             }
 
+            // BESPOKEN_DEV_DEBUG: runs the full chunking + concatenation pipeline
+            // but substitutes test.mp3 for each API call (handled in makeElevenLabsRequest)
+
             // Call the Eleven Labs API
             $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel);
 
@@ -197,6 +200,21 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         ?string $nextText = null,
         array $previousRequestIds = []
     ): array {
+        // Dev debug mode: return test.mp3 audio instead of calling the API
+        if (getenv('BESPOKEN_DEV_DEBUG') === 'true') {
+            $site = $this->siteId ? \Craft::$app->sites->getSiteById($this->siteId) : null;
+            $baseUrl = $site ? $site->baseUrl : \Craft::$app->sites->currentSite->baseUrl;
+            $testAudio = @file_get_contents($baseUrl . 'test.mp3');
+            if ($testAudio === false) {
+                throw new \RuntimeException('BESPOKEN_DEV_DEBUG: Could not download test.mp3 from ' . $baseUrl . 'test.mp3');
+            }
+            Bespoken::info('[DEV_DEBUG] Returning test.mp3 audio for chunk (' . mb_strlen($text) . ' chars)');
+            return [
+                'audio' => $testAudio,
+                'requestId' => 'dev-debug-' . uniqid(),
+            ];
+        }
+
         $settings = Bespoken::getInstance()->getSettings();
 
         $api_key = App::parseEnv($settings->elevenlabsApiKey);
@@ -301,7 +319,12 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $totalChunks = count($chunks);
 
         Bespoken::info('Text split into ' . $totalChunks . ' chunk(s) (target size: ' . $targetSize . ' chars)');
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Contacting ElevenLabs API. This may take a few minutes.');
+
+        $isDevDebug = getenv('BESPOKEN_DEV_DEBUG') === 'true';
+        $debugPrefix = $isDevDebug
+            ? '[DEBUG] ' . $totalChunks . ' chunk(s), target: ' . $targetSize . ' chars, text: ' . mb_strlen($text) . ' chars — '
+            : '';
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, $debugPrefix . ($isDevDebug ? 'Using test.mp3 instead of API.' : 'Contacting ElevenLabs API. This may take a few minutes.'));
 
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
@@ -321,13 +344,14 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
             foreach ($chunks as $i => $chunk) {
                 $chunkNum = $i + 1;
+                $chunkMessage = $totalChunks > 1
+                    ? "Generating audio: chunk {$chunkNum} of {$totalChunks}"
+                    : 'Generating audio...';
                 $this->setBespokeProgress(
                     $queue,
                     $bespokenJobId,
                     0.10 + ($i * $progressPerChunk),
-                    $totalChunks > 1
-                        ? "Generating audio: chunk {$chunkNum} of {$totalChunks}"
-                        : 'Generating audio...'
+                    $debugPrefix . $chunkMessage
                 );
 
                 // Build stitching context for supported models with multiple chunks

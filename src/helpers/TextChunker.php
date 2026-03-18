@@ -32,6 +32,12 @@ class TextChunker
      */
     public static function getTargetSize(string $voiceModel): int
     {
+        $envOverride = getenv('BESPOKEN_DEV_CHUNK_SIZE');
+        if ($envOverride !== false && (int) $envOverride > 0) {
+            Bespoken::warning('BESPOKEN_DEV_CHUNK_SIZE override active: using ' . (int) $envOverride . ' chars instead of model default');
+            return (int) $envOverride;
+        }
+
         $maxLimit = self::MODEL_LIMITS[$voiceModel] ?? null;
 
         if ($maxLimit === null) {

@@ -2,21 +2,9 @@
 
 ## Unreleased
 
-### Fixed
-
-- **Multisite support**: Audio generation, content preview, and generation history now work correctly on non-primary sites. Previously, editing an entry on site 2 and generating audio would fail with "Element not found" because the controller didn't resolve the correct site context.
-- **Site context in action URLs**: Field template action URLs now explicitly include the site handle parameter, ensuring the correct site context is carried through to all AJAX requests.
-- **Generation history filtered by site**: The "View History" modal now only shows generations for the current site, not all sites.
-- **Queue job site awareness**: The audio generation queue job now carries the originating site ID, so debug mode uses the correct site's base URL.
-
-### Changed
-
-- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0), making the component easier to maintain and share across projects.
-- **Build system switched to browser platform**: esbuild now uses `--platform=browser --format=iife` instead of `--platform=node`, correctly bundling browser dependencies like Lit.
-- **Progress component layout**: The progress indicator now renders on its own full-width row below the action buttons instead of inline.
-
 ### Added
 
+- **Dev debug mode for audio chunking**: Set `BESPOKEN_DEV_DEBUG=true` to run the full chunking and concatenation pipeline using a local `test.mp3` file instead of calling the ElevenLabs API. Progress messages show chunk count, target size, and text length. Pair with `BESPOKEN_DEV_CHUNK_SIZE=200` to override the chunk target size for testing with smaller text.
 - **Request stitching for seamless chunk transitions**: Multi-chunk audio now uses ElevenLabs' request stitching (`previous_text`, `next_text`, `previous_request_ids`) to condition each chunk on surrounding context, producing smoother prosody and voice consistency across chunk boundaries. Automatically disabled for `eleven_v3` (unsupported) and single-chunk generations.
 - **Text chunking for long content**: Text is now automatically split into chunks at paragraph and sentence boundaries before sending to ElevenLabs, preventing failures when text exceeds model character limits and improving audio quality on longer texts.
 - **Audio concatenation**: Multiple audio chunks are stitched into a single MP3 using ffmpeg (with binary fallback), so the final output is seamless.
@@ -28,8 +16,18 @@
 
 ### Changed
 
+- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0), making the component easier to maintain and share across projects.
+- **Build system switched to browser platform**: esbuild now uses `--platform=browser --format=iife` instead of `--platform=node`, correctly bundling browser dependencies like Lit.
+- **Progress component layout**: The progress indicator now renders on its own full-width row below the action buttons instead of inline.
 - **Paragraph markers preserved**: The text processing pipeline now preserves `\n\n` paragraph boundaries through both the frontend (TypeScript) and backend (PHP), enabling natural chunk splitting points.
 - **Smarter job monitor timeout**: The frontend job monitor now uses a stall-based timeout (3 minutes of no progress change) instead of a fixed poll count, so long multi-chunk jobs no longer falsely report timeouts while actively progressing.
+
+### Fixed
+
+- **Multisite support**: Audio generation, content preview, and generation history now work correctly on non-primary sites. Previously, editing an entry on site 2 and generating audio would fail with "Element not found" because the controller didn't resolve the correct site context.
+- **Site context in action URLs**: Field template action URLs now explicitly include the site handle parameter, ensuring the correct site context is carried through to all AJAX requests.
+- **Generation history filtered by site**: The "View History" modal now only shows generations for the current site, not all sites.
+- **Queue job site awareness**: The audio generation queue job now carries the originating site ID, so debug mode uses the correct site's base URL.
 
 ## 5.2.0 - 2026-03-05
 

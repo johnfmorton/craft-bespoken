@@ -17,7 +17,7 @@
 
 ### Changed
 
-- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0→v0.2.1), making the component easier to maintain and share across projects.
+- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) package (v0.2.0→v0.2.1), making the component easier to maintain and share across projects.
 - **Build system switched to browser platform**: esbuild now uses `--platform=browser --format=iife` instead of `--platform=node`, correctly bundling browser dependencies like Lit.
 - **Progress component layout**: The progress indicator now renders on its own full-width row below the action buttons instead of inline.
 - **Paragraph markers preserved**: The text processing pipeline now preserves `\n\n` paragraph boundaries through both the frontend (TypeScript) and backend (PHP), enabling natural chunk splitting points.

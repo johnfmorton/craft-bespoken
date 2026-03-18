@@ -2,7 +2,7 @@
   "name": "johnfmorton/craft-bespoken",
   "description": "Customizable, high-quality text-to-speech generation for Craft CMS using the ElevenLabs API.",
   "type": "craft-plugin",
-  "version": "5.2.0",
+  "version": "5.3.0",
   "license": "proprietary",
   "authors": [
     {

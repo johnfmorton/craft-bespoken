@@ -1,6 +1,6 @@
 # Release Notes for Bespoken
 
-## Unreleased
+## 5.3.0 - 2026-03-18
 
 ### Added
 

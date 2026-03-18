@@ -54,6 +54,7 @@ class Install extends Migration
             'status' => $this->string(20)->notNull()->defaultValue(AudioGenerationRecord::STATUS_PENDING),
             'progress' => $this->float()->notNull()->defaultValue(0),
             'message' => $this->text()->null(),
+            'messageLog' => $this->text()->null(),
             'success' => $this->boolean()->notNull()->defaultValue(true),
             'voiceId' => $this->string(255)->null(),
             'voiceModel' => $this->string(255)->null(),

@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Progress message log**: All progress messages are now accumulated in a `messageLog` column so the frontend never misses intermediate messages between poll intervals. The progress component replays any unseen messages on each poll, ensuring the full message history is always complete — even when chunks process faster than the 1-second polling interval.
 - **Dev debug mode for audio chunking**: Set `BESPOKEN_DEV_DEBUG=true` to run the full chunking and concatenation pipeline using a local `test.mp3` file instead of calling the ElevenLabs API. Progress messages show chunk count, target size, and text length. Pair with `BESPOKEN_DEV_CHUNK_SIZE=200` to override the chunk target size for testing with smaller text.
 - **Request stitching for seamless chunk transitions**: Multi-chunk audio now uses ElevenLabs' request stitching (`previous_text`, `next_text`, `previous_request_ids`) to condition each chunk on surrounding context, producing smoother prosody and voice consistency across chunk boundaries. Automatically disabled for `eleven_v3` (unsupported) and single-chunk generations.
 - **Text chunking for long content**: Text is now automatically split into chunks at paragraph and sentence boundaries before sending to ElevenLabs, preventing failures when text exceeds model character limits and improving audio quality on longer texts.

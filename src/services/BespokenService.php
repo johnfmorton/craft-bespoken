@@ -131,6 +131,7 @@ class BespokenService extends Component
                 'success' => (bool)$record->success,
                 'progress' => (float)$record->progress,
                 'message' => $record->message ?? '',
+                'messageLog' => $record->messageLog ? (json_decode($record->messageLog, true) ?? []) : [],
                 'status' => $record->status,
                 'assetId' => $record->assetId,
             ];
@@ -216,6 +217,9 @@ class BespokenService extends Component
         }
         if (isset($data['message'])) {
             $record->message = $data['message'];
+            $log = $record->messageLog ? (json_decode($record->messageLog, true) ?? []) : [];
+            $log[] = $data['message'];
+            $record->messageLog = json_encode($log, JSON_THROW_ON_ERROR);
         }
         if (isset($data['success'])) {
             $record->success = $data['success'];

@@ -18,6 +18,7 @@ use craft\db\ActiveRecord;
  * @property string $status
  * @property float $progress
  * @property string|null $message
+ * @property string|null $messageLog
  * @property bool $success
  * @property string|null $voiceId
  * @property string|null $voiceModel

@@ -12,6 +12,7 @@ let howManyTimes = 0;
 let pendingStartTime: number | null = null;
 let lastProgress: number = -1;
 let lastProgressChangeTime: number = Date.now();
+let lastSeenLogLength: number = 0;
 
 export function startJobMonitor(bespokenJobId: string, progressComponent: ProgressComponent, button: HTMLButtonElement, actionUrlJobStatus: string){
     console.log('startJobMonitor', bespokenJobId);
@@ -21,6 +22,7 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
     pendingStartTime = null;
     lastProgress = -1;
     lastProgressChangeTime = Date.now();
+    lastSeenLogLength = 0;
 
     const interval = setInterval(async () => {
         howManyTimes++;
@@ -100,13 +102,31 @@ export function startJobMonitor(bespokenJobId: string, progressComponent: Progre
                 lastProgressChangeTime = Date.now();
             }
 
+            // Replay any unseen messages from the log, or fall back to single message.
+            // We must await updateComplete between each message so Lit's updated()
+            // fires for every value — otherwise only the last one is seen.
+            const messageLog = (responseData as any)?.messageLog;
             try {
-              updateProgressComponent(progressComponent, {
-                progress: safeProgress,
-                success: safeSuccess,
-                message: safeMessage,
-                textColor: safeSuccess ? 'rgb(89, 102, 115)' : 'rgb(126,7,7)'
-              });
+              if (Array.isArray(messageLog) && messageLog.length > lastSeenLogLength) {
+                const newMessages = messageLog.slice(lastSeenLogLength);
+                for (const msg of newMessages) {
+                  updateProgressComponent(progressComponent, {
+                    progress: safeProgress,
+                    success: safeSuccess,
+                    message: String(msg),
+                    textColor: safeSuccess ? 'rgb(89, 102, 115)' : 'rgb(126,7,7)'
+                  });
+                  await progressComponent.updateComplete;
+                }
+                lastSeenLogLength = messageLog.length;
+              } else {
+                updateProgressComponent(progressComponent, {
+                  progress: safeProgress,
+                  success: safeSuccess,
+                  message: safeMessage,
+                  textColor: safeSuccess ? 'rgb(89, 102, 115)' : 'rgb(126,7,7)'
+                });
+              }
             } catch (e) {
               console.error(`updateProgressComponent failed: ${_toMessage(e)}`);
             }

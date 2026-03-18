@@ -1086,12 +1086,14 @@
   var pendingStartTime = null;
   var lastProgress = -1;
   var lastProgressChangeTime = Date.now();
+  var lastSeenLogLength = 0;
   function startJobMonitor(bespokenJobId, progressComponent, button, actionUrlJobStatus) {
     console.log("startJobMonitor", bespokenJobId);
     howManyTimes = 0;
     pendingStartTime = null;
     lastProgress = -1;
     lastProgressChangeTime = Date.now();
+    lastSeenLogLength = 0;
     const interval = setInterval(async () => {
       howManyTimes++;
       try {
@@ -1145,13 +1147,28 @@
           lastProgress = safeProgress;
           lastProgressChangeTime = Date.now();
         }
+        const messageLog = responseData?.messageLog;
         try {
-          updateProgressComponent(progressComponent, {
-            progress: safeProgress,
-            success: safeSuccess,
-            message: safeMessage,
-            textColor: safeSuccess ? "rgb(89, 102, 115)" : "rgb(126,7,7)"
-          });
+          if (Array.isArray(messageLog) && messageLog.length > lastSeenLogLength) {
+            const newMessages = messageLog.slice(lastSeenLogLength);
+            for (const msg of newMessages) {
+              updateProgressComponent(progressComponent, {
+                progress: safeProgress,
+                success: safeSuccess,
+                message: String(msg),
+                textColor: safeSuccess ? "rgb(89, 102, 115)" : "rgb(126,7,7)"
+              });
+              await progressComponent.updateComplete;
+            }
+            lastSeenLogLength = messageLog.length;
+          } else {
+            updateProgressComponent(progressComponent, {
+              progress: safeProgress,
+              success: safeSuccess,
+              message: safeMessage,
+              textColor: safeSuccess ? "rgb(89, 102, 115)" : "rgb(126,7,7)"
+            });
+          }
         } catch (e5) {
           console.error(`updateProgressComponent failed: ${_toMessage(e5)}`);
         }

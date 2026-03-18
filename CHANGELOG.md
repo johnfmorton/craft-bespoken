@@ -17,7 +17,7 @@
 
 ### Changed
 
-- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0), making the component easier to maintain and share across projects.
+- **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0→v0.2.1), making the component easier to maintain and share across projects.
 - **Build system switched to browser platform**: esbuild now uses `--platform=browser --format=iife` instead of `--platform=node`, correctly bundling browser dependencies like Lit.
 - **Progress component layout**: The progress indicator now renders on its own full-width row below the action buttons instead of inline.
 - **Paragraph markers preserved**: The text processing pipeline now preserves `\n\n` paragraph boundaries through both the frontend (TypeScript) and backend (PHP), enabling natural chunk splitting points.
@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- **Expanded message history now scrolls**: Updated `progress-component` to v0.2.1, which adds `overflow-y: auto` to the expanded history panel. Previously, long message histories (15+ messages) were clipped with no scrollbar.
 - **Multisite support**: Audio generation, content preview, and generation history now work correctly on non-primary sites. Previously, editing an entry on site 2 and generating audio would fail with "Element not found" because the controller didn't resolve the correct site context.
 - **Site context in action URLs**: Field template action URLs now explicitly include the site handle parameter, ensuring the correct site context is carried through to all AJAX requests.
 - **Generation history filtered by site**: The "View History" modal now only shows generations for the current site, not all sites.

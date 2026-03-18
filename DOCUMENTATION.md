@@ -232,3 +232,50 @@ Click the **View History** button in any Bespoken field to open the history moda
 | Filename | The name of the generated audio file |
 
 The history is stored per-entry, so each entry maintains its own record of audio generation attempts.
+
+## Development & Debugging
+
+Bespoken provides two environment variables for testing the audio chunking and concatenation pipeline without consuming ElevenLabs API credits. These are separate from the existing `BESPOKEN_DEBUG` variable (which bypasses chunking entirely and downloads a single test file).
+
+### `BESPOKEN_DEV_DEBUG`
+
+Set `BESPOKEN_DEV_DEBUG=true` in your `.env` file to run the **full chunking and concatenation pipeline** using a local `test.mp3` file instead of calling the ElevenLabs API. Each chunk receives a copy of `test.mp3`, and they are concatenated together just like real API responses would be.
+
+This is useful for verifying that:
+- Text is being split into the expected number of chunks
+- Audio concatenation (ffmpeg) is working correctly
+- The progress UI displays chunk information properly
+
+When active, progress messages are prefixed with debug info, e.g.:
+
+```
+[DEBUG] 6 chunk(s), target: 200 chars, text: 765 chars — Generating audio: chunk 1 of 6
+```
+
+**Requirement:** A `test.mp3` file must be accessible at your site's base URL (e.g., `https://your-site.ddev.site/test.mp3`).
+
+### `BESPOKEN_DEV_CHUNK_SIZE`
+
+Set `BESPOKEN_DEV_CHUNK_SIZE` to a positive integer to override the chunk target size (in characters). This forces text to be split into smaller chunks than the voice model would normally require, which is useful for testing chunking and concatenation with short content.
+
+```env
+# Example: force chunks at 200 characters instead of the default ~4500
+BESPOKEN_DEV_CHUNK_SIZE=200
+```
+
+This override applies regardless of the selected voice model and logs a warning when active.
+
+### Typical development workflow
+
+To test the full chunking pipeline without using API credits:
+
+```env
+BESPOKEN_DEV_DEBUG=true
+BESPOKEN_DEV_CHUNK_SIZE=200
+```
+
+1. Add both variables to your `.env` file.
+2. Generate audio for an entry with text exceeding your chunk size.
+3. Observe the debug info in the progress UI showing chunk count and sizes.
+4. Verify the resulting MP3 is a concatenation of multiple copies of `test.mp3`.
+5. Remove both variables to return to normal API-based generation.

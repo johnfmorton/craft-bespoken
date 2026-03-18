@@ -83,6 +83,7 @@ export default class ModalDialog extends HTMLElement {
       }
       .content {
         font-size: 1em;
+        white-space: pre-wrap;
       }
     `;
     shadow.appendChild(style);

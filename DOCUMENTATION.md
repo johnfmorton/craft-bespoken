@@ -6,7 +6,14 @@ The Bespoken plugin for Craft CMS allows you to create audio files from text fie
 
 Here are the basic steps in setting up the Bespoken plugin:
 
-1. [Create an account with ElevenLabs](https://elevenlabs.io/?from=partnergomez2285) and get your API key. This key is found in the [control panel](https://elevenlabs.io/app/speech-synthesis/text-to-speech) in the _My Account_ menu.
+1. [Create an account with ElevenLabs](https://elevenlabs.io/?from=partnergomez2285) and get your API key. This key is found in the [control panel](https://elevenlabs.io/app/speech-synthesis/text-to-speech) in the _My Account_ menu. When creating your API key, restrict its permissions to only what Bespoken requires:
+
+   | Scope          | Access Level |
+   |----------------|--------------|
+   | Text to Speech | Access       |
+   | User           | Read         |
+
+   The **Text to Speech** scope is needed to generate audio, and the **User** scope (read-only) is needed to display your credit balance and usage in the Bespoken field.
 2. Add your API key to the plugin settings page.
 3. Customize the voices available on your site. You can include as many as you want. The Voice ID entered in the Bespoken settings must match the ID from the ElevenLabs Voice Lab. The Voice Lab page also provides a voice name, but you can use any name you prefer within Bespoken.
 4. Choose a voice model for each voice. See the [ElevenLabs Models documentation](https://elevenlabs.io/docs/overview/models) for more information about the models.

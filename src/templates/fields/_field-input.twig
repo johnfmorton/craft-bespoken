@@ -13,6 +13,9 @@
 
 {% set fieldId = field.getInputId() %}
 
+{# Ensure action URLs carry the current site handle for multisite support #}
+{% set siteActionParams = craft.app.isMultiSite ? {site: craft.app.request.getQueryParam('site') ?? craft.app.sites.currentSite.handle} : {} %}
+
 {% set voiceIdNameOptionsForField = {} %}
 {% set voiceModeltoVoiceIdForField = {} %}
 {% set pronunciationRuleSettoVoiceIdForField = {} %}
@@ -76,7 +79,7 @@
                 value:  voiceModeltoVoiceIdForField ?? ''|json_encode,
             }) }}
 
-			<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info') }}"></div>
+			<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info', siteActionParams) }}"></div>
 
 			<div class=" group flex flex-row">
 
@@ -91,7 +94,7 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
-                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content')
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams)
                         }
                     }
                 }) }}
@@ -108,8 +111,8 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
-                            'process-text-action-url': actionUrl('bespoken/bespoken/process-text'),
-                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content'),
+                            'process-text-action-url': actionUrl('bespoken/bespoken/process-text', siteActionParams),
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams),
                             'pronunciation-rule-set': 'TEST',
                             'voice-model': 'TEST',
                         }
@@ -125,7 +128,7 @@
                     ],
                     attributes: {
                         data: {
-                            'generation-history-action-url': actionUrl('bespoken/bespoken/generation-history'),
+                            'generation-history-action-url': actionUrl('bespoken/bespoken/generation-history', siteActionParams),
                         }
                     }
                 }) }}

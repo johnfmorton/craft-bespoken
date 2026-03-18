@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Multisite support**: Audio generation, content preview, and generation history now work correctly on non-primary sites. Previously, editing an entry on site 2 and generating audio would fail with "Element not found" because the controller didn't resolve the correct site context.
+- **Site context in action URLs**: Field template action URLs now explicitly include the site handle parameter, ensuring the correct site context is carried through to all AJAX requests.
+- **Generation history filtered by site**: The "View History" modal now only shows generations for the current site, not all sites.
+- **Queue job site awareness**: The audio generation queue job now carries the originating site ID, so debug mode uses the correct site's base URL.
+
 ### Changed
 
 - **Progress component now uses external package**: Replaced the local `progress-component-v2.ts` with the [`progress-component`](https://github.com/johnfmorton/progress-component) npm package (v0.2.0), making the component easier to maintain and share across projects.

@@ -25,7 +25,7 @@ class BespokenService extends Component
      * @param string $fileNamePrefix
      * @return array
      */
-    public function sendTextToElevenLabsApi(int $elementId, string $text, string $voiceId, string $entryTitle, string $fileNamePrefix, string $voiceModel): array
+    public function sendTextToElevenLabsApi(int $elementId, string $text, string $voiceId, string $entryTitle, string $fileNamePrefix, string $voiceModel, ?int $siteId = null): array
     {
 
       // Check the plugin settings to confirm that an API key is set
@@ -67,6 +67,7 @@ class BespokenService extends Component
                 'filename' => $filename,
                 'bespokenJobId' => $bespokenJobId,
                 'voiceModel' => $voiceModel,
+                'siteId' => $siteId,
             ]
         ));
 
@@ -86,6 +87,7 @@ class BespokenService extends Component
             'bespokenJobId' => $bespokenJobId,
             'craftQueueJobId' => $jobId,
             'elementId' => $elementId,
+            'siteId' => $siteId ?? Craft::$app->sites->currentSite->id,
             'voiceId' => $voiceId,
             'voiceModel' => $voiceModel,
             'filename' => $filename,
@@ -240,7 +242,7 @@ class BespokenService extends Component
      * @param int $limit Maximum number of records to return
      * @return array
      */
-    public function getGenerationHistory(?int $elementId = null, int $limit = 50): array
+    public function getGenerationHistory(?int $elementId = null, int $limit = 50, ?int $siteId = null): array
     {
         // First, mark stale "running" jobs as failed.
         // If a job hasn't been updated in 10+ minutes and is still "running",
@@ -252,6 +254,9 @@ class BespokenService extends Component
 
         if ($elementId !== null) {
             $staleQuery->andWhere(['elementId' => $elementId]);
+        }
+        if ($siteId !== null) {
+            $staleQuery->andWhere(['siteId' => $siteId]);
         }
 
         foreach ($staleQuery->all() as $staleRecord) {
@@ -267,6 +272,9 @@ class BespokenService extends Component
 
         if ($elementId !== null) {
             $query->where(['elementId' => $elementId]);
+        }
+        if ($siteId !== null) {
+            $query->andWhere(['siteId' => $siteId]);
         }
 
         $records = $query->all();

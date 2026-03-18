@@ -23,6 +23,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     public ?string $entryTitle = '';
     public ?string $filename = '';
     public ?string $voiceModel = '';
+    public ?int $siteId = null;
 
     // for debugging purposes to mimic a long-running process
     private ?int $sleepValue = 1;
@@ -99,7 +100,9 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         // add a pause to simulate a long-running process
         sleep($this->sleepValue);
 
-        $publicUrlFromCraft = Craft::$app->sites->currentSite->baseUrl;
+        // Use the site associated with this job, falling back to the current site
+        $site = $this->siteId ? Craft::$app->sites->getSiteById($this->siteId) : null;
+        $publicUrlFromCraft = $site ? $site->baseUrl : Craft::$app->sites->currentSite->baseUrl;
 
         // download a test file with CURL - this must be a publicly accessible file on the same URL as the site for testing
         $url = $publicUrlFromCraft. 'test.mp3';

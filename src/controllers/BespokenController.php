@@ -125,16 +125,41 @@ class BespokenController extends Controller
 
         $voiceId = $postData['voiceId'];
         $fileNamePrefix = $postData['fileNamePrefix'];
-        $elementId = $this->_confirmAndCastToInt($postData['elementId']);
+        $elementId = $this->_confirmAndCastToInt($postData['elementId'] ?? '');
 
-        // retrieve the element by the elementId
-        $element = Craft::$app->elements->getElementById($elementId);
+        if ($elementId === 0) {
+            BespokenPlugin::error('elementId is missing or invalid. Raw value: ' . json_encode($postData['elementId'] ?? 'NOT SET'));
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Element ID is missing or invalid (received: ' . json_encode($postData['elementId'] ?? null) . ')',
+            ]);
+        }
 
-        // if the element is not found, return an error
+        $siteId = $this->_resolveRequestSiteId();
+
+        // Retrieve the element scoped to the resolved site
+        $element = Craft::$app->elements->getElementById($elementId, null, $siteId);
+
+        // If site-scoped lookup fails, try across all sites as a fallback
+        // (handles cases where the site param wasn't carried through)
+        if (!$element) {
+            $element = \craft\elements\Entry::find()
+                ->id($elementId)
+                ->siteId('*')
+                ->status(null)
+                ->one();
+
+            if ($element) {
+                // Use the site the element was actually found on
+                $siteId = $element->siteId;
+                BespokenPlugin::info("Element {$elementId} not on site {$siteId}, found on site {$element->siteId}");
+            }
+        }
+
         if (!$element) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Element not found'
+                'message' => 'Element not found',
             ]);
         }
 
@@ -142,7 +167,7 @@ class BespokenController extends Controller
         $entryTitle = $this->_cleanTitle($element->title, 56);
 
         // call the sendTextToElevenLabsApi service method
-        $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix, $voiceModel);
+        $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix, $voiceModel, $siteId);
 
         return $this->asJson($result);
     }
@@ -173,8 +198,11 @@ class BespokenController extends Controller
         $this->requireLogin();
         $elementId = Craft::$app->request->get('elementId');
 
+        $siteId = $this->_resolveRequestSiteId();
         $history = BespokenPlugin::getInstance()->bespokenService->getGenerationHistory(
-            $elementId ? (int)$elementId : null
+            $elementId ? (int)$elementId : null,
+            50,
+            $siteId
         );
 
         return $this->asJson([
@@ -192,9 +220,17 @@ class BespokenController extends Controller
         $this->requireLogin();
         $elementId = Craft::$app->request->get('elementId');
 
-        $element = Craft::$app->elements->getElementById($elementId);
+        $siteId = $this->_resolveRequestSiteId();
+        $element = Craft::$app->elements->getElementById($elementId, null, $siteId);
 
-
+        // Fallback: try all sites if site-scoped lookup fails
+        if (!$element) {
+            $element = \craft\elements\Entry::find()
+                ->id($elementId)
+                ->siteId('*')
+                ->status(null)
+                ->one();
+        }
 
         if (!$element) {
             return $this->asJson([
@@ -305,6 +341,23 @@ class BespokenController extends Controller
         }
 
         return parent::beforeAction($action);
+    }
+
+    /**
+     * Resolve the current site ID from the request's ?site= query param,
+     * falling back to Craft's currentSite. Action URLs may not always carry
+     * the site param, so this ensures we resolve correctly for multisite.
+     */
+    private function _resolveRequestSiteId(): int
+    {
+        $siteHandle = Craft::$app->request->getQueryParam('site');
+        if ($siteHandle) {
+            $site = Craft::$app->sites->getSiteByHandle($siteHandle);
+            if ($site) {
+                return $site->id;
+            }
+        }
+        return Craft::$app->sites->currentSite->id;
     }
 
     /**

@@ -2,7 +2,9 @@
 
 _Bespoken_ uses the ElevenLabs API to bring customizable, high-quality narration to Craft CMS. With the click of a button in the control panel, your content becomes accessible to a broader audience.
 
-Bespoken stores audio files as Craft Assets. Create them once and use the audio files anywhere. Embed your audio files in your site, use them in your podcast, share them on social media, etc.
+Bespoken handles long-form content automatically — text is chunked at natural paragraph and sentence boundaries, generated in segments, and stitched into a single seamless MP3. ElevenLabs request stitching keeps voice and prosody consistent across chunk boundaries.
+
+Audio files are stored as Craft Assets. Create them once and use them anywhere — embed them on your site, use them in your podcast, or share them on social media.
 
 For complete documentation, see the [Bespoken Documentation](DOCUMENTATION.md) in this repo.
 
@@ -10,15 +12,18 @@ The [Bespoken Web Component](https://www.npmjs.com/package/bespoken-audio-player
 
 ## Highlights
 
-* Users can create audio narration of posts with a single click.
+* Generate audio narration of your content with a single click.
+* Automatically chunks and stitches long-form content into a single seamless MP3.
+* Real-time progress tracking with chunk-by-chunk updates during generation.
+* ElevenLabs credit balance and model-aware cost estimates displayed in the field before you generate.
+* Generation history for each entry to review past jobs and outputs.
+* Full multisite support for audio generation, previews, and history.
 * Customize the Bespoken field type to choose which fields to narrate.
-* Bespoken supports CKEditor fields or Plain Text fields.
-* Bespoken supports Matrix fields that contain CKEditor or Plain Text fields.
+* Supports CKEditor fields, Redactor fields, Plain Text fields, and Matrix fields containing them.
 * Support for 32 languages.
-* Use any of ElevenLab's professional voice models.
+* Use any of ElevenLabs' professional voice models.
 * Use Voice Cloning to create custom voice models for your Craft site. See the [ElevenLabs Voice Cloning page](https://elevenlabs.io/voice-cloning) for more information.
-* Bespoken lets you create custom pronunciation rule sets for unique words used in your site to ensure difficult words are pronounced correctly.
-* Pronunciation rule sets support multiple languages.
+* Create custom pronunciation rule sets to ensure unique words are pronounced correctly, with support for multiple languages.
 
 ## Requirements
 

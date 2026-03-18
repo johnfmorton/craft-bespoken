@@ -1,5 +1,15 @@
 # Release Notes for Bespoken
 
+## 5.3.1 - 2026-03-18
+
+### Fixed
+
+- Fixed paragraph breaks not displaying in the Preview Script modal. The `\n\n` boundaries were present in the text but collapsed by the browser due to missing `white-space: pre-wrap` styling.
+
+### Changed
+
+- Updated documentation to recommend restricting ElevenLabs API key permissions to only the required scopes (Text to Speech: Access, User: Read).
+
 ## 5.3.0 - 2026-03-18
 
 ### Added

@@ -118,8 +118,15 @@ class BespokenController extends Controller
         $text = preg_replace('/\n{3,}/', "\n\n", $text);
         $text = preg_replace('/\n([^\n])/', "\n\n$1", $text);
 
+        // Strip angle brackets that survive pronunciation rules — ElevenLabs
+        // interprets stray "<" as SSML/XML markup, silently swallowing content.
+        $text = str_replace(['<', '>'], ' ', $text);
+
         // trim leading/trailing spaces that padding may have introduced
         $text = trim($text);
+
+        // Collapse any double-spaces introduced by the angle-bracket removal
+        $text = preg_replace('/[^\S\n]+/', ' ', $text);
 
         BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
 

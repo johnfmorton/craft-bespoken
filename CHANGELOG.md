@@ -1,5 +1,11 @@
 # Release Notes for Bespoken
 
+## 5.3.2 - 2026-03-23
+
+### Fixed
+
+- Fixed audio output silently dropping content when source text contains HTML tags (e.g., `<nav>`, `<script>`, `<h2>`). Angle brackets surviving pronunciation rules were interpreted as SSML/XML markup by ElevenLabs, causing entire sections to be swallowed.
+
 ## 5.3.1 - 2026-03-18
 
 ### Fixed

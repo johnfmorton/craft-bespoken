@@ -7,3 +7,4 @@
 /vendor
 *.psd
 /blog_posts
+composer.lock

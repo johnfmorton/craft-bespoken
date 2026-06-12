@@ -1394,11 +1394,11 @@
     return text;
   }
   function _removeFigureElements(input) {
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = input;
-    const figures = tempDiv.querySelectorAll("figure");
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(input, "text/html");
+    const figures = doc.querySelectorAll("figure");
     figures.forEach((figure) => figure.remove());
-    return tempDiv.innerHTML;
+    return doc.body.innerHTML;
   }
   function _stripTags(text) {
     text = _removeBespokenExcludeElements(text);

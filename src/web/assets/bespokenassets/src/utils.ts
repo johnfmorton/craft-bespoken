@@ -115,18 +115,19 @@ function _processCKEditorFields(text: string): string {
 * so this function will remove those as well.
 */
 function _removeFigureElements(input:string) {
-  // Create a temporary DOM element to work with
-  const tempDiv = document.createElement('div');
-
-  // Set the innerHTML of the div to the input string
-  tempDiv.innerHTML = input;
+  // Parse the input with DOMParser instead of assigning to innerHTML.
+  // A DOMParser document has no browsing context, so scripts never execute
+  // and resource-loading handlers (e.g. <img onerror>) never fire — unlike
+  // setting innerHTML on a detached element, which begins loading resources.
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(input, 'text/html');
 
   // Find all <figure> elements and remove them
-  const figures = tempDiv.querySelectorAll('figure');
+  const figures = doc.querySelectorAll('figure');
   figures.forEach(figure => figure.remove());
 
-  // Return the remaining text content of the div
-  return tempDiv.innerHTML;
+  // Return the remaining HTML of the parsed body
+  return doc.body.innerHTML;
 }
 
 function _stripTags(text: string) {

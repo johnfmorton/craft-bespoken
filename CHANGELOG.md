@@ -1,5 +1,11 @@
 # Release Notes for Bespoken
 
+## 5.3.4 - 2026-06-12
+
+### Security
+
+- Hardened CKEditor field text processing against a potential cross-site scripting (XSS) vector flagged by CodeQL (`js/xss-through-dom`). `_removeFigureElements` now parses field HTML with `DOMParser.parseFromString`, which produces an inert document with no browsing context, instead of assigning untrusted HTML to a detached element's `innerHTML` (which could begin resource loading and fire handlers such as `<img onerror>`). The risk was limited to authenticated control-panel authors, but the safer inert-parsing pattern is now used consistently throughout the text pipeline.
+
 ## 5.3.3 - 2026-06-09
 
 ### Changed

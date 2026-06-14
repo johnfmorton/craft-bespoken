@@ -11,7 +11,7 @@
   "author": "John F Morton",
   "license": "ISC",
   "dependencies": {
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "progress-component": "github:johnfmorton/progress-component"
   }
 }

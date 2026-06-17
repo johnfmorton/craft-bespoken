@@ -143,10 +143,9 @@ class Settings extends Model
             ['apiBaseUrl', 'string'],
             ['apiBaseUrl', 'default', 'value' => ''],
             // The endpoint URL is only meaningful — and required — when pointing
-            // at a self-hosted Bespoken TTS service.
-            ['apiBaseUrl', 'required', 'when' => function($model): bool {
-                return $model->apiProvider === self::PROVIDER_BESPOKEN;
-            }],
+            // at a self-hosted Bespoken TTS service. skipOnEmpty must be false so
+            // the rule still fires when the field is left blank.
+            ['apiBaseUrl', 'validateApiBaseUrlForProvider', 'skipOnEmpty' => false],
             ['voices', BespokenVoicesValidator::class],
             ['pronunciations', BespokenPronuciationValidator::class],
             ['voiceModel', 'string'],
@@ -166,6 +165,18 @@ class Settings extends Model
             ['fileNamePrefix', 'string'],
             ['fileNamePrefix', 'default', 'value' => ''],
         ];
+    }
+
+    /**
+     * Require a base URL when the Bespoken TTS service provider is selected.
+     * A raw value — including an environment-variable reference such as
+     * `$BESPOKEN_TTS_URL` — counts as provided.
+     */
+    public function validateApiBaseUrlForProvider(string $attribute): void
+    {
+        if ($this->apiProvider === self::PROVIDER_BESPOKEN && trim((string) $this->$attribute) === '') {
+            $this->addError($attribute, \Craft::t('bespoken', 'Enter the base URL of your Bespoken TTS service.'));
+        }
     }
 
     /**

@@ -93,7 +93,8 @@
     name: 'apiBaseUrl',
     first: false,
     placeholder: 'https://tts.example.com',
-    value: settings['apiBaseUrl']})
+    value: settings['apiBaseUrl'],
+    errors: settings.getErrors('apiBaseUrl')})
 }}
 {% endif %}
 <hr>

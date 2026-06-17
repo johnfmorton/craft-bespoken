@@ -77,6 +77,7 @@ return [
 <p>Bespoken is set to use your self-hosted, ElevenLabs-compatible <a href="https://github.com/johnfmorton/bespoken-tts-service" target="_blank">Bespoken TTS service</a>. Enter the service&rsquo;s base URL and an API key generated in its control panel on the <i>API keys</i> page.</p>',
     'Bespoken service API key' => 'API key',
     'Bespoken service API Key instructions' => 'Generate this in your Bespoken TTS service control panel on the <i>API keys</i> page. Can be an environment variable.',
+    'Enter the base URL of your Bespoken TTS service.' => 'Enter the base URL of your Bespoken TTS service.',
 
     // Bespoken TTS service mode — voice configuration (no ElevenLabs voice models)
     'Voice configuration instructions (bespoken)' => '<p>Define the voices available in Bespoken. Each <b>Voice ID</b> must match a voice configured in your Bespoken TTS service (see its <i>Voices</i> page). The <b>Voice name</b> can be anything you like &mdash; it identifies the voice for your editors.</p>

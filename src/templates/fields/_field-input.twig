@@ -79,7 +79,12 @@
                 value:  voiceModeltoVoiceIdForField ?? ''|json_encode,
             }) }}
 
-			<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info', siteActionParams) }}"></div>
+			{# Credit balance + usage estimate are ElevenLabs concepts (credits, model
+			   multipliers). They don't apply to a self-hosted Bespoken TTS service, so
+			   omit the element entirely; the JS that fills it null-checks and no-ops. #}
+			{% if not bespokenSettings.usesCustomEndpoint() %}
+				<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info', siteActionParams) }}"></div>
+			{% endif %}
 
 			<div class=" group flex flex-row">
 

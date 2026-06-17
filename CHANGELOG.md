@@ -6,6 +6,7 @@
 
 - Added a **TTS provider** setting so Bespoken can talk to either ElevenLabs or your own self-hosted, ElevenLabs-compatible [bespoken-tts-service](https://github.com/johnfmorton/bespoken-tts-service). Choose **ElevenLabs** (the default, unchanged behavior) or **Bespoken TTS service** and enter its base URL (e.g. `https://tts.example.com`). The endpoint URL supports environment variables.
 - The settings screen now tailors itself to the selected provider, reorganizing as soon as you pick one. In Bespoken TTS service mode it shows only the options that apply — hiding the ElevenLabs-specific Voice model, Similarity boost, Use speaker boost, and character-usage display, and updating the account and voice guidance to point at your service's control panel.
+- In Bespoken TTS service mode, the ElevenLabs credit/usage estimate (e.g. "~175 credits · Eleven v3") shown on a Bespoken field is hidden, since credits and model multipliers don't apply to a self-hosted service.
 
 ## 5.3.4 - 2026-06-12
 

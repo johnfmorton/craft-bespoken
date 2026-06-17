@@ -64,5 +64,25 @@ return [
 	<a href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a>
 </p>',
     'API endpoint URL' => 'API endpoint URL',
-    'API endpoint URL instructions' => 'Leave blank to use ElevenLabs (<code>https://api.elevenlabs.io</code>). To use a self-hosted, ElevenLabs-compatible service such as <a href="https://github.com/johnfmorton/bespoken-tts-service" target="_blank">bespoken-tts-service</a>, enter its base URL, e.g. <code>https://tts.example.com</code>. Can be an environment variable.',
+    'API endpoint URL instructions' => 'The base URL of your Bespoken TTS service, e.g. <code>https://tts.example.com</code>. Can be an environment variable.',
+
+    // Provider toggle
+    'TTS provider' => 'TTS provider',
+    'TTS provider instructions' => 'Choose where Bespoken sends text to generate audio. <b>ElevenLabs</b> uses the hosted ElevenLabs API. <b>Bespoken TTS service</b> targets your own self-hosted, ElevenLabs-compatible <a href="https://github.com/johnfmorton/bespoken-tts-service" target="_blank">service</a>. The options below update to match your selection; click Save to apply it.',
+    'ElevenLabs' => 'ElevenLabs',
+    'Bespoken TTS service (self-hosted)' => 'Bespoken TTS service (self-hosted)',
+
+    // Bespoken TTS service mode — account details
+    'Bespoken service account details instructions' => '<h2 class="first">Bespoken TTS service</h2>
+<p>Bespoken is set to use your self-hosted, ElevenLabs-compatible <a href="https://github.com/johnfmorton/bespoken-tts-service" target="_blank">Bespoken TTS service</a>. Enter the service&rsquo;s base URL and an API key generated in its control panel on the <i>API keys</i> page.</p>',
+    'Bespoken service API key' => 'API key',
+    'Bespoken service API Key instructions' => 'Generate this in your Bespoken TTS service control panel on the <i>API keys</i> page. Can be an environment variable.',
+
+    // Bespoken TTS service mode — voice configuration (no ElevenLabs voice models)
+    'Voice configuration instructions (bespoken)' => '<p>Define the voices available in Bespoken. Each <b>Voice ID</b> must match a voice configured in your Bespoken TTS service (see its <i>Voices</i> page). The <b>Voice name</b> can be anything you like &mdash; it identifies the voice for your editors.</p>
+<p>You can define a <b>Pronunciation rule set</b> for each voice to customize how words are pronounced on a per-voice or per-language basis.</p>',
+
+    // Bespoken TTS service mode — advanced settings (only stability + style apply)
+    'Advanced settings instructions (bespoken)' => '<h2>Advanced settings</h2>
+<p>Your Bespoken TTS service maps <b>Stability</b> and <b>Style</b> onto its own voice-generation controls. The remaining ElevenLabs voice settings do not apply and are hidden.</p>',
 ];

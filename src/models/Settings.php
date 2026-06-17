@@ -15,12 +15,21 @@ class Settings extends Model
 {
     public const DEFAULT_API_BASE_URL = 'https://api.elevenlabs.io';
 
+    public const PROVIDER_ELEVENLABS = 'elevenlabs';
+    public const PROVIDER_BESPOKEN = 'bespoken';
+
+    /**
+     * Which TTS backend to use: ElevenLabs (hosted) or a self-hosted,
+     * ElevenLabs-compatible Bespoken TTS service. Drives both which settings the
+     * control panel shows and which API the plugin calls.
+     */
+    public string $apiProvider = self::PROVIDER_ELEVENLABS;
+
     public string $elevenlabsApiKey = '';
 
     /**
-     * Base URL of the ElevenLabs-compatible API. Leave blank to use ElevenLabs;
-     * point it at a self-hosted, ElevenLabs-compatible service (e.g.
-     * bespoken-tts-service) by entering its origin, like https://tts.example.com.
+     * Base URL of the self-hosted, ElevenLabs-compatible Bespoken TTS service
+     * (e.g. https://tts.example.com). Only used when apiProvider is "bespoken".
      * Supports environment variables.
      */
     public string $apiBaseUrl = '';
@@ -127,10 +136,17 @@ class Settings extends Model
     public function rules(): array
     {
         return [
+            ['apiProvider', 'in', 'range' => [self::PROVIDER_ELEVENLABS, self::PROVIDER_BESPOKEN]],
+            ['apiProvider', 'default', 'value' => self::PROVIDER_ELEVENLABS],
             ['elevenlabsApiKey', 'string'],
             ['elevenlabsApiKey', 'default', 'value' => ''],
             ['apiBaseUrl', 'string'],
             ['apiBaseUrl', 'default', 'value' => ''],
+            // The endpoint URL is only meaningful — and required — when pointing
+            // at a self-hosted Bespoken TTS service.
+            ['apiBaseUrl', 'required', 'when' => function($model): bool {
+                return $model->apiProvider === self::PROVIDER_BESPOKEN;
+            }],
             ['voices', BespokenVoicesValidator::class],
             ['pronunciations', BespokenPronuciationValidator::class],
             ['voiceModel', 'string'],
@@ -153,16 +169,21 @@ class Settings extends Model
     }
 
     /**
-     * The configured API origin (no trailing slash, no /v1/... path), defaulting
-     * to ElevenLabs. Tolerates a full text-to-speech path being pasted in, and
-     * resolves environment variables.
+     * The configured API origin (no trailing slash, no /v1/... path). Returns
+     * ElevenLabs unless the Bespoken TTS service provider is selected, in which
+     * case it resolves the configured base URL (env vars supported), tolerating a
+     * full text-to-speech path being pasted in.
      */
     public function getApiBaseUrl(): string
     {
+        if (!$this->usesCustomEndpoint()) {
+            return self::DEFAULT_API_BASE_URL;
+        }
+
         $base = trim((string) App::parseEnv($this->apiBaseUrl));
 
         if ($base === '') {
-            $base = self::DEFAULT_API_BASE_URL;
+            return self::DEFAULT_API_BASE_URL;
         }
 
         $base = rtrim($base, '/');
@@ -183,6 +204,6 @@ class Settings extends Model
 
     public function usesCustomEndpoint(): bool
     {
-        return $this->getApiBaseUrl() !== self::DEFAULT_API_BASE_URL;
+        return $this->apiProvider === self::PROVIDER_BESPOKEN;
     }
 }

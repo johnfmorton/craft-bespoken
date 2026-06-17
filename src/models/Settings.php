@@ -3,6 +3,7 @@
 namespace johnfmorton\bespoken\models;
 
 use craft\base\Model;
+use craft\helpers\App;
 use johnfmorton\bespoken\validators\BespokenPronuciationValidator;
 use johnfmorton\bespoken\validators\BespokenSettingZeroToOneValidator;
 use johnfmorton\bespoken\validators\BespokenVoicesValidator;
@@ -12,43 +13,54 @@ use johnfmorton\bespoken\validators\BespokenVoicesValidator;
  */
 class Settings extends Model
 {
+    public const DEFAULT_API_BASE_URL = 'https://api.elevenlabs.io';
+
     public string $elevenlabsApiKey = '';
+
+    /**
+     * Base URL of the ElevenLabs-compatible API. Leave blank to use ElevenLabs;
+     * point it at a self-hosted, ElevenLabs-compatible service (e.g.
+     * bespoken-tts-service) by entering its origin, like https://tts.example.com.
+     * Supports environment variables.
+     */
+    public string $apiBaseUrl = '';
+
     public mixed $model_id = null;
     public string $voice = '';
     public array $voices = [
         [
             'voice' => "Brian (Default)",
-            'voiceId' => "nPczCjzI2devNBz1zQrb"
-        ]
+            'voiceId' => "nPczCjzI2devNBz1zQrb",
+        ],
     ];
 
     public array $pronunciations = [
         [
             'word' => 'DDEV',
-            'pronunciation' => 'deedev'
+            'pronunciation' => 'deedev',
         ],
         [
             'word' => 'colonel',
-            'pronunciation' => 'kernel'
+            'pronunciation' => 'kernel',
         ],
         [
             'word' => 'bologna',
-            'pronunciation' => 'baloney'
-        ]
+            'pronunciation' => 'baloney',
+        ],
     ];
 
-     /**
-     * @var float | int The stability slider determines how stable the voice is and
-     * the randomness between each generation. Lowering this slider introduces
-     * a broader emotional range for the voice. As mentioned before, this is
-     * also influenced heavily by the original voice. Setting the slider too
-     * low may result in odd performances that are overly random and cause
-     * the character to speak too quickly. On the other hand, setting it too
-     * high can lead to a monotonous voice with limited emotion.
-     *
-     * ElevenLabs suggested default setting is 0.50. The range is 0-1.
-     * https://elevenlabs.io/docs/speech-synthesis/voice-settings#stability
-     */
+    /**
+    * @var float | int The stability slider determines how stable the voice is and
+    * the randomness between each generation. Lowering this slider introduces
+    * a broader emotional range for the voice. As mentioned before, this is
+    * also influenced heavily by the original voice. Setting the slider too
+    * low may result in odd performances that are overly random and cause
+    * the character to speak too quickly. On the other hand, setting it too
+    * high can lead to a monotonous voice with limited emotion.
+    *
+    * ElevenLabs suggested default setting is 0.50. The range is 0-1.
+    * https://elevenlabs.io/docs/speech-synthesis/voice-settings#stability
+    */
     public float|int $stability = 0.5;
 
     /**
@@ -96,7 +108,7 @@ class Settings extends Model
      *
      * https://elevenlabs.io/docs/overview/models
      */
-   public string $voiceModel = 'eleven_v3';
+    public string $voiceModel = 'eleven_v3';
 
     /**
      * Asset Volume Handle
@@ -117,6 +129,8 @@ class Settings extends Model
         return [
             ['elevenlabsApiKey', 'string'],
             ['elevenlabsApiKey', 'default', 'value' => ''],
+            ['apiBaseUrl', 'string'],
+            ['apiBaseUrl', 'default', 'value' => ''],
             ['voices', BespokenVoicesValidator::class],
             ['pronunciations', BespokenPronuciationValidator::class],
             ['voiceModel', 'string'],
@@ -136,5 +150,39 @@ class Settings extends Model
             ['fileNamePrefix', 'string'],
             ['fileNamePrefix', 'default', 'value' => ''],
         ];
+    }
+
+    /**
+     * The configured API origin (no trailing slash, no /v1/... path), defaulting
+     * to ElevenLabs. Tolerates a full text-to-speech path being pasted in, and
+     * resolves environment variables.
+     */
+    public function getApiBaseUrl(): string
+    {
+        $base = trim((string) App::parseEnv($this->apiBaseUrl));
+
+        if ($base === '') {
+            $base = self::DEFAULT_API_BASE_URL;
+        }
+
+        $base = rtrim($base, '/');
+        $base = preg_replace('#/v1/text-to-speech/?$#', '', $base);
+
+        return $base;
+    }
+
+    public function getTextToSpeechUrl(string $voiceId): string
+    {
+        return $this->getApiBaseUrl() . '/v1/text-to-speech/' . $voiceId;
+    }
+
+    public function getSubscriptionUrl(): string
+    {
+        return $this->getApiBaseUrl() . '/v1/user/subscription';
+    }
+
+    public function usesCustomEndpoint(): bool
+    {
+        return $this->getApiBaseUrl() !== self::DEFAULT_API_BASE_URL;
     }
 }

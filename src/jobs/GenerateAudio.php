@@ -41,8 +41,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     ];
 
 
-    protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
-
     public string $bespokenJobId;
     public int $cacheExpire = 1800; // 30 minutes
 
@@ -69,7 +67,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         // Log that the job has started
         Bespoken::info('Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
         try {
-
             $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to running. Line  ' . __LINE__ . ' in ' . __FILE__);
 
@@ -84,7 +81,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
             // Call the Eleven Labs API
             $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel);
-
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());
@@ -97,7 +93,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
      */
     protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId): void
     {
-
         $this->setBespokeProgress($queue, $bespokenJobId, 0.25, 'Downloading a test file with CURL');
 
         // add a pause to simulate a long-running process
@@ -108,7 +103,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $publicUrlFromCraft = $site ? $site->baseUrl : Craft::$app->sites->currentSite->baseUrl;
 
         // download a test file with CURL - this must be a publicly accessible file on the same URL as the site for testing
-        $url = $publicUrlFromCraft. 'test.mp3';
+        $url = $publicUrlFromCraft . 'test.mp3';
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
         $tempFilePath = $tempDir . '/test' . $timestamp . '.mp3';
@@ -198,7 +193,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         string $voiceModel,
         ?string $previousText = null,
         ?string $nextText = null,
-        array $previousRequestIds = []
+        array $previousRequestIds = [],
     ): array {
         // Dev debug mode: return test.mp3 audio instead of calling the API
         if (getenv('BESPOKEN_DEV_DEBUG') === 'true') {
@@ -215,6 +210,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             ];
         }
 
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
 
         $api_key = App::parseEnv($settings->elevenlabsApiKey);
@@ -225,7 +221,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         $headers = [
             "Content-Type: application/json",
-            "xi-api-key: $api_key"
+            "xi-api-key: $api_key",
         ];
 
         $requestBody = [
@@ -236,8 +232,8 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                 'stability' => $stability,
                 'similarity_boost' => $similarity_boost,
                 'style' => $style,
-                'use_speaker_boost' => $use_speaker_boost
-            ]
+                'use_speaker_boost' => $use_speaker_boost,
+            ],
         ];
 
         if ($previousText !== null) {
@@ -254,7 +250,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => $this->url . $voiceId,
+            CURLOPT_URL => $settings->getTextToSpeechUrl($voiceId),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => true,
             CURLOPT_ENCODING => "",
@@ -461,7 +457,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         // Create a new asset
         $this->setBespokeProgress($queue, $bespokenJobId, 0.78, 'Preparing Craft asset from the audio file');
-sleep($this->sleepValue * 1);
+        sleep($this->sleepValue * 1);
         // prepare the asset
         $asset = new Asset();
         $asset->tempFilePath = $tempFilePath;
@@ -473,11 +469,11 @@ sleep($this->sleepValue * 1);
         $asset->setScenario(Asset::SCENARIO_CREATE);
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.79, 'Created the asset object');
-sleep($this->sleepValue * 1);
+        sleep($this->sleepValue * 1);
         $asset->validate();
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.8, 'Validated the asset object');
-sleep($this->sleepValue * 1);
+        sleep($this->sleepValue * 1);
         // Save the audio file to the volume
         try {
             Craft::$app->getElements()->saveElement(
@@ -492,8 +488,7 @@ sleep($this->sleepValue * 1);
                 'assetId' => $asset->id,
             ]);
 
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: '. $entryTitle . ' (audio) - ' . $filename, 1, AudioGenerationRecord::STATUS_COMPLETED);
-
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: ' . $entryTitle . ' (audio) - ' . $filename, 1, AudioGenerationRecord::STATUS_COMPLETED);
         } catch (\Throwable $e) {
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());

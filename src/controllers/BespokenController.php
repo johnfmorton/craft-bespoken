@@ -22,11 +22,10 @@ class BespokenController extends Controller
      */
     public function actionIndex(): Response
     {
-
         $message = 'You are using the Bespoken plugin action method. Showing you this text is all it does.';
         $data = [
             'success' => true,
-            'message' => $message
+            'message' => $message,
         ];
         return $this->asJson(
             $data
@@ -242,14 +241,14 @@ class BespokenController extends Controller
         if (!$element) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Element not found'
+                'message' => 'Element not found',
             ]);
         }
 
         return $this->asJson([
 
             'success' => true,
-            'element' => $element
+            'element' => $element,
         ]);
     }
 
@@ -260,6 +259,7 @@ class BespokenController extends Controller
     {
         $this->requireLogin();
 
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = BespokenPlugin::getInstance()->getSettings();
         $apiKey = App::parseEnv($settings->elevenlabsApiKey);
 
@@ -270,9 +270,18 @@ class BespokenController extends Controller
             ]);
         }
 
+        // Character usage is an ElevenLabs-specific endpoint; skip it for
+        // self-hosted / compatible endpoints that don't implement it.
+        if ($settings->usesCustomEndpoint()) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Character usage is only available with the ElevenLabs endpoint.',
+            ]);
+        }
+
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.elevenlabs.io/v1/user/subscription',
+            CURLOPT_URL => $settings->getSubscriptionUrl(),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
             CURLOPT_HTTPHEADER => [
@@ -400,5 +409,4 @@ class BespokenController extends Controller
 
         return $cleanText;
     }
-
 }

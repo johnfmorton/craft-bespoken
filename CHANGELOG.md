@@ -1,5 +1,11 @@
 # Release Notes for Bespoken
 
+## 5.4.0 - Unreleased
+
+### Added
+
+- Added an **API endpoint URL** setting so Bespoken can talk to any ElevenLabs-compatible text-to-speech service — for example the self-hosted [bespoken-tts-service](https://github.com/johnfmorton/bespoken-tts-service) — instead of ElevenLabs. Leave it blank to use ElevenLabs exactly as before, or set it to a service's base URL (e.g. `https://tts.example.com`) to point there. Supports environment variables. The ElevenLabs character-usage display is automatically hidden when a custom endpoint is in use.
+
 ## 5.3.4 - 2026-06-12
 
 ### Security

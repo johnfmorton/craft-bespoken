@@ -26,6 +26,16 @@
     first: false,
     value: settings['elevenlabsApiKey']})
 }}
+{{  forms.autosuggestField({
+    label: 'API endpoint URL' | t('bespoken'),
+    instructions: 'API endpoint URL instructions' | t('bespoken'),
+    id: 'apiBaseUrl',
+    suggestEnvVars: true,
+    name: 'apiBaseUrl',
+    first: false,
+    placeholder: 'https://api.elevenlabs.io',
+    value: settings['apiBaseUrl']})
+}}
 <hr>
 	<h2>
 Voice configuration

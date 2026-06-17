@@ -63,4 +63,6 @@ return [
 <p>All values below should be left at the defaults under most circumstances. For more information, read the
 	<a href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a>
 </p>',
+    'API endpoint URL' => 'API endpoint URL',
+    'API endpoint URL instructions' => 'Leave blank to use ElevenLabs (<code>https://api.elevenlabs.io</code>). To use a self-hosted, ElevenLabs-compatible service such as <a href="https://github.com/johnfmorton/bespoken-tts-service" target="_blank">bespoken-tts-service</a>, enter its base URL, e.g. <code>https://tts.example.com</code>. Can be an environment variable.',
 ];

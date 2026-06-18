@@ -121,6 +121,29 @@ class BespokenController extends Controller
         // interprets stray "<" as SSML/XML markup, silently swallowing content.
         $text = str_replace(['<', '>'], ' ', $text);
 
+        // Strip emoji and pictographic symbols. The TTS engines choke on them —
+        // a stray emoji (e.g. "🍻") can corrupt the generated audio — so remove
+        // them entirely before queueing. Covers the standard emoji Unicode blocks
+        // plus the modifiers (variation selectors, ZWJ, skin tones, keycaps,
+        // regional-indicator flags) that combine into compound emoji.
+        $text = preg_replace(
+            '/['
+            . '\x{1F300}-\x{1FAFF}'  // Misc/Supplemental Symbols & Pictographs, Emoticons, Transport, Extended-A
+            . '\x{1F000}-\x{1F0FF}'  // Mahjong, Dominoes, Playing Cards
+            . '\x{1F100}-\x{1F2FF}'  // Enclosed Alphanumeric & Ideographic Supplement
+            . '\x{2600}-\x{27BF}'    // Misc Symbols & Dingbats
+            . '\x{2B00}-\x{2BFF}'    // Misc Symbols & Arrows
+            . '\x{2300}-\x{23FF}'    // Misc Technical (⏰, ⌚, ▶, etc.)
+            . '\x{2190}-\x{21FF}'    // Arrows
+            . '\x{FE00}-\x{FE0F}'    // Variation Selectors
+            . '\x{1F1E6}-\x{1F1FF}'  // Regional Indicator Symbols (flags)
+            . '\x{200D}'             // Zero Width Joiner
+            . '\x{20E3}'             // Combining Enclosing Keycap
+            . ']/u',
+            '',
+            $text
+        );
+
         // trim leading/trailing spaces that padding may have introduced
         $text = trim($text);
 

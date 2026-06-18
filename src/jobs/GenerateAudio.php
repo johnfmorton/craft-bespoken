@@ -309,9 +309,22 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     {
         Bespoken::info('Voice model in elevenLabsApiCall: ' . $voiceModel);
 
-        // Split text into chunks
-        $targetSize = TextChunker::getTargetSize($voiceModel);
-        $chunks = TextChunker::splitText($text, $targetSize);
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
+        $settings = Bespoken::getInstance()->getSettings();
+
+        // Split text into chunks. A custom (Bespoken TTS service) endpoint does
+        // its own sentence-aware chunking and crossfade, so re-chunking here is
+        // redundant and only adds un-crossfaded seams — send the whole text in a
+        // single request and let the service own chunking. ElevenLabs still needs
+        // client-side chunking for its per-model character limits.
+        if ($settings->usesCustomEndpoint()) {
+            $targetSize = mb_strlen($text);
+            $chunks = [trim($text)];
+            Bespoken::info('Custom endpoint: sending whole text (' . $targetSize . ' chars) in one request; the service handles chunking.');
+        } else {
+            $targetSize = TextChunker::getTargetSize($voiceModel);
+            $chunks = TextChunker::splitText($text, $targetSize);
+        }
         $totalChunks = count($chunks);
 
         Bespoken::info('Text split into ' . $totalChunks . ' chunk(s) (target size: ' . $targetSize . ' chars)');
@@ -508,6 +521,15 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
      */
     public function getTtr(): int
     {
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
+        $settings = Bespoken::getInstance()->getSettings();
+
+        // Custom endpoint = one request that the service chunks internally; it can
+        // run up to the 300s cURL ceiling, so budget that plus asset-save overhead.
+        if ($settings->usesCustomEndpoint()) {
+            return 120 + 300;
+        }
+
         $text = $this->text ?? '';
         $voiceModel = $this->voiceModel ?? '';
 

@@ -8,6 +8,7 @@
 - The settings screen now tailors itself to the selected provider, reorganizing as soon as you pick one. In Bespoken TTS service mode it shows only the options that apply — hiding the ElevenLabs-specific Voice model, Similarity boost, Use speaker boost, and character-usage display, and updating the account and voice guidance to point at your service's control panel.
 - In Bespoken TTS service mode, the ElevenLabs credit/usage estimate (e.g. "~175 credits · Eleven v3") shown on a Bespoken field is hidden, since credits and model multipliers don't apply to a self-hosted service.
 - The **API endpoint URL** is now required when the Bespoken TTS service provider is selected — saving without one shows an inline error instead of silently falling back to ElevenLabs. An environment-variable reference (e.g. `$BESPOKEN_TTS_URL`) counts as provided.
+- In Bespoken TTS service mode, the plugin now sends the **whole article in a single request** instead of chunking it client-side first. The Bespoken TTS service already does its own sentence-aware chunking and crossfades the seams, so the previous double-chunking only added un-crossfaded joins — sending the whole text yields smoother audio. ElevenLabs mode is unchanged (it still chunks client-side for the per-model character limits). Note: because this is one synchronous request bounded by a ~5-minute timeout, very long articles are best generated once the service's async path lands.
 
 ## 5.3.4 - 2026-06-12
 

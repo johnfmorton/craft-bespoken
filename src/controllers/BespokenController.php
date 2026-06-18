@@ -112,10 +112,14 @@ class BespokenController extends Controller
         // remove any   characters
         $text = str_replace(' ', ' ', $text);
 
-        // Collapse horizontal whitespace (spaces, tabs, nbsp) but preserve paragraph markers (\n\n)
-        $text = preg_replace('/[^\S\n]+/', ' ', $text);
-        $text = preg_replace('/\n{3,}/', "\n\n", $text);
-        $text = preg_replace('/\n([^\n])/', "\n\n$1", $text);
+        // Collapse every run of whitespace — spaces, tabs, and the paragraph
+        // newlines added upstream — down to a single space. Each block already
+        // had a sentence-ending period appended client-side, so that marks the
+        // boundary for the TTS; we don't need blank lines between paragraphs,
+        // and a stray "\n\n" sent to a self-hosted (Chatterbox) endpoint can
+        // surface as an audible gap. Long text is still chunked on sentence
+        // boundaries by TextChunker.
+        $text = preg_replace('/\s+/', ' ', $text);
 
         // Strip angle brackets that survive pronunciation rules — ElevenLabs
         // interprets stray "<" as SSML/XML markup, silently swallowing content.
@@ -149,6 +153,32 @@ class BespokenController extends Controller
 
         // Collapse any double-spaces introduced by the angle-bracket removal
         $text = preg_replace('/[^\S\n]+/', ' ', $text);
+
+        // Drop spaces left *before* punctuation. Pronunciation replacements pad
+        // their output with surrounding spaces (' ' . $replacement . ' ') and
+        // tag/emoji stripping leaves gaps, so a replaced word at the end of a
+        // sentence yields "see kay editor ." — strip the space so the mark
+        // attaches to the word. The (?=\s|$) guard limits this to punctuation
+        // that actually ends a token, leaving dot-prefixed words (".NET",
+        // ".gitignore") untouched.
+        $text = preg_replace('/ +([.,;:!?])(?=\s|$)/', '$1', $text);
+
+        // Collapse accidental double punctuation. The client-side text prep
+        // appends a sentence-ending ". " to any block/line that doesn't already
+        // end in ".!?". When a block ends in a "soft" mark (":", ";", ",") — or
+        // in "!"/"?"/"." that was hidden behind an emoji we stripped above (the
+        // strip leaves the period and the space the emoji occupied, e.g.
+        // "Redactor. 🍻." -> "Redactor. .") — that produces doubles like
+        // "videos:." or "Wow!." which some TTS engines (e.g. Chatterbox) render
+        // as a gap with audio artifacts. The appended period is always followed
+        // by whitespace or end-of-text, so the (?=\s|$) lookahead lets us target
+        // it while leaving real text alone (".NET", "3:30", "16:9", "U.S.").
+        //   soft punctuation + appended period -> single period (sentence break)
+        //   "!"/"?" + appended period          -> keep the original mark
+        //   period (+ optional gap) + appended period -> single period; ellipsis "..." preserved
+        $text = preg_replace('/[,;:]+\s*\.(?=\s|$)/', '.', $text);
+        $text = preg_replace('/([!?])\s*\.(?=\s|$)/', '$1', $text);
+        $text = preg_replace('/(?<!\.)\.\s*\.(?=\s|$)/', '.', $text);
 
         BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
 

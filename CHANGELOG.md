@@ -13,6 +13,10 @@
 
 ### Fixed
 
+- Cleaned up several text artifacts that could surface as gaps or "swishing" noises in generated audio — most noticeably with the self-hosted Bespoken TTS service (Chatterbox), which is less forgiving of odd punctuation and whitespace than ElevenLabs:
+  - **Double punctuation** is now collapsed before the text is queued. The client-side prep appends a sentence-ending period to any block that doesn't already end in `.`/`!`/`?`, which could produce `videos:.` when a paragraph ended in a colon, or `Redactor. .` when a trailing emoji was stripped after the period had been added. These now normalize to a single, correct mark, while real text (`.NET`, `3:30`, `16:9`, `U.S.`, `https://…`, and `…` ellipses) is left untouched.
+  - **Extra whitespace between paragraphs** is gone. Paragraph breaks are now flattened to a single space — each block already gets a sentence-ending period, so the boundary is preserved for the TTS without a blank-line gap (a stray `\n\n` could read as an audible pause/artifact on a self-hosted endpoint). Long articles are still chunked on sentence boundaries.
+  - **Spaces left before punctuation** by pronunciation replacements (which pad their output with surrounding spaces) are removed, so `see kay editor .` becomes `see kay editor.`.
 - Progress and error messages in the synchronous generation path now name the **active provider** instead of always saying "ElevenLabs API". In Bespoken TTS service mode a failed generation is now reported as e.g. *"Error contacting the Bespoken TTS service…"* rather than an ElevenLabs error — the request had correctly gone to the self-hosted endpoint all along, but the shared code path's hard-coded "ElevenLabs" wording made self-hosted failures (such as an invalid service API key) look like an ElevenLabs problem. The "API key is not set" pre-flight message is likewise provider-aware.
 
 ## 5.3.4 - 2026-06-12

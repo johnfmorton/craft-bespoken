@@ -1432,6 +1432,7 @@
     textArray = textArray.filter((line) => line.trim() !== "").map((line) => {
       line = line.trim();
       if (!punctuationRegex.test(line)) {
+        line = line.replace(/[,;:]+$/, "");
         line += ". ";
       }
       return line;
@@ -1474,6 +1475,7 @@
         return "";
       }
       if (!endsWithPunctuation(trimmedContent)) {
+        trimmedContent = trimmedContent.replace(/[,;:]+$/, "");
         trimmedContent += ". ";
       } else {
         trimmedContent += " ";

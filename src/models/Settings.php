@@ -208,6 +208,15 @@ class Settings extends Model
         return $this->getApiBaseUrl() . '/v1/text-to-speech/' . $voiceId;
     }
 
+    /**
+     * Async generation endpoint (Bespoken TTS service only): POST returns a job
+     * id + poll URLs so long text isn't bound by the synchronous request timeout.
+     */
+    public function getTextToSpeechJobsUrl(string $voiceId): string
+    {
+        return $this->getTextToSpeechUrl($voiceId) . '/jobs';
+    }
+
     public function getSubscriptionUrl(): string
     {
         return $this->getApiBaseUrl() . '/v1/user/subscription';

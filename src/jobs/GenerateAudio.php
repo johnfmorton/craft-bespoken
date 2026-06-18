@@ -40,6 +40,19 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         'eleven_english_sts_v1',
     ];
 
+    /**
+     * Custom-endpoint only: text longer than this (chars) is generated via the
+     * Bespoken TTS service's async job endpoint (no synchronous timeout ceiling,
+     * with live progress). Shorter text uses the synchronous send-whole path.
+     */
+    private const ASYNC_TEXT_THRESHOLD = 4000;
+
+    /** Seconds between async status polls. */
+    private const ASYNC_POLL_INTERVAL_SECONDS = 3;
+
+    /** Hard cap (seconds) on waiting for an async job before giving up. */
+    private const ASYNC_MAX_WAIT_SECONDS = 1800;
+
 
     public string $bespokenJobId;
     public int $cacheExpire = 1800; // 30 minutes
@@ -214,27 +227,13 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $settings = Bespoken::getInstance()->getSettings();
 
         $api_key = App::parseEnv($settings->elevenlabsApiKey);
-        $stability = $settings->stability;
-        $similarity_boost = $settings->similarity_boost;
-        $style = $settings->style;
-        $use_speaker_boost = $settings->use_speaker_boost;
 
         $headers = [
             "Content-Type: application/json",
             "xi-api-key: $api_key",
         ];
 
-        $requestBody = [
-            'text' => $text,
-            'voice_id' => $voiceId,
-            'model_id' => $voiceModel,
-            'voice_settings' => [
-                'stability' => $stability,
-                'similarity_boost' => $similarity_boost,
-                'style' => $style,
-                'use_speaker_boost' => $use_speaker_boost,
-            ],
-        ];
+        $requestBody = $this->buildBaseRequestBody($text, $voiceId, $voiceModel);
 
         if ($previousText !== null) {
             $requestBody['previous_text'] = $previousText;
@@ -311,6 +310,18 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
+
+        // Custom (Bespoken TTS service) endpoint: long text goes through the
+        // service's async job endpoint, which removes the ~300s synchronous
+        // timeout ceiling and streams progress while we poll. Shorter text uses
+        // the synchronous send-whole path below. If the service doesn't expose
+        // the async endpoint (older version → 404), fall back to send-whole.
+        if ($settings->usesCustomEndpoint() && mb_strlen(trim($text)) > self::ASYNC_TEXT_THRESHOLD) {
+            if ($this->generateViaAsyncEndpoint($queue, trim($text), $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel)) {
+                return;
+            }
+            Bespoken::info('Bespoken TTS service async endpoint unavailable (404); using synchronous send-whole.');
+        }
 
         // Split text into chunks. A custom (Bespoken TTS service) endpoint does
         // its own sentence-aware chunking and crossfade, so re-chunking here is
@@ -430,6 +441,222 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     }
 
     /**
+     * Build the core request body shared by the synchronous and async paths.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildBaseRequestBody(string $text, string $voiceId, string $voiceModel): array
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+
+        return [
+            'text' => $text,
+            'voice_id' => $voiceId,
+            'model_id' => $voiceModel,
+            'voice_settings' => [
+                'stability' => $settings->stability,
+                'similarity_boost' => $settings->similarity_boost,
+                'style' => $settings->style,
+                'use_speaker_boost' => $settings->use_speaker_boost,
+            ],
+        ];
+    }
+
+    /**
+     * Generate audio via the Bespoken TTS service's async endpoint: submit the
+     * whole text as one job, poll until it completes (emitting steadily-changing
+     * progress so the front-end stall timer never trips), then download the MP3.
+     *
+     * Returns true on success, false if the service has no async endpoint (404)
+     * so the caller can fall back to the synchronous path. Throws on a real
+     * generation error.
+     *
+     * @throws \JsonException
+     * @throws \RuntimeException
+     */
+    protected function generateViaAsyncEndpoint($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId, string $voiceModel): bool
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Submitting audio job to your Bespoken TTS service…');
+
+        [$status, $body] = $this->jsonRequest('POST', $settings->getTextToSpeechJobsUrl($voiceId), $this->buildBaseRequestBody($text, $voiceId, $voiceModel));
+
+        // 404 = older service without the async endpoint → signal fallback.
+        if ($status === 404) {
+            return false;
+        }
+
+        if ($status >= 400 || !is_array($body)) {
+            throw new \RuntimeException($this->asyncErrorMessage($body, $status, 'submit the audio job'));
+        }
+
+        $jobId = $body['id'] ?? null;
+        $statusUrl = $body['status_url'] ?? null;
+        $audioUrl = $body['audio_url'] ?? null;
+        $jobStatus = (string)($body['status'] ?? 'processing');
+        $latestBody = $body;
+
+        if (!is_string($statusUrl) || !is_string($audioUrl)) {
+            throw new \RuntimeException('The Bespoken TTS service returned an invalid async job response.');
+        }
+
+        Bespoken::info('Async job ' . $jobId . ' submitted to Bespoken TTS service; status=' . $jobStatus);
+
+        $start = time();
+        while (in_array($jobStatus, ['processing', 'pending'], true)) {
+            if (time() - $start > self::ASYNC_MAX_WAIT_SECONDS) {
+                throw new \RuntimeException('Timed out after ' . self::ASYNC_MAX_WAIT_SECONDS . 's waiting for the Bespoken TTS service to finish generating.');
+            }
+
+            sleep(self::ASYNC_POLL_INTERVAL_SECONDS);
+
+            [$pollStatus, $pollBody] = $this->jsonRequest('GET', $statusUrl);
+            if ($pollStatus >= 400 || !is_array($pollBody)) {
+                throw new \RuntimeException($this->asyncErrorMessage($pollBody, $pollStatus, 'check the audio job status'));
+            }
+
+            $latestBody = $pollBody;
+            $jobStatus = (string)($pollBody['status'] ?? 'processing');
+
+            // Creep progress within 0.15–0.59 so each poll reports a distinct
+            // value (the front-end times out on 3 min with no progress change).
+            $elapsed = time() - $start;
+            $progress = min(0.59, 0.15 + 0.44 * ($elapsed / self::ASYNC_MAX_WAIT_SECONDS));
+            $this->setBespokeProgress($queue, $bespokenJobId, $progress, 'Generating audio on your Bespoken TTS service… (' . $elapsed . 's elapsed)');
+        }
+
+        if ($jobStatus === 'failed') {
+            throw new \RuntimeException('Bespoken TTS service error: ' . ($latestBody['error'] ?? 'generation failed'));
+        }
+
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'Downloading the generated audio…');
+
+        $audio = $this->downloadBinary($audioUrl);
+
+        $tempDir = $this->getTempDirectory();
+        $finalPath = $tempDir . '/audio-' . time() . '.mp3';
+        file_put_contents($finalPath, $audio);
+
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.65, 'Audio file processed in temporary directory');
+        $this->saveToCraftAssets($queue, $finalPath, $filename, $entryTitle, $bespokenJobId);
+
+        return true;
+    }
+
+    /**
+     * Perform a JSON request to the TTS service. Returns [httpStatus, decodedBody]
+     * where decodedBody is null if the response wasn't JSON. Throws only on a
+     * cURL transport error.
+     *
+     * @param  array<string, mixed>|null  $body
+     * @return array{0: int, 1: array<mixed>|null}
+     *
+     * @throws \JsonException
+     * @throws \RuntimeException
+     */
+    private function jsonRequest(string $method, string $url, ?array $body = null): array
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+        $apiKey = App::parseEnv($settings->elevenlabsApiKey);
+
+        $headers = [
+            'Accept: application/json',
+            "xi-api-key: $apiKey",
+        ];
+
+        $options = [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => $method,
+        ];
+
+        if ($body !== null) {
+            $headers[] = 'Content-Type: application/json';
+            $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_THROW_ON_ERROR);
+        }
+
+        $options[CURLOPT_HTTPHEADER] = $headers;
+
+        $curl = curl_init();
+        curl_setopt_array($curl, $options);
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        $httpStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($err) {
+            throw new \RuntimeException('cURL Error: ' . $err);
+        }
+
+        $decoded = null;
+        if (is_string($response) && $response !== '') {
+            try {
+                $decoded = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                $decoded = null;
+            }
+        }
+
+        return [$httpStatus, is_array($decoded) ? $decoded : null];
+    }
+
+    /**
+     * Download binary audio from the TTS service (authenticated).
+     *
+     * @throws \RuntimeException
+     */
+    private function downloadBinary(string $url): string
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+        $apiKey = App::parseEnv($settings->elevenlabsApiKey);
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 300,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_HTTPHEADER => ["xi-api-key: $apiKey"],
+        ]);
+
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        $httpStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($err) {
+            throw new \RuntimeException('cURL Error: ' . $err);
+        }
+
+        if ($httpStatus >= 400 || !is_string($response) || $response === '') {
+            throw new \RuntimeException('Failed to download the generated audio from the Bespoken TTS service (HTTP ' . $httpStatus . ').');
+        }
+
+        return $response;
+    }
+
+    /**
+     * Extract an ElevenLabs-shaped error message from a response body.
+     *
+     * @param  array<mixed>|null  $body
+     */
+    private function asyncErrorMessage(?array $body, int $status, string $action): string
+    {
+        if (is_array($body) && isset($body['detail']['message'])) {
+            return 'Bespoken TTS service error: ' . $body['detail']['message'];
+        }
+
+        return 'Failed to ' . $action . ' on the Bespoken TTS service (HTTP ' . $status . ').';
+    }
+
+    /**
      * @throws \JsonException
      */
     private function saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId): void
@@ -524,9 +751,14 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
 
-        // Custom endpoint = one request that the service chunks internally; it can
-        // run up to the 300s cURL ceiling, so budget that plus asset-save overhead.
+        // Custom endpoint: long text uses the async job (we poll up to
+        // ASYNC_MAX_WAIT_SECONDS), shorter text is one synchronous request that
+        // the service chunks internally (up to the 300s cURL ceiling).
         if ($settings->usesCustomEndpoint()) {
+            if (mb_strlen(trim($this->text ?? '')) > self::ASYNC_TEXT_THRESHOLD) {
+                return self::ASYNC_MAX_WAIT_SECONDS + 120;
+            }
+
             return 120 + 300;
         }
 

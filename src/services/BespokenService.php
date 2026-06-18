@@ -34,10 +34,11 @@ class BespokenService extends Component
         $apiKey = $settings->elevenlabsApiKey;
         // if there is no API key, return an error
         if (!$apiKey) {
+            $providerName = $settings->usesCustomEndpoint() ? 'Bespoken TTS service' : 'ElevenLabs';
             return [
                 'success' => false,
                 'progress' => 0,
-                'message' => 'Eleven Labs API key is not set in the plugin settings.',
+                'message' => $providerName . ' API key is not set in the plugin settings.',
             ];
         }
 

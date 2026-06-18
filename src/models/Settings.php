@@ -226,4 +226,15 @@ class Settings extends Model
     {
         return $this->apiProvider === self::PROVIDER_BESPOKEN;
     }
+
+    /**
+     * Human-facing name of the active TTS backend, for progress and error
+     * messages — "Bespoken TTS service" when self-hosted, else "ElevenLabs API".
+     * The synchronous request path is shared between providers, so messages there
+     * must use this rather than hard-coding "ElevenLabs".
+     */
+    public function getProviderLabel(): string
+    {
+        return $this->usesCustomEndpoint() ? 'Bespoken TTS service' : 'ElevenLabs API';
+    }
 }

@@ -11,6 +11,10 @@
 - In Bespoken TTS service mode, the plugin now sends the **whole article in a single request** instead of chunking it client-side first. The Bespoken TTS service already does its own sentence-aware chunking and crossfades the seams, so the previous double-chunking only added un-crossfaded joins — sending the whole text yields smoother audio. ElevenLabs mode is unchanged (it still chunks client-side for the per-model character limits).
 - In Bespoken TTS service mode, **long articles are generated asynchronously**. Above ~4,000 characters the plugin submits the article to the service's async job endpoint, polls it (showing live progress in the entry editor instead of one long silent wait), and downloads the finished audio when it's ready. This removes the ~5-minute synchronous request ceiling that previously capped how long an article could be. Shorter articles still use the direct synchronous request, and the plugin automatically falls back to it if your service doesn't expose the async endpoint (older versions). Async generation requires a running queue worker on your Bespoken TTS service.
 
+### Fixed
+
+- Progress and error messages in the synchronous generation path now name the **active provider** instead of always saying "ElevenLabs API". In Bespoken TTS service mode a failed generation is now reported as e.g. *"Error contacting the Bespoken TTS service…"* rather than an ElevenLabs error — the request had correctly gone to the self-hosted endpoint all along, but the shared code path's hard-coded "ElevenLabs" wording made self-hosted failures (such as an invalid service API key) look like an ElevenLabs problem. The "API key is not set" pre-flight message is likewise provider-aware.
+
 ## 5.3.4 - 2026-06-12
 
 ### Security

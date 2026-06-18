@@ -284,15 +284,15 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         try {
             $decodedResponse = json_decode($responseBody, true, 512, JSON_THROW_ON_ERROR);
             if ($decodedResponse) {
-                Bespoken::info('Response from ElevenLabs API: ' . print_r($decodedResponse, true));
+                Bespoken::info('Response from ' . $settings->getProviderLabel() . ': ' . print_r($decodedResponse, true));
                 if (is_array($decodedResponse) && isset($decodedResponse['detail']['message'])) {
-                    throw new \RuntimeException('ElevenLabs API error: ' . $decodedResponse['detail']['message']);
+                    throw new \RuntimeException($settings->getProviderLabel() . ' error: ' . $decodedResponse['detail']['message']);
                 }
-                throw new \RuntimeException('ElevenLabs API error: ' . print_r($decodedResponse, true));
+                throw new \RuntimeException($settings->getProviderLabel() . ' error: ' . print_r($decodedResponse, true));
             }
         } catch (\JsonException $e) {
             // Not valid JSON = binary MP3 data, which is expected
-            Bespoken::info('Response from ElevenLabs API is not JSON, which is expected for an audio file');
+            Bespoken::info('Response from ' . $settings->getProviderLabel() . ' is not JSON, which is expected for an audio file');
         }
 
         return [
@@ -344,7 +344,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $debugPrefix = $isDevDebug
             ? '[DEBUG] ' . $totalChunks . ' chunk(s), target: ' . $targetSize . ' chars, text: ' . mb_strlen($text) . ' chars — '
             : '';
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, $debugPrefix . ($isDevDebug ? 'Using test.mp3 instead of API.' : 'Contacting ElevenLabs API. This may take a few minutes.'));
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, $debugPrefix . ($isDevDebug ? 'Using test.mp3 instead of API.' : 'Contacting ' . $settings->getProviderLabel() . '. This may take a few minutes.'));
 
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
@@ -395,7 +395,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                         ? "Failed on chunk {$chunkNum} of {$totalChunks}: " . $e->getMessage()
                         : $e->getMessage();
                     Bespoken::error($errorMsg);
-                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . $errorMsg, 0, AudioGenerationRecord::STATUS_FAILED, $errorMsg);
+                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ' . $settings->getProviderLabel() . '. Details: ' . $errorMsg, 0, AudioGenerationRecord::STATUS_FAILED, $errorMsg);
                     return;
                 }
 

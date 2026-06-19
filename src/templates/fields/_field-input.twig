@@ -138,6 +138,27 @@
                     }
                 }) }}
 
+				{# Self-hosted Bespoken TTS service only: create an editable project
+				   from the text instead of generating audio. ElevenLabs has no such
+				   endpoint, so the button is hidden in ElevenLabs mode. #}
+				{% if bespokenSettings.usesCustomEndpoint() %}
+					{{ forms.button({
+                    label: 'Create project button' | t('bespoken'),
+                    class: [
+                        'btn',
+                        'bespoken-button',
+                        'bespoken-create-project',
+                    ],
+                    attributes: {
+                        data: {
+                            'target-field': field.sourceField,
+                            'create-project-action-url': actionUrl('bespoken/bespoken/create-project', siteActionParams),
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams),
+                        }
+                    }
+                }) }}
+				{% endif %}
+
 				{%  if fieldSettings.showPreview %}
 					<modal-dialog class="bespoken-dialog" x-cloak>
 						<div slot="title">{{ "Preview window title" | t('bespoken') }}</div>

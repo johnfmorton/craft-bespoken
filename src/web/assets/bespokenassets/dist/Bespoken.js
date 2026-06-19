@@ -1549,6 +1549,10 @@
     historyButtons.forEach((button) => {
       button.addEventListener("click", handleHistoryButtonClick);
     });
+    const createProjectButtons = document.querySelectorAll(".bespoken-create-project");
+    createProjectButtons.forEach((button) => {
+      button.addEventListener("click", handleCreateProjectButtonClick);
+    });
     const fieldGroups = document.querySelectorAll(".bespoken-fields");
     fieldGroups.forEach((fieldGroup) => {
       const creditInfoEl = fieldGroup.querySelector(".bespoken-credit-info");
@@ -1695,6 +1699,143 @@
     } catch (error) {
       console.error("Error fetching generation history:", error);
     }
+  }
+  async function handleCreateProjectButtonClick(event) {
+    const button = event.target.closest(".bespoken-create-project");
+    if (!button) return;
+    button.classList.add("disabled");
+    const fieldGroup = event.target.closest(".bespoken-fields");
+    const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
+    const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
+    const actionUrlCreateProject = button.getAttribute("data-create-project-action-url") || "";
+    const elementId = _getInputValue('input[name="elementId"]');
+    const title = _cleanTitle(_getInputValue("#title") || elementId);
+    const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
+    const voiceId = voiceSelect ? voiceSelect.value : "";
+    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]');
+    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]');
+    let voiceModelSelected = "";
+    let pronunciationRuleSetSelected = "";
+    try {
+      voiceModelSelected = JSON.parse(voiceModelField?.value || "{}")[voiceId] || "";
+    } catch (e5) {
+    }
+    try {
+      pronunciationRuleSetSelected = JSON.parse(pronunciationRuleSetField?.value || "{}")[voiceId] || "";
+    } catch (e5) {
+    }
+    const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
+    updateProgressComponent(progressComponent, {
+      progress: 0.1,
+      success: true,
+      message: "Gathering text\u2026",
+      textColor: "rgb(89, 102, 115)"
+    });
+    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
+    if (!text || text.length === 0) {
+      button.classList.remove("disabled");
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: "No text to create a project from.",
+        textColor: "rgb(126,7,7)"
+      });
+      return;
+    }
+    updateProgressComponent(progressComponent, {
+      progress: 0.4,
+      success: true,
+      message: "Creating project on the Bespoken TTS service\u2026",
+      textColor: "rgb(89, 102, 115)"
+    });
+    try {
+      const response = await fetch(actionUrlCreateProject, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voiceId,
+          elementId,
+          voiceModel: voiceModelSelected,
+          pronunciationRuleSet: pronunciationRuleSetSelected
+        })
+      });
+      const data = await response.json();
+      if (!data || !data.success || !data.editUrl) {
+        button.classList.remove("disabled");
+        updateProgressComponent(progressComponent, {
+          progress: 0,
+          success: false,
+          message: data && data.message ? data.message : "Could not create the project.",
+          textColor: "rgb(126,7,7)"
+        });
+        return;
+      }
+      updateProgressComponent(progressComponent, {
+        progress: 1,
+        success: true,
+        message: "Project created.",
+        textColor: "rgb(34, 113, 71)"
+      });
+      button.classList.remove("disabled");
+      await showProjectCreatedModal(fieldGroup, data);
+    } catch (error) {
+      console.error("Error creating project:", error);
+      button.classList.remove("disabled");
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: "Error creating the project.",
+        textColor: "rgb(126,7,7)"
+      });
+    }
+  }
+  async function showProjectCreatedModal(parentElement, data) {
+    const content = document.createElement("div");
+    content.style.cssText = "font-size: 14px; line-height: 1.5;";
+    const intro = document.createElement("p");
+    intro.textContent = data.title ? `Created the project \u201C${data.title}\u201D.` : "Created the project.";
+    content.appendChild(intro);
+    if (typeof data.chunkCount === "number") {
+      const meta = document.createElement("p");
+      meta.style.cssText = "color: #666; font-size: 13px; margin: 4px 0;";
+      meta.textContent = `${data.chunkCount} chunk${data.chunkCount === 1 ? "" : "s"} ready to generate.`;
+      content.appendChild(meta);
+    }
+    const link = document.createElement("a");
+    link.href = data.editUrl;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.classList.add("btn", "submit");
+    link.textContent = "Open project in Bespoken TTS \u2192";
+    link.style.cssText = "display: inline-flex; align-items: center; margin-top: 8px;";
+    content.appendChild(link);
+    const note = document.createElement("p");
+    note.style.cssText = "color: #888; font-size: 12px; margin-top: 10px;";
+    note.textContent = "This is a one-time sign-in link \u2014 it opens the project once, then expires.";
+    content.appendChild(note);
+    let modal = parentElement.querySelector(".bespoken-project-dialog");
+    if (!modal) {
+      modal = document.createElement("modal-dialog");
+      modal.classList.add("bespoken-project-dialog");
+      const titleSlot = document.createElement("div");
+      titleSlot.slot = "title";
+      titleSlot.textContent = "Bespoken TTS project created";
+      modal.appendChild(titleSlot);
+      const descSlot = document.createElement("div");
+      descSlot.slot = "description";
+      descSlot.textContent = "Open the project to generate and edit its audio.";
+      modal.appendChild(descSlot);
+      const contentSlot = document.createElement("div");
+      contentSlot.slot = "content";
+      modal.appendChild(contentSlot);
+      parentElement.appendChild(modal);
+      await customElements.whenDefined("modal-dialog");
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    link.addEventListener("click", () => modal.close());
+    modal.setContent(content);
+    modal.open();
   }
   function createHistoryContent(generations) {
     const container = document.createElement("div");

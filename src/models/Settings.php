@@ -222,6 +222,16 @@ class Settings extends Model
         return $this->getApiBaseUrl() . '/v1/user/subscription';
     }
 
+    /**
+     * Create-a-project endpoint (Bespoken TTS service only): POST text + a voice
+     * and the service builds an editable project instead of generating audio,
+     * returning a single-use link into its control panel.
+     */
+    public function getProjectsUrl(): string
+    {
+        return $this->getApiBaseUrl() . '/v1/projects';
+    }
+
     public function usesCustomEndpoint(): bool
     {
         return $this->apiProvider === self::PROVIDER_BESPOKEN;

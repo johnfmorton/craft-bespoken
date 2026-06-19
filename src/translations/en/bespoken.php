@@ -44,6 +44,7 @@ return [
     'Asset volume instructions' => 'Choose the volume where the audio files will be saved.',
     'Start Audio Job' => 'Generate audio',
     'Preview Script button' => 'Preview script',
+    'Create project button' => 'Create Bespoken TTS project',
     'Bespoken field name' => 'Bespoken',
     'Prefix instructions' => 'An optional prefix to the audio filename.',
     'Source field instructions' => 'The field handle of the field that will be read aloud. To include multiple handles, separate the handles with a comma. You can include `title` to have the title of your entry have it included in your audio narration.',

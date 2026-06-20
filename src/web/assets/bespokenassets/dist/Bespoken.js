@@ -1751,7 +1751,13 @@
     try {
       const response = await fetch(actionUrlCreateProject, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Send Craft's CSRF token so the create-project endpoint can
+          // keep default CSRF validation on. Craft exposes the token
+          // globally in the control panel.
+          "X-CSRF-Token": window.Craft?.csrfTokenValue ?? ""
+        },
         body: JSON.stringify({
           text,
           voiceId,

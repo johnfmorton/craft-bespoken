@@ -354,11 +354,8 @@ class BespokenController extends Controller
             $this->enableCsrfValidation = false;
         }
 
-        // Don't require a CSRF token for the create-project action
-        // The action already requires a logged-in user
-        if ($action->id === 'create-project') {
-            $this->enableCsrfValidation = false;
-        }
+        // create-project keeps default CSRF validation on: it's a state-changing
+        // POST and the TypeScript caller sends Craft's CSRF token (X-CSRF-Token).
 
         return parent::beforeAction($action);
     }

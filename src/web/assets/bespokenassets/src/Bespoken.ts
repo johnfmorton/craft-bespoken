@@ -297,10 +297,10 @@ async function handleHistoryButtonClick(event: Event): Promise<void> {
     }
 }
 
-// Create an editable project on the Bespoken TTS service from this field's text +
+// Create an editable project on the Alias TTS service from this field's text +
 // selected voice, instead of generating audio. Gathers the script exactly like
 // the generate flow (so the project's chunks match what generation would
-// produce), POSTs it, then surfaces the service's one-time sign-in link.
+// produce), POSTs it, then surfaces a link into the service's control panel.
 async function handleCreateProjectButtonClick(event: Event): Promise<void> {
     const button = (event.target as HTMLElement).closest('.bespoken-create-project') as HTMLButtonElement | null;
     if (!button) return;
@@ -352,7 +352,7 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
     updateProgressComponent(progressComponent, {
         progress: 0.4,
         success: true,
-        message: 'Creating project on the Bespoken TTS service…',
+        message: 'Creating project on the Alias TTS service…',
         textColor: 'rgb(89, 102, 115)',
     });
 
@@ -377,7 +377,7 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
 
         const data = await response.json();
 
-        if (!data || !data.success || !data.editUrl) {
+        if (!data || !data.success || !data.projectUrl) {
             button.classList.remove('disabled');
             updateProgressComponent(progressComponent, {
                 progress: 0,
@@ -409,9 +409,8 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
     }
 }
 
-// Show the "project created" modal with the one-time sign-in link. The link is a
-// real anchor the user clicks — it must NOT be pre-fetched, since the token is
-// single-use and the first GET consumes it.
+// Show the "project created" modal with a link into the Alias TTS control panel
+// for the new project. The user clicks it and signs in there as usual.
 async function showProjectCreatedModal(parentElement: HTMLElement, data: any): Promise<void> {
     const content = document.createElement('div');
     content.style.cssText = 'font-size: 14px; line-height: 1.5;';
@@ -430,11 +429,11 @@ async function showProjectCreatedModal(parentElement: HTMLElement, data: any): P
     }
 
     const link = document.createElement('a');
-    link.href = data.editUrl;
+    link.href = data.projectUrl;
     link.target = '_blank';
     link.rel = 'noopener';
     link.classList.add('btn', 'submit');
-    link.textContent = 'Open project in Bespoken TTS →';
+    link.textContent = 'Open project in Alias TTS →';
     // Keep Craft's .btn flex centering (don't override display with inline-block,
     // which would left/top-align the label); just add top spacing.
     link.style.cssText = 'display: inline-flex; align-items: center; margin-top: 8px;';
@@ -442,7 +441,7 @@ async function showProjectCreatedModal(parentElement: HTMLElement, data: any): P
 
     const note = document.createElement('p');
     note.style.cssText = 'color: #888; font-size: 12px; margin-top: 10px;';
-    note.textContent = 'This is a one-time sign-in link — it opens the project once, then expires.';
+    note.textContent = 'Opens the project in Alias TTS — sign in there if you are not already.';
     content.appendChild(note);
 
     let modal = parentElement.querySelector('.bespoken-project-dialog') as ModalDialog | null;
@@ -453,7 +452,7 @@ async function showProjectCreatedModal(parentElement: HTMLElement, data: any): P
 
         const titleSlot = document.createElement('div');
         titleSlot.slot = 'title';
-        titleSlot.textContent = 'Bespoken TTS project created';
+        titleSlot.textContent = 'Alias TTS project created';
         modal.appendChild(titleSlot);
 
         const descSlot = document.createElement('div');
@@ -471,9 +470,9 @@ async function showProjectCreatedModal(parentElement: HTMLElement, data: any): P
         await new Promise(resolve => requestAnimationFrame(resolve));
     }
 
-    // Clicking the link opens the project in a new tab and consumes the one-time
-    // token, so close this (now-stale) dialog. target="_blank" means the new tab
-    // opens independently, so closing the dialog doesn't interrupt it.
+    // Clicking the link opens the project in a new tab, so close this dialog.
+    // target="_blank" means the new tab opens independently, so closing the
+    // dialog doesn't interrupt it.
     link.addEventListener('click', () => modal.close());
 
     modal.setContent(content);

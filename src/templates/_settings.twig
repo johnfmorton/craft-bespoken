@@ -36,7 +36,7 @@
     first: true,
     options: [
         { label: 'ElevenLabs' | t('bespoken'), value: 'elevenlabs' },
-        { label: 'Bespoken TTS service (self-hosted)' | t('bespoken'), value: 'bespoken' }
+        { label: 'Alias TTS service (self-hosted)' | t('bespoken'), value: 'bespoken' }
     ],
     value: provider
 }) }}
@@ -83,7 +83,7 @@
     value: settings['elevenlabsApiKey']})
 }}
 
-{# The endpoint URL only applies to the self-hosted Bespoken TTS service #}
+{# The endpoint URL only applies to the self-hosted Alias TTS service #}
 {% if isBespoken %}
 {{  forms.autosuggestField({
     label: 'API endpoint URL' | t('bespoken'),
@@ -109,7 +109,7 @@ Voice configuration
 {% endif %}
 
 {# Voice name + Voice ID are always shown. The ElevenLabs Voice model column is
-   dropped for the Bespoken TTS service, which decides the model server-side. #}
+   dropped for the Alias TTS service, which decides the model server-side. #}
 {% set voiceCols = {
     voice: {
         heading: 'Voice name' | t('bespoken'),

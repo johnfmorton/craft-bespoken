@@ -80,7 +80,7 @@
             }) }}
 
 			{# Credit balance + usage estimate are ElevenLabs concepts (credits, model
-			   multipliers). They don't apply to a self-hosted Bespoken TTS service, so
+			   multipliers). They don't apply to a self-hosted Alias TTS service, so
 			   omit the element entirely; the JS that fills it null-checks and no-ops. #}
 			{% if not bespokenSettings.usesCustomEndpoint() %}
 				<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info', siteActionParams) }}"></div>
@@ -138,7 +138,7 @@
                     }
                 }) }}
 
-				{# Self-hosted Bespoken TTS service only: create an editable project
+				{# Self-hosted Alias TTS service only: create an editable project
 				   from the text instead of generating audio. ElevenLabs has no such
 				   endpoint, so the button is hidden in ElevenLabs mode. #}
 				{% if bespokenSettings.usesCustomEndpoint() %}

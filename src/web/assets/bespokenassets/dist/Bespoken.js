@@ -1745,7 +1745,7 @@
     updateProgressComponent(progressComponent, {
       progress: 0.4,
       success: true,
-      message: "Creating project on the Bespoken TTS service\u2026",
+      message: "Creating project on the Alias TTS service\u2026",
       textColor: "rgb(89, 102, 115)"
     });
     try {
@@ -1767,7 +1767,7 @@
         })
       });
       const data = await response.json();
-      if (!data || !data.success || !data.editUrl) {
+      if (!data || !data.success || !data.projectUrl) {
         button.classList.remove("disabled");
         updateProgressComponent(progressComponent, {
           progress: 0,
@@ -1809,16 +1809,16 @@
       content.appendChild(meta);
     }
     const link = document.createElement("a");
-    link.href = data.editUrl;
+    link.href = data.projectUrl;
     link.target = "_blank";
     link.rel = "noopener";
     link.classList.add("btn", "submit");
-    link.textContent = "Open project in Bespoken TTS \u2192";
+    link.textContent = "Open project in Alias TTS \u2192";
     link.style.cssText = "display: inline-flex; align-items: center; margin-top: 8px;";
     content.appendChild(link);
     const note = document.createElement("p");
     note.style.cssText = "color: #888; font-size: 12px; margin-top: 10px;";
-    note.textContent = "This is a one-time sign-in link \u2014 it opens the project once, then expires.";
+    note.textContent = "Opens the project in Alias TTS \u2014 sign in there if you are not already.";
     content.appendChild(note);
     let modal = parentElement.querySelector(".bespoken-project-dialog");
     if (!modal) {
@@ -1826,7 +1826,7 @@
       modal.classList.add("bespoken-project-dialog");
       const titleSlot = document.createElement("div");
       titleSlot.slot = "title";
-      titleSlot.textContent = "Bespoken TTS project created";
+      titleSlot.textContent = "Alias TTS project created";
       modal.appendChild(titleSlot);
       const descSlot = document.createElement("div");
       descSlot.slot = "description";

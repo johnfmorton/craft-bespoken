@@ -35,7 +35,7 @@ class BespokenService extends Component
         $apiKey = $settings->elevenlabsApiKey;
         // if there is no API key, return an error
         if (!$apiKey) {
-            $providerName = $settings->usesCustomEndpoint() ? 'Bespoken TTS service' : 'ElevenLabs';
+            $providerName = $settings->usesCustomEndpoint() ? 'Alias TTS service' : 'ElevenLabs';
             return [
                 'success' => false,
                 'progress' => 0,
@@ -106,14 +106,14 @@ class BespokenService extends Component
     }
 
     /**
-     * Create an editable project on the self-hosted Bespoken TTS service from the
+     * Create an editable project on the self-hosted Alias TTS service from the
      * given text + voice, instead of generating audio. Returns the new project's
-     * details and a single-use link that logs the user into the service's control
-     * panel on that project. No audio is generated here — that happens later in
-     * the service's Studio. Bespoken-TTS-service only (ElevenLabs has no such
-     * endpoint); guarded so it fails clearly if called in ElevenLabs mode.
+     * details and a link into the service's control panel for that project (the
+     * user signs in there normally). No audio is generated here — that happens
+     * later in the service's Studio. Bespoken-TTS-service only (ElevenLabs has no
+     * such endpoint); guarded so it fails clearly if called in ElevenLabs mode.
      *
-     * @return array{success: bool, message?: string, projectId?: ?string, title?: string, editUrl?: ?string, projectUrl?: ?string, chunkCount?: ?int, characters?: ?int}
+     * @return array{success: bool, message?: string, projectId?: ?string, title?: string, projectUrl?: ?string, chunkCount?: ?int, characters?: ?int}
      */
     public function createProject(string $text, string $voiceId, string $title, string $voiceModel): array
     {
@@ -122,7 +122,7 @@ class BespokenService extends Component
         if (!$settings->usesCustomEndpoint()) {
             return [
                 'success' => false,
-                'message' => 'Creating a project is only available with the Bespoken TTS service endpoint.',
+                'message' => 'Creating a project is only available with the Alias TTS service endpoint.',
             ];
         }
 
@@ -130,7 +130,7 @@ class BespokenService extends Component
         if (!$apiKey) {
             return [
                 'success' => false,
-                'message' => 'Bespoken TTS service API key is not set in the plugin settings.',
+                'message' => 'Alias TTS service API key is not set in the plugin settings.',
             ];
         }
 
@@ -186,7 +186,7 @@ class BespokenService extends Component
             BespokenPlugin::error('Create project request failed: ' . $curlError);
             return [
                 'success' => false,
-                'message' => 'Could not contact the Bespoken TTS service.',
+                'message' => 'Could not contact the Alias TTS service.',
             ];
         }
 
@@ -195,7 +195,7 @@ class BespokenService extends Component
         } catch (\JsonException $e) {
             return [
                 'success' => false,
-                'message' => 'Invalid response from the Bespoken TTS service.',
+                'message' => 'Invalid response from the Alias TTS service.',
             ];
         }
 
@@ -203,16 +203,18 @@ class BespokenService extends Component
         if ($httpStatus < 200 || $httpStatus >= 300) {
             return [
                 'success' => false,
-                'message' => $data['detail']['message'] ?? 'The Bespoken TTS service rejected the request.',
+                'message' => $data['detail']['message'] ?? 'The Alias TTS service rejected the request.',
             ];
         }
 
+        // The service returns a plain control-panel URL in `url` (the owner opens
+        // it and signs in normally). Older builds returned a single-use `edit_url`;
+        // accept either so the plugin keeps working across service versions.
         return [
             'success' => true,
             'projectId' => $data['id'] ?? null,
             'title' => $data['title'] ?? $title,
-            'editUrl' => $data['edit_url'] ?? null,
-            'projectUrl' => $data['url'] ?? null,
+            'projectUrl' => $data['url'] ?? $data['edit_url'] ?? null,
             'chunkCount' => $data['chunk_count'] ?? null,
             'characters' => $data['characters'] ?? null,
         ];

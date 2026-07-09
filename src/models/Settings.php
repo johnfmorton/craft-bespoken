@@ -20,7 +20,7 @@ class Settings extends Model
 
     /**
      * Which TTS backend to use: ElevenLabs (hosted) or a self-hosted,
-     * ElevenLabs-compatible Bespoken TTS service. Drives both which settings the
+     * ElevenLabs-compatible Alias TTS service. Drives both which settings the
      * control panel shows and which API the plugin calls.
      */
     public string $apiProvider = self::PROVIDER_ELEVENLABS;
@@ -28,7 +28,7 @@ class Settings extends Model
     public string $elevenlabsApiKey = '';
 
     /**
-     * Base URL of the self-hosted, ElevenLabs-compatible Bespoken TTS service
+     * Base URL of the self-hosted, ElevenLabs-compatible Alias TTS service
      * (e.g. https://tts.example.com). Only used when apiProvider is "bespoken".
      * Supports environment variables.
      */
@@ -143,7 +143,7 @@ class Settings extends Model
             ['apiBaseUrl', 'string'],
             ['apiBaseUrl', 'default', 'value' => ''],
             // The endpoint URL is only meaningful — and required — when pointing
-            // at a self-hosted Bespoken TTS service. skipOnEmpty must be false so
+            // at a self-hosted Alias TTS service. skipOnEmpty must be false so
             // the rule still fires when the field is left blank.
             ['apiBaseUrl', 'validateApiBaseUrlForProvider', 'skipOnEmpty' => false],
             ['voices', BespokenVoicesValidator::class],
@@ -168,20 +168,20 @@ class Settings extends Model
     }
 
     /**
-     * Require a base URL when the Bespoken TTS service provider is selected.
+     * Require a base URL when the Alias TTS service provider is selected.
      * A raw value — including an environment-variable reference such as
      * `$BESPOKEN_TTS_URL` — counts as provided.
      */
     public function validateApiBaseUrlForProvider(string $attribute): void
     {
         if ($this->apiProvider === self::PROVIDER_BESPOKEN && trim((string) $this->$attribute) === '') {
-            $this->addError($attribute, \Craft::t('bespoken', 'Enter the base URL of your Bespoken TTS service.'));
+            $this->addError($attribute, \Craft::t('bespoken', 'Enter the base URL of your Alias TTS service.'));
         }
     }
 
     /**
      * The configured API origin (no trailing slash, no /v1/... path). Returns
-     * ElevenLabs unless the Bespoken TTS service provider is selected, in which
+     * ElevenLabs unless the Alias TTS service provider is selected, in which
      * case it resolves the configured base URL (env vars supported), tolerating a
      * full text-to-speech path being pasted in.
      */
@@ -209,7 +209,7 @@ class Settings extends Model
     }
 
     /**
-     * Async generation endpoint (Bespoken TTS service only): POST returns a job
+     * Async generation endpoint (Alias TTS service only): POST returns a job
      * id + poll URLs so long text isn't bound by the synchronous request timeout.
      */
     public function getTextToSpeechJobsUrl(string $voiceId): string
@@ -223,7 +223,7 @@ class Settings extends Model
     }
 
     /**
-     * Create-a-project endpoint (Bespoken TTS service only): POST text + a voice
+     * Create-a-project endpoint (Alias TTS service only): POST text + a voice
      * and the service builds an editable project instead of generating audio,
      * returning a single-use link into its control panel.
      */
@@ -239,12 +239,12 @@ class Settings extends Model
 
     /**
      * Human-facing name of the active TTS backend, for progress and error
-     * messages — "Bespoken TTS service" when self-hosted, else "ElevenLabs API".
+     * messages — "Alias TTS service" when self-hosted, else "ElevenLabs API".
      * The synchronous request path is shared between providers, so messages there
      * must use this rather than hard-coding "ElevenLabs".
      */
     public function getProviderLabel(): string
     {
-        return $this->usesCustomEndpoint() ? 'Bespoken TTS service' : 'ElevenLabs API';
+        return $this->usesCustomEndpoint() ? 'Alias TTS service' : 'ElevenLabs API';
     }
 }

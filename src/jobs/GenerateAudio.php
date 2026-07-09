@@ -42,7 +42,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
     /**
      * Custom-endpoint only: text longer than this (chars) is generated via the
-     * Bespoken TTS service's async job endpoint (no synchronous timeout ceiling,
+     * Alias TTS service's async job endpoint (no synchronous timeout ceiling,
      * with live progress). Shorter text uses the synchronous send-whole path.
      */
     private const ASYNC_TEXT_THRESHOLD = 4000;
@@ -311,7 +311,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
 
-        // Custom (Bespoken TTS service) endpoint: long text goes through the
+        // Custom (Alias TTS service) endpoint: long text goes through the
         // service's async job endpoint, which removes the ~300s synchronous
         // timeout ceiling and streams progress while we poll. Shorter text uses
         // the synchronous send-whole path below. If the service doesn't expose
@@ -320,10 +320,10 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             if ($this->generateViaAsyncEndpoint($queue, trim($text), $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel)) {
                 return;
             }
-            Bespoken::info('Bespoken TTS service async endpoint unavailable (404); using synchronous send-whole.');
+            Bespoken::info('Alias TTS service async endpoint unavailable (404); using synchronous send-whole.');
         }
 
-        // Split text into chunks. A custom (Bespoken TTS service) endpoint does
+        // Split text into chunks. A custom (Alias TTS service) endpoint does
         // its own sentence-aware chunking and crossfade, so re-chunking here is
         // redundant and only adds un-crossfaded seams — send the whole text in a
         // single request and let the service own chunking. ElevenLabs still needs
@@ -463,7 +463,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     }
 
     /**
-     * Generate audio via the Bespoken TTS service's async endpoint: submit the
+     * Generate audio via the Alias TTS service's async endpoint: submit the
      * whole text as one job, poll until it completes (emitting steadily-changing
      * progress so the front-end stall timer never trips), then download the MP3.
      *
@@ -478,7 +478,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     {
         $settings = Bespoken::getInstance()->getSettings();
 
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Submitting audio job to your Bespoken TTS service…');
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Submitting audio job to your Alias TTS service…');
 
         [$status, $body] = $this->jsonRequest('POST', $settings->getTextToSpeechJobsUrl($voiceId), $this->buildBaseRequestBody($text, $voiceId, $voiceModel));
 
@@ -498,15 +498,15 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $latestBody = $body;
 
         if (!is_string($statusUrl) || !is_string($audioUrl)) {
-            throw new \RuntimeException('The Bespoken TTS service returned an invalid async job response.');
+            throw new \RuntimeException('The Alias TTS service returned an invalid async job response.');
         }
 
-        Bespoken::info('Async job ' . $jobId . ' submitted to Bespoken TTS service; status=' . $jobStatus);
+        Bespoken::info('Async job ' . $jobId . ' submitted to Alias TTS service; status=' . $jobStatus);
 
         $start = time();
         while (in_array($jobStatus, ['processing', 'pending'], true)) {
             if (time() - $start > self::ASYNC_MAX_WAIT_SECONDS) {
-                throw new \RuntimeException('Timed out after ' . self::ASYNC_MAX_WAIT_SECONDS . 's waiting for the Bespoken TTS service to finish generating.');
+                throw new \RuntimeException('Timed out after ' . self::ASYNC_MAX_WAIT_SECONDS . 's waiting for the Alias TTS service to finish generating.');
             }
 
             sleep(self::ASYNC_POLL_INTERVAL_SECONDS);
@@ -523,11 +523,11 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             // value (the front-end times out on 3 min with no progress change).
             $elapsed = time() - $start;
             $progress = min(0.59, 0.15 + 0.44 * ($elapsed / self::ASYNC_MAX_WAIT_SECONDS));
-            $this->setBespokeProgress($queue, $bespokenJobId, $progress, 'Generating audio on your Bespoken TTS service… (' . $elapsed . 's elapsed)');
+            $this->setBespokeProgress($queue, $bespokenJobId, $progress, 'Generating audio on your Alias TTS service… (' . $elapsed . 's elapsed)');
         }
 
         if ($jobStatus === 'failed') {
-            throw new \RuntimeException('Bespoken TTS service error: ' . ($latestBody['error'] ?? 'generation failed'));
+            throw new \RuntimeException('Alias TTS service error: ' . ($latestBody['error'] ?? 'generation failed'));
         }
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'Downloading the generated audio…');
@@ -636,7 +636,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         }
 
         if ($httpStatus >= 400 || !is_string($response) || $response === '') {
-            throw new \RuntimeException('Failed to download the generated audio from the Bespoken TTS service (HTTP ' . $httpStatus . ').');
+            throw new \RuntimeException('Failed to download the generated audio from the Alias TTS service (HTTP ' . $httpStatus . ').');
         }
 
         return $response;
@@ -650,10 +650,10 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     private function asyncErrorMessage(?array $body, int $status, string $action): string
     {
         if (is_array($body) && isset($body['detail']['message'])) {
-            return 'Bespoken TTS service error: ' . $body['detail']['message'];
+            return 'Alias TTS service error: ' . $body['detail']['message'];
         }
 
-        return 'Failed to ' . $action . ' on the Bespoken TTS service (HTTP ' . $status . ').';
+        return 'Failed to ' . $action . ' on the Alias TTS service (HTTP ' . $status . ').';
     }
 
     /**

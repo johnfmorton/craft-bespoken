@@ -111,11 +111,11 @@ class BespokenController extends Controller
     }
 
     /**
-     * Create an editable project on the Bespoken TTS service from this field's
+     * Create an editable project on the Alias TTS service from this field's
      * text + selected voice, instead of generating audio. Returns the new
-     * project's details and a single-use link into the service's control panel.
-     * Mirrors actionProcessText's text preparation so the project's chunks match
-     * what generation would produce. Bespoken TTS service only.
+     * project's details and a link into the service's control panel. Mirrors
+     * actionProcessText's text preparation so the project's chunks match what
+     * generation would produce. Alias TTS service only.
      *
      * @throws MethodNotAllowedHttpException
      */
@@ -130,7 +130,7 @@ class BespokenController extends Controller
         if (!$settings->usesCustomEndpoint()) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Creating a project is only available with the Bespoken TTS service endpoint.',
+                'message' => 'Creating a project is only available with the Alias TTS service endpoint.',
             ]);
         }
 

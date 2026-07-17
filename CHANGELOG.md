@@ -22,6 +22,13 @@
 - When submitting an async job, a 404 that carries a real error payload (e.g. an unknown voice ID) is now reported as the error it is, instead of being mistaken for "this service has no async endpoint" and silently re-sent through the synchronous path — where it would only fail again with a less direct message.
 - Progress and error messages in the synchronous generation path now name the **active provider** instead of always saying "ElevenLabs API". In Alias TTS service mode a failed generation is now reported as e.g. *"Error contacting the Alias TTS service…"* rather than an ElevenLabs error — the request had correctly gone to the self-hosted endpoint all along, but the shared code path's hard-coded "ElevenLabs" wording made self-hosted failures (such as an invalid service API key) look like an ElevenLabs problem. The "API key is not set" pre-flight message is likewise provider-aware.
 
+## 5.3.5 - 2026-07-17
+
+### Fixed
+
+- Disabled matrix blocks are no longer included in the narration script ([#31](https://github.com/johnfmorton/craft-bespoken/issues/31)). A nested entry that was disabled **for the current site only** (multi-site installs) renders in the inline "blocks" view with no disabled marker at all, so the script builder treated it as live and narrated its content. The plugin now confirms each block's per-site status with the server before including it — in all three matrix view modes (cards, inline blocks, element index). Blocks toggled off in the editor but not yet saved are still respected via the editor markup, and if the status lookup fails the previous behavior applies unchanged.
+- The element index matrix view no longer relies on every `data-id` element carrying a status: list rows and their chips are deduplicated per block, so each block is evaluated (and its content fetched) exactly once.
+
 ## 5.3.4 - 2026-06-12
 
 ### Security

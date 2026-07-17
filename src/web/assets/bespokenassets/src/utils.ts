@@ -67,6 +67,64 @@ export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[
 }
 
 
+/*
+* _getElementStatuses
+* params: elementIds: element IDs found in the matrix field DOM, actionUrl: the get-element-content action URL
+* description: Fetches the per-site status ('live', 'disabled', …) of the given
+* elements in one request. The DOM alone can't reveal a nested entry that is
+* disabled only for the current site (it renders with no disabled marker in the
+* inline blocks view), so the server is asked for the authoritative status.
+* Fails open (returns {}) on any error so the existing DOM-based filtering
+* still applies.
+ */
+export async function _getElementStatuses(elementIds: (string | null)[], actionUrl: string | null): Promise<Record<string, string | null>> {
+    const ids = [...new Set(elementIds.filter((id): id is string => !!id && /^\d+$/.test(id)))];
+    if (ids.length === 0 || !actionUrl) {
+        return {};
+    }
+    try {
+        // Both actions live on the same controller, so the element-statuses
+        // URL is the get-element-content URL with the action path swapped.
+        const url = new URL(actionUrl.replace('get-element-content', 'element-statuses'));
+        url.searchParams.set('elementIds', ids.join(','));
+        const result = await fetch(url.toString(), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!result.ok) {
+            return {};
+        }
+        const data = await result.json();
+        return (data && data.statuses) || {};
+    } catch (error) {
+        console.error('Error fetching element statuses:', error);
+        return {};
+    }
+}
+
+/*
+* _isBlockLive
+* description: Decides whether a matrix block should be narrated, combining the
+* DOM's status marker (authoritative for unsaved editor state) with the
+* server-reported per-site status (authoritative for saved state, including
+* blocks disabled for the current site only).
+ */
+export function _isBlockLive(id: string | null, domStatus: string | null, serverStatuses: Record<string, string | null>): boolean {
+    // The DOM explicitly marks the block as something other than live
+    // (e.g. just toggled in the editor) — trust it.
+    if (domStatus !== null && domStatus !== 'live') {
+        return false;
+    }
+    // The server knows this block — its per-site status decides.
+    const serverStatus = id !== null ? serverStatuses[id] : undefined;
+    if (serverStatus !== undefined && serverStatus !== null) {
+        return serverStatus === 'live';
+    }
+    // Unknown to the server (new unsaved block, or the status request
+    // failed): fall back to the DOM marker alone.
+    return domStatus === 'live';
+}
+
 export function _getFieldText(field: HTMLElement): string {
 
   let text = '';

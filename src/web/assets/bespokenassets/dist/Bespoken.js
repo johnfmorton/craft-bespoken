@@ -1375,6 +1375,38 @@
       return "";
     }
   }
+  async function _getElementStatuses(elementIds, actionUrl) {
+    const ids = [...new Set(elementIds.filter((id) => !!id && /^\d+$/.test(id)))];
+    if (ids.length === 0 || !actionUrl) {
+      return {};
+    }
+    try {
+      const url = new URL(actionUrl.replace("get-element-content", "element-statuses"));
+      url.searchParams.set("elementIds", ids.join(","));
+      const result = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      if (!result.ok) {
+        return {};
+      }
+      const data = await result.json();
+      return data && data.statuses || {};
+    } catch (error) {
+      console.error("Error fetching element statuses:", error);
+      return {};
+    }
+  }
+  function _isBlockLive(id, domStatus, serverStatuses) {
+    if (domStatus !== null && domStatus !== "live") {
+      return false;
+    }
+    const serverStatus = id !== null ? serverStatuses[id] : void 0;
+    if (serverStatus !== void 0 && serverStatus !== null) {
+      return serverStatus === "live";
+    }
+    return domStatus === "live";
+  }
   function _getFieldText(field) {
     let text = "";
     if (field.getAttribute("data-type") === "craft\\ckeditor\\Field") {
@@ -2108,54 +2140,75 @@
               case "matrix":
                 const viewTypeTest = _getMatrixViewType(targetField);
                 switch (viewTypeTest) {
-                  case "cards":
+                  case "cards": {
                     let targetFieldCards = targetField.querySelector(".nested-element-cards");
                     if (targetFieldCards) {
                       const cards = Array.from(targetFieldCards.querySelectorAll(".card"));
+                      const statuses = await _getElementStatuses(cards.map((c4) => c4.getAttribute("data-id")), actionUrl);
                       for (const card of cards) {
                         const status = card.getAttribute("data-status");
                         const id = card.getAttribute("data-id");
-                        if (status === "live") {
+                        if (_isBlockLive(id, status, statuses)) {
                           const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
                           text += newText + " ";
                         }
                       }
                     }
                     break;
-                  case "inline-editable-elements":
+                  }
+                  case "inline-editable-elements": {
                     let targetFieldInline = targetField.querySelector(".blocks");
                     if (targetFieldInline) {
-                      const blocks = targetFieldInline.querySelectorAll(".matrixblock");
-                      blocks.forEach((block) => {
-                        const isDisabled = block.classList.contains("disabled-entry");
-                        if (!isDisabled) {
-                          const fieldsContainerElement = block.querySelector(".fields");
-                          const fieldElements = Array.from(fieldsContainerElement.querySelectorAll(".field"));
-                          for (const field of fieldElements) {
-                            const fieldHandle = field.getAttribute("data-attribute");
-                            for (const nestedHandle of nestedHandles) {
-                              if (fieldHandle === nestedHandle) {
-                                text += _getFieldText(field) + " ";
-                              }
+                      const blocks = Array.from(targetFieldInline.querySelectorAll(".matrixblock"));
+                      const statuses = await _getElementStatuses(blocks.map((b3) => b3.getAttribute("data-id")), actionUrl);
+                      for (const block of blocks) {
+                        const id = block.getAttribute("data-id");
+                        const enabledInput = block.querySelector('input[name$="[enabled]"]');
+                        const domDisabled = block.classList.contains("disabled-entry") || enabledInput !== null && enabledInput.value === "";
+                        const serverStatus = id !== null ? statuses[id] : void 0;
+                        const serverDisabled = serverStatus != null && serverStatus !== "live";
+                        if (domDisabled || serverDisabled) {
+                          continue;
+                        }
+                        const fieldsContainerElement = block.querySelector(".fields");
+                        if (!fieldsContainerElement) {
+                          continue;
+                        }
+                        const fieldElements = Array.from(fieldsContainerElement.querySelectorAll(".field"));
+                        for (const field of fieldElements) {
+                          const fieldHandle = field.getAttribute("data-attribute");
+                          for (const nestedHandle of nestedHandles) {
+                            if (fieldHandle === nestedHandle) {
+                              text += _getFieldText(field) + " ";
                             }
                           }
                         }
-                      });
-                    }
-                    break;
-                  case "element-index":
-                    const targetFields = Array.from(targetField.querySelectorAll("[data-id]"));
-                    if (targetFields) {
-                      for (const targetField2 of targetFields) {
-                        const status = targetField2.getAttribute("data-status");
-                        const id = targetField2.getAttribute("data-id");
-                        if (status === "live") {
-                          const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
-                          text += newText + " ";
-                        }
                       }
                     }
                     break;
+                  }
+                  case "element-index": {
+                    const withDataId = Array.from(targetField.querySelectorAll("[data-id]"));
+                    const blockStatusById = /* @__PURE__ */ new Map();
+                    for (const el of withDataId) {
+                      const id = el.getAttribute("data-id");
+                      if (!id) {
+                        continue;
+                      }
+                      const status = el.getAttribute("data-status");
+                      if (!blockStatusById.has(id) || status !== null) {
+                        blockStatusById.set(id, status);
+                      }
+                    }
+                    const statuses = await _getElementStatuses([...blockStatusById.keys()], actionUrl);
+                    for (const [id, status] of blockStatusById) {
+                      if (_isBlockLive(id, status, statuses)) {
+                        const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
+                        text += newText + " ";
+                      }
+                    }
+                    break;
+                  }
                   default:
                     text += " There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ";
                 }

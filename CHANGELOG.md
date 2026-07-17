@@ -1,5 +1,12 @@
 # Release Notes for Bespoken
 
+## 5.3.5 - 2026-07-17
+
+### Fixed
+
+- Disabled matrix blocks are no longer included in the narration script ([#31](https://github.com/johnfmorton/craft-bespoken/issues/31)). A nested entry that was disabled **for the current site only** (multi-site installs) renders in the inline "blocks" view with no disabled marker at all, so the script builder treated it as live and narrated its content. The plugin now confirms each block's per-site status with the server before including it — in all three matrix view modes (cards, inline blocks, element index). Blocks toggled off in the editor but not yet saved are still respected via the editor markup, and if the status lookup fails the previous behavior applies unchanged.
+- The element index matrix view no longer relies on every `data-id` element carrying a status: list rows and their chips are deduplicated per block, so each block is evaluated (and its content fetched) exactly once.
+
 ## 5.3.4 - 2026-06-12
 
 ### Security

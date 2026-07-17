@@ -530,6 +530,13 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             $latestBody = $pollBody;
             $jobStatus = (string)($pollBody['status'] ?? 'processing');
 
+            // Terminal poll: progress is null by contract, so skip the display
+            // update — the next state ("Downloading…" or the error) follows
+            // immediately, and a fallback message here would flash in between.
+            if (!in_array($jobStatus, ['processing', 'pending'], true)) {
+                continue;
+            }
+
             [$targetProgress, $message] = $this->asyncDisplayState($pollBody, time() - $start);
             $lastReportedProgress = min(0.59, max($targetProgress, $lastReportedProgress + self::ASYNC_PROGRESS_MIN_STEP));
             $this->setBespokeProgress($queue, $bespokenJobId, $lastReportedProgress, $message);

@@ -335,7 +335,12 @@ class BespokenService extends Component
         if (isset($data['message'])) {
             $record->message = $data['message'];
             $log = $record->messageLog ? (json_decode($record->messageLog, true) ?? []) : [];
-            $log[] = $data['message'];
+            // Async polling repeats the same message across many polls (e.g.
+            // "Creating clip 3 of 8"), and the CP replays every new log entry —
+            // skip consecutive duplicates.
+            if (end($log) !== $data['message']) {
+                $log[] = $data['message'];
+            }
             $record->messageLog = json_encode($log, JSON_THROW_ON_ERROR);
         }
         if (isset($data['success'])) {

@@ -53,6 +53,14 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     /** Hard cap (seconds) on waiting for an async job before giving up. */
     private const ASYNC_MAX_WAIT_SECONDS = 1800;
 
+    /**
+     * Minimum progress increase reported per async poll. The CP job monitor
+     * times out after 3 minutes without a progress change, but the service's
+     * progress snapshots legitimately repeat between clips — always inch
+     * forward so a working job is never mistaken for a stalled one.
+     */
+    private const ASYNC_PROGRESS_MIN_STEP = 0.0005;
+
 
     public string $bespokenJobId;
     public int $cacheExpire = 1800; // 30 minutes
@@ -483,7 +491,9 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         [$status, $body] = $this->jsonRequest('POST', $settings->getTextToSpeechJobsUrl($voiceId), $this->buildBaseRequestBody($text, $voiceId, $voiceModel));
 
         // 404 = older service without the async endpoint → signal fallback.
-        if ($status === 404) {
+        // But a 404 with an ElevenLabs-shaped error body (detail.message) is a
+        // real API error — e.g. an unknown voice_id — not a missing route.
+        if ($status === 404 && !isset($body['detail']['message'])) {
             return false;
         }
 
@@ -504,6 +514,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         Bespoken::info('Async job ' . $jobId . ' submitted to Alias TTS service; status=' . $jobStatus);
 
         $start = time();
+        $lastReportedProgress = 0.1;
         while (in_array($jobStatus, ['processing', 'pending'], true)) {
             if (time() - $start > self::ASYNC_MAX_WAIT_SECONDS) {
                 throw new \RuntimeException('Timed out after ' . self::ASYNC_MAX_WAIT_SECONDS . 's waiting for the Alias TTS service to finish generating.');
@@ -519,11 +530,9 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             $latestBody = $pollBody;
             $jobStatus = (string)($pollBody['status'] ?? 'processing');
 
-            // Creep progress within 0.15–0.59 so each poll reports a distinct
-            // value (the front-end times out on 3 min with no progress change).
-            $elapsed = time() - $start;
-            $progress = min(0.59, 0.15 + 0.44 * ($elapsed / self::ASYNC_MAX_WAIT_SECONDS));
-            $this->setBespokeProgress($queue, $bespokenJobId, $progress, 'Generating audio on your Alias TTS service… (' . $elapsed . 's elapsed)');
+            [$targetProgress, $message] = $this->asyncDisplayState($pollBody, time() - $start);
+            $lastReportedProgress = min(0.59, max($targetProgress, $lastReportedProgress + self::ASYNC_PROGRESS_MIN_STEP));
+            $this->setBespokeProgress($queue, $bespokenJobId, $lastReportedProgress, $message);
         }
 
         if ($jobStatus === 'failed') {
@@ -542,6 +551,43 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $this->saveToCraftAssets($queue, $finalPath, $filename, $entryTitle, $bespokenJobId);
 
         return true;
+    }
+
+    /**
+     * Derive the CP display state — progress within the 0.15–0.59 generation
+     * band plus a status message — from one async poll response.
+     *
+     * The service reports real progress in a nullable `progress` object
+     * ({stage, chunks_total, chunks_done, percent, message}). It is null (or
+     * absent on services ≤ v0.56.0) when the job hasn't started, has reached a
+     * terminal status, or the server restarted mid-run — in all of those cases
+     * fall back to the previous time-based estimate. Display only: job state
+     * is driven solely by `status`, never by `progress`.
+     *
+     * @param array<mixed> $pollBody
+     * @return array{0: float, 1: string}
+     */
+    private function asyncDisplayState(array $pollBody, int $elapsed): array
+    {
+        $fallbackProgress = min(0.59, 0.15 + 0.44 * ($elapsed / self::ASYNC_MAX_WAIT_SECONDS));
+        $fallbackMessage = 'Generating audio on your Alias TTS service… (' . $elapsed . 's elapsed)';
+
+        $info = $pollBody['progress'] ?? null;
+        if (!is_array($info)) {
+            return [$fallbackProgress, $fallbackMessage];
+        }
+
+        $percent = is_numeric($info['percent'] ?? null) ? (int)$info['percent'] : 0;
+        $percent = max(0, min(100, $percent));
+        // Map 0–100% into 0.15–0.58, leaving headroom below the 0.59 band
+        // ceiling so the reported value can keep inching forward while a long
+        // stitching phase holds percent at 100.
+        $progress = 0.15 + 0.43 * ($percent / 100);
+
+        $message = $info['message'] ?? null;
+        $message = is_string($message) ? trim($message) : '';
+
+        return [$progress, $message !== '' ? $message : $fallbackMessage];
     }
 
     /**

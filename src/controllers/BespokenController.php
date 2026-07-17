@@ -219,6 +219,36 @@ class BespokenController extends Controller
     }
 
     /**
+     * Action to get the per-site statuses of a set of elements by ID.
+     *
+     * Used by the field JS to decide which matrix blocks to narrate: a nested
+     * entry that is disabled only for the current site renders with no
+     * disabled marker in the inline (blocks) view, so the DOM alone can't be
+     * trusted (issue #31).
+     *
+     * @return Response
+     */
+    public function actionElementStatuses(): Response
+    {
+        $this->requireLogin();
+        $idsParam = (string)Craft::$app->request->get('elementIds', '');
+        $ids = array_values(array_filter(array_map('intval', explode(',', $idsParam))));
+
+        $siteId = $this->_resolveRequestSiteId();
+
+        $statuses = [];
+        foreach (array_slice($ids, 0, 200) as $id) {
+            $element = Craft::$app->elements->getElementById($id, null, $siteId);
+            $statuses[$id] = $element?->getStatus();
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'statuses' => $statuses,
+        ]);
+    }
+
+    /**
      * Action to get the content of an Element by its ID
      * @return Response
      */

@@ -16,7 +16,16 @@ class Settings extends Model
     public const DEFAULT_API_BASE_URL = 'https://api.elevenlabs.io';
 
     public const PROVIDER_ELEVENLABS = 'elevenlabs';
-    public const PROVIDER_BESPOKEN = 'bespoken';
+    public const PROVIDER_ALIAS = 'alias';
+
+    /**
+     * Legacy stored value for {@see PROVIDER_ALIAS}. The self-hosted provider
+     * shipped as `'bespoken'` in 5.4.0 pre-releases, before the service was
+     * named **Alias TTS** to make clear it's a separate project from the
+     * Bespoken plugin. Still accepted on read so a config that already stored
+     * `'bespoken'` keeps working; new saves write `'alias'`.
+     */
+    public const PROVIDER_ALIAS_LEGACY = 'bespoken';
 
     /**
      * Which TTS backend to use: ElevenLabs (hosted) or a self-hosted,
@@ -29,7 +38,7 @@ class Settings extends Model
 
     /**
      * Base URL of the self-hosted, ElevenLabs-compatible Alias TTS service
-     * (e.g. https://tts.example.com). Only used when apiProvider is "bespoken".
+     * (e.g. https://tts.example.com). Only used with the Alias TTS provider.
      * Supports environment variables.
      */
     public string $apiBaseUrl = '';
@@ -136,7 +145,7 @@ class Settings extends Model
     public function rules(): array
     {
         return [
-            ['apiProvider', 'in', 'range' => [self::PROVIDER_ELEVENLABS, self::PROVIDER_BESPOKEN]],
+            ['apiProvider', 'in', 'range' => [self::PROVIDER_ELEVENLABS, self::PROVIDER_ALIAS, self::PROVIDER_ALIAS_LEGACY]],
             ['apiProvider', 'default', 'value' => self::PROVIDER_ELEVENLABS],
             ['elevenlabsApiKey', 'string'],
             ['elevenlabsApiKey', 'default', 'value' => ''],
@@ -174,7 +183,7 @@ class Settings extends Model
      */
     public function validateApiBaseUrlForProvider(string $attribute): void
     {
-        if ($this->apiProvider === self::PROVIDER_BESPOKEN && trim((string) $this->$attribute) === '') {
+        if ($this->usesCustomEndpoint() && trim((string) $this->$attribute) === '') {
             $this->addError($attribute, \Craft::t('bespoken', 'Enter the base URL of your Alias TTS service.'));
         }
     }
@@ -234,7 +243,9 @@ class Settings extends Model
 
     public function usesCustomEndpoint(): bool
     {
-        return $this->apiProvider === self::PROVIDER_BESPOKEN;
+        // Accept the legacy 'bespoken' value too, so a config stored by a 5.4.0
+        // pre-release keeps resolving to the Alias TTS service.
+        return in_array($this->apiProvider, [self::PROVIDER_ALIAS, self::PROVIDER_ALIAS_LEGACY], true);
     }
 
     /**

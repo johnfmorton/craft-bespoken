@@ -40,13 +40,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         'eleven_english_sts_v1',
     ];
 
-    /**
-     * Custom-endpoint only: text longer than this (chars) is generated via the
-     * Alias TTS service's async job endpoint (no synchronous timeout ceiling,
-     * with live progress). Shorter text uses the synchronous send-whole path.
-     */
-    private const ASYNC_TEXT_THRESHOLD = 4000;
-
     /** Seconds between async status polls. */
     private const ASYNC_POLL_INTERVAL_SECONDS = 3;
 
@@ -319,12 +312,13 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
 
-        // Custom (Alias TTS service) endpoint: long text goes through the
+        // Custom (Alias TTS service) endpoint: every generation goes through the
         // service's async job endpoint, which removes the ~300s synchronous
-        // timeout ceiling and streams progress while we poll. Shorter text uses
-        // the synchronous send-whole path below. If the service doesn't expose
-        // the async endpoint (older version → 404), fall back to send-whole.
-        if ($settings->usesCustomEndpoint() && mb_strlen(trim($text)) > self::ASYNC_TEXT_THRESHOLD) {
+        // timeout ceiling and streams live per-clip progress while we poll — so
+        // short entries get the same "Creating clip N of M" feedback as long
+        // articles. If the service doesn't expose the async endpoint (older
+        // version → 404), fall back to the synchronous send-whole path below.
+        if ($settings->usesCustomEndpoint()) {
             if ($this->generateViaAsyncEndpoint($queue, trim($text), $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel)) {
                 return;
             }
@@ -515,6 +509,8 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         $start = time();
         $lastReportedProgress = 0.1;
+        $lastClipKey = null;
+        $stableMessage = null;
         while (in_array($jobStatus, ['processing', 'pending'], true)) {
             if (time() - $start > self::ASYNC_MAX_WAIT_SECONDS) {
                 throw new \RuntimeException('Timed out after ' . self::ASYNC_MAX_WAIT_SECONDS . 's waiting for the Alias TTS service to finish generating.');
@@ -537,7 +533,23 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                 continue;
             }
 
-            [$targetProgress, $message] = $this->asyncDisplayState($pollBody, time() - $start);
+            [$targetProgress, $message, $clipKey] = $this->asyncDisplayState($pollBody, time() - $start);
+
+            // Stabilize the status line on the clip, not on every poll. The
+            // service bakes a live ETA into the message that wobbles between
+            // polls of the *same* clip ("clip 6 of 44 · about 13 min left" →
+            // "· about 22 min left"); re-logging each wobble would churn the
+            // display and bloat the message log. Keep the message captured when
+            // the clip started and only refresh it when the clip (or stage)
+            // advances. The numeric progress below still moves every poll, so
+            // the ring animates and the CP's 3-minute stall timeout never trips.
+            if ($clipKey !== null && $clipKey === $lastClipKey) {
+                $message = $stableMessage;
+            } else {
+                $lastClipKey = $clipKey;
+                $stableMessage = $message;
+            }
+
             $lastReportedProgress = min(0.59, max($targetProgress, $lastReportedProgress + self::ASYNC_PROGRESS_MIN_STEP));
             $this->setBespokeProgress($queue, $bespokenJobId, $lastReportedProgress, $message);
         }
@@ -561,18 +573,21 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     }
 
     /**
-     * Derive the CP display state — progress within the 0.15–0.59 generation
-     * band plus a status message — from one async poll response.
+     * Derive the CP display state from one async poll response: the progress
+     * value (within the 0.15–0.59 generation band), a status message, and a
+     * stable "clip key" the caller uses to refresh the message only when the
+     * clip (or stage) advances rather than on every poll.
      *
      * The service reports real progress in a nullable `progress` object
      * ({stage, chunks_total, chunks_done, percent, message}). It is null (or
      * absent on services ≤ v0.56.0) when the job hasn't started, has reached a
      * terminal status, or the server restarted mid-run — in all of those cases
-     * fall back to the previous time-based estimate. Display only: job state
-     * is driven solely by `status`, never by `progress`.
+     * fall back to the previous time-based estimate and a null key (nothing
+     * stable to key on). Display only: job state is driven solely by `status`,
+     * never by `progress`.
      *
      * @param array<mixed> $pollBody
-     * @return array{0: float, 1: string}
+     * @return array{0: float, 1: string, 2: string|null}
      */
     private function asyncDisplayState(array $pollBody, int $elapsed): array
     {
@@ -581,7 +596,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         $info = $pollBody['progress'] ?? null;
         if (!is_array($info)) {
-            return [$fallbackProgress, $fallbackMessage];
+            return [$fallbackProgress, $fallbackMessage, null];
         }
 
         $percent = is_numeric($info['percent'] ?? null) ? (int)$info['percent'] : 0;
@@ -594,7 +609,15 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $message = $info['message'] ?? null;
         $message = is_string($message) ? trim($message) : '';
 
-        return [$progress, $message !== '' ? $message : $fallbackMessage];
+        // Stable key for the current clip/stage: changes when the service moves
+        // to the next clip (chunks_done) or into stitching, but NOT when only the
+        // baked-in ETA in the message wobbles. Prefer chunks_done; fall back to
+        // percent; null if the service reports neither numerically.
+        $stage = is_string($info['stage'] ?? null) ? $info['stage'] : '';
+        $clip = $info['chunks_done'] ?? ($info['percent'] ?? null);
+        $key = is_numeric($clip) ? $stage . ':' . (int)$clip : null;
+
+        return [$progress, $message !== '' ? $message : $fallbackMessage, $key];
     }
 
     /**
@@ -804,15 +827,12 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
 
-        // Custom endpoint: long text uses the async job (we poll up to
-        // ASYNC_MAX_WAIT_SECONDS), shorter text is one synchronous request that
-        // the service chunks internally (up to the 300s cURL ceiling).
+        // Custom endpoint: every generation now runs through the async job (we
+        // poll up to ASYNC_MAX_WAIT_SECONDS), falling back to a synchronous
+        // send-whole only when the service lacks the async endpoint — so reserve
+        // the async wait budget for all Alias TTS jobs.
         if ($settings->usesCustomEndpoint()) {
-            if (mb_strlen(trim($this->text ?? '')) > self::ASYNC_TEXT_THRESHOLD) {
-                return self::ASYNC_MAX_WAIT_SECONDS + 120;
-            }
-
-            return 120 + 300;
+            return self::ASYNC_MAX_WAIT_SECONDS + 120;
         }
 
         $text = $this->text ?? '';

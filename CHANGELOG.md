@@ -1,6 +1,6 @@
 # Release Notes for Bespoken
 
-## 5.4.0 - Unreleased
+## 5.4.0 - 2026-09-02
 
 ### Added
 

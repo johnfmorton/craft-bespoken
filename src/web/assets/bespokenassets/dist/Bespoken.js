@@ -254,7 +254,7 @@
   };
   customElements.define("modal-dialog", ModalDialog);
 
-  // node_modules/@lit/reactive-element/css-tag.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/css-tag.js
   var t = globalThis;
   var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
   var s = Symbol();
@@ -299,7 +299,7 @@
     return r(e5);
   })(t4) : t4;
 
-  // node_modules/@lit/reactive-element/reactive-element.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/reactive-element.js
   var { is: i2, defineProperty: e2, getOwnPropertyDescriptor: h, getOwnPropertyNames: r2, getOwnPropertySymbols: o2, getPrototypeOf: n2 } = Object;
   var a = globalThis;
   var c2 = a.trustedTypes;
@@ -521,7 +521,7 @@
   };
   y.elementStyles = [], y.shadowRootOptions = { mode: "open" }, y[d("elementProperties")] = /* @__PURE__ */ new Map(), y[d("finalized")] = /* @__PURE__ */ new Map(), p?.({ ReactiveElement: y }), (a.reactiveElementVersions ??= []).push("2.1.2");
 
-  // node_modules/lit-html/lit-html.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/lit-html/lit-html.js
   var t2 = globalThis;
   var i3 = (t4) => t4;
   var s2 = t2.trustedTypes;
@@ -775,7 +775,7 @@
     return h3._$AI(t4), h3;
   };
 
-  // node_modules/lit-element/lit-element.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/lit-element/lit-element.js
   var s3 = globalThis;
   var i4 = class extends y {
     constructor() {
@@ -804,14 +804,14 @@
   o4?.({ LitElement: i4 });
   (s3.litElementVersions ??= []).push("4.2.2");
 
-  // node_modules/@lit/reactive-element/decorators/custom-element.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/decorators/custom-element.js
   var t3 = (t4) => (e5, o6) => {
     void 0 !== o6 ? o6.addInitializer(() => {
       customElements.define(t4, e5);
     }) : customElements.define(t4, e5);
   };
 
-  // node_modules/@lit/reactive-element/decorators/property.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/decorators/property.js
   var o5 = { attribute: true, type: String, converter: u, reflect: false, hasChanged: f };
   var r4 = (t4 = o5, e5, r6) => {
     const { kind: n5, metadata: i5 } = r6;
@@ -841,12 +841,12 @@
     })(t4, e5, o6);
   }
 
-  // node_modules/@lit/reactive-element/decorators/state.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/decorators/state.js
   function r5(r6) {
     return n4({ ...r6, state: true, attribute: false });
   }
 
-  // node_modules/progress-component/progress-component.js
+  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/progress-component/progress-component.js
   var __decorate = function(decorators, target, key, desc) {
     var c4 = arguments.length, r6 = c4 < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d3;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r6 = Reflect.decorate(decorators, target, key, desc);
@@ -1530,16 +1530,23 @@
     return "invalid";
   }
   function _getMatrixViewType(element) {
-    if (element.querySelector(".nested-element-cards")) {
+    const container = element.querySelector(".nested-element-cards, .blocks, .element-index");
+    if (!container) {
+      return "unknown";
+    }
+    if (container.classList.contains("nested-element-cards")) {
       return "cards";
     }
-    if (element.querySelector(".blocks")) {
+    if (container.classList.contains("blocks")) {
       return "inline-editable-elements";
     }
-    if (element.querySelector(".element-index")) {
-      return "element-index";
-    }
-    return "unknown";
+    return "element-index";
+  }
+  function _getOwnMatrixBlocks(blocksContainer) {
+    return Array.from(blocksContainer.querySelectorAll(".matrixblock")).filter((block) => block.closest(".blocks") === blocksContainer);
+  }
+  function _getOwnBlockFields(block) {
+    return Array.from(block.querySelectorAll(".fields .field")).filter((field) => field.closest(".matrixblock") === block);
   }
   function _parseFieldHandles(input) {
     const result = [];
@@ -2010,22 +2017,18 @@
                   case "inline-editable-elements": {
                     let targetFieldInline = targetField.querySelector(".blocks");
                     if (targetFieldInline) {
-                      const blocks = Array.from(targetFieldInline.querySelectorAll(".matrixblock"));
+                      const blocks = _getOwnMatrixBlocks(targetFieldInline);
                       const statuses = await _getElementStatuses(blocks.map((b3) => b3.getAttribute("data-id")), actionUrl);
                       for (const block of blocks) {
                         const id = block.getAttribute("data-id");
-                        const enabledInput = block.querySelector('input[name$="[enabled]"]');
+                        const enabledInput = block.querySelector(':scope > input[name$="[enabled]"]');
                         const domDisabled = block.classList.contains("disabled-entry") || enabledInput !== null && enabledInput.value === "";
                         const serverStatus = id !== null ? statuses[id] : void 0;
                         const serverDisabled = serverStatus != null && serverStatus !== "live";
                         if (domDisabled || serverDisabled) {
                           continue;
                         }
-                        const fieldsContainerElement = block.querySelector(".fields");
-                        if (!fieldsContainerElement) {
-                          continue;
-                        }
-                        const fieldElements = Array.from(fieldsContainerElement.querySelectorAll(".field"));
+                        const fieldElements = _getOwnBlockFields(block);
                         for (const field of fieldElements) {
                           const fieldHandle = field.getAttribute("data-attribute");
                           for (const nestedHandle of nestedHandles) {

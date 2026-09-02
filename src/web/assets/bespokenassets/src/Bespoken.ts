@@ -17,6 +17,8 @@ import {
     _getFieldText,
     _cleanTitle,
     _getMatrixViewType,
+    _getOwnMatrixBlocks,
+    _getOwnBlockFields,
     _getFieldTextViaAPI,
     _getFieldType,
     _parseFieldHandles,
@@ -696,7 +698,11 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
 
                                     // if the matrix field has nested elements then...
                                     if (targetFieldInline) {
-                                        const blocks = Array.from(targetFieldInline.querySelectorAll('.matrixblock'));
+                                        // Only this field's own blocks. A Matrix field nested
+                                        // inside a block renders its blocks in here too, and
+                                        // those must not be scraped as top-level blocks as
+                                        // well (issue #33).
+                                        const blocks = _getOwnMatrixBlocks(targetFieldInline);
                                         // The DOM only marks blocks that are disabled globally
                                         // (disabled-entry class / cleared [enabled] input). A block
                                         // disabled for the current site only renders with no marker
@@ -704,7 +710,10 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                                         const statuses = await _getElementStatuses(blocks.map(b => b.getAttribute('data-id')), actionUrl);
                                         for (const block of blocks) {
                                             const id = block.getAttribute('data-id');
-                                            const enabledInput = block.querySelector('input[name$="[enabled]"]') as HTMLInputElement | null;
+                                            // The block's own [enabled] input is a direct child of
+                                            // .matrixblock; a descendant query could pick up a
+                                            // nested block's input instead.
+                                            const enabledInput = block.querySelector(':scope > input[name$="[enabled]"]') as HTMLInputElement | null;
                                             const domDisabled = block.classList.contains('disabled-entry')
                                                 || (enabledInput !== null && enabledInput.value === '');
                                             const serverStatus = id !== null ? statuses[id] : undefined;
@@ -712,14 +721,10 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                                             if (domDisabled || serverDisabled) {
                                                 continue;
                                             }
-                                            // get the .fields element
-                                            const fieldsContainerElement = block.querySelector('.fields');
-                                            if (!fieldsContainerElement) {
-                                                continue;
-                                            }
-
-                                            // find the .field element
-                                            const fieldElements = Array.from(fieldsContainerElement.querySelectorAll('.field'));
+                                            // The block's own fields only — a nested Matrix
+                                            // field's blocks carry the same handles and would
+                                            // otherwise be read here as well (issue #33).
+                                            const fieldElements = _getOwnBlockFields(block);
 
                                             // loop through the field elements
                                             for (const field of fieldElements) {

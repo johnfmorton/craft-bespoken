@@ -400,7 +400,7 @@ class BespokenController extends Controller
     private function _prepareTextForTts(string $text, string $pronunciationRuleSet): string
     {
         // Accommodate users who have not updated their settings.
-        if (!$pronunciationRuleSet || $pronunciationRuleSet === '') {
+        if (!$pronunciationRuleSet) {
             $pronunciationRuleSet = 'language1';
         }
 
@@ -410,14 +410,14 @@ class BespokenController extends Controller
         // Upgrade the legacy 2-key pronunciations array (no rule set) in place,
         // defaulting it to language1.
         if (count($pronunciations) > 0 and count($pronunciations[0]) == 2) {
-            $pronunciations = array_map(function ($pronunciation) {
+            $pronunciations = array_map(function($pronunciation) {
                 return ['word' => $pronunciation['word'], 'pronunciation' => $pronunciation['pronunciation'], 'pronunciationRuleSet' => 'language1'];
             }, $pronunciations);
         }
 
         // Keep only the rules for the active rule set (lets different voices use
         // different pronunciations for the same word on multilingual sites).
-        $filteredPronunciations = array_filter($pronunciations, function ($pronunciation) use ($pronunciationRuleSet) {
+        $filteredPronunciations = array_filter($pronunciations, function($pronunciation) use ($pronunciationRuleSet) {
             return $pronunciation['pronunciationRuleSet'] == $pronunciationRuleSet;
         });
 
@@ -442,12 +442,20 @@ class BespokenController extends Controller
         // Convert non-breaking spaces (U+00A0) to regular spaces.
         $text = str_replace("\u{00A0}", ' ', $text);
 
-        // Collapse every run of whitespace — including the paragraph newlines added
-        // upstream — to a single space. Each block already had a sentence-ending
-        // period appended client-side, so that marks the boundary for the TTS; a
-        // stray "\n\n" sent to a self-hosted (Chatterbox) endpoint can surface as
-        // an audible gap. Long text is still chunked on sentence boundaries.
-        $text = preg_replace('/\s+/', ' ', $text);
+        // Normalize whitespace while KEEPING paragraph breaks. Horizontal runs
+        // collapse to one space; every run of newlines (with any spaces around
+        // it) becomes exactly one blank line. The client-side prep emits "\n\n"
+        // between blocks, and both providers rely on those breaks: the
+        // ElevenLabs path sends a post that fits in one request as-is, blank
+        // lines included (as it always has), and splits longer posts at
+        // paragraph boundaries first (joining paragraphs with a space inside
+        // each chunk); the Alias TTS service treats a blank line as a block
+        // seam, inserting its longer paragraph pause there instead of the short
+        // sentence gap. Normalizing to a single "\n\n" also fixes the old bug
+        // that doubled an existing break into "\n\n\n".
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace('/[^\S\n]+/', ' ', $text);
+        $text = preg_replace('/ *\n[\n ]*/', "\n\n", $text);
 
         // Strip angle brackets — a stray "<" is interpreted as SSML/XML markup,
         // silently swallowing content.
@@ -478,20 +486,24 @@ class BespokenController extends Controller
         // Trim leading/trailing spaces that padding may have introduced.
         $text = trim($text);
 
-        // Collapse any double-spaces introduced by the angle-bracket removal.
+        // Collapse any double-spaces introduced by the angle-bracket removal, and
+        // re-tighten paragraph breaks it may have padded with spaces.
         $text = preg_replace('/[^\S\n]+/', ' ', $text);
+        $text = preg_replace('/ *\n\n */', "\n\n", $text);
 
         // Drop spaces left *before* end-of-token punctuation, so a replaced word
         // at a sentence end yields "editor." not "editor .". The (?=\s|$) guard
-        // leaves dot-prefixed words (".NET", ".gitignore") untouched.
-        $text = preg_replace('/ +([.,;:!?])(?=\s|$)/', '$1', $text);
+        // leaves dot-prefixed words (".NET", ".gitignore") untouched. Only
+        // horizontal whitespace is matched so a paragraph break is never bridged.
+        $text = preg_replace('/[^\S\n]+([.,;:!?])(?=\s|$)/', '$1', $text);
 
         // Collapse accidental double punctuation from the client-side appended
         // period: soft mark + period -> period; "!"/"?" + period -> keep the mark;
-        // period + period -> single (ellipsis "..." preserved).
-        $text = preg_replace('/[,;:]+\s*\.(?=\s|$)/', '.', $text);
-        $text = preg_replace('/([!?])\s*\.(?=\s|$)/', '$1', $text);
-        $text = preg_replace('/(?<!\.)\.\s*\.(?=\s|$)/', '.', $text);
+        // period + period -> single (ellipsis "..." preserved). Again across
+        // horizontal whitespace only, so paragraph breaks survive.
+        $text = preg_replace('/[,;:]+[^\S\n]*\.(?=\s|$)/', '.', $text);
+        $text = preg_replace('/([!?])[^\S\n]*\.(?=\s|$)/', '$1', $text);
+        $text = preg_replace('/(?<!\.)\.[^\S\n]*\.(?=\s|$)/', '.', $text);
 
         return $text;
     }

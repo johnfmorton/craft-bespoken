@@ -124,3 +124,101 @@
     border-radius: 2px;
     transition: width 0.4s ease;
 }
+
+/* Editable preview: field status line (only visible while an edited script is in use) */
+.bespoken-script-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid #d6e4f2;
+    border-left: 3px solid #0b69a3;
+    border-radius: 4px;
+    background: #f3f7fc;
+    font-size: 12px;
+    color: #3c4858;
+}
+
+.bespoken-script-status[hidden] {
+    display: none;
+}
+
+.bespoken-script-status--stale {
+    border-color: #f3d9b1;
+    border-left-color: #cf6d00;
+    background: #fff8ee;
+}
+
+.bespoken-script-status-text {
+    flex: 1 1 240px;
+}
+
+.bespoken-script-status-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+}
+
+/* Editable preview: dialog body. Slotted content inherits pre-wrap from the
+   dialog, which is right for the script but not for the notices. */
+.bespoken-script-notice {
+    white-space: normal;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border: 1px solid #d6e4f2;
+    border-radius: 4px;
+    background: #f3f7fc;
+    color: #3c4858;
+}
+
+.bespoken-script-notice--warning {
+    border-color: #f3d9b1;
+    background: #fff8ee;
+}
+
+.bespoken-script-view {
+    white-space: pre-wrap;
+}
+
+.bespoken-script-editor {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid #cdd8e4;
+    border-radius: 4px;
+    font: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    white-space: pre-wrap;
+}
+
+.bespoken-script-editor:focus {
+    outline: none;
+    border-color: #0b69a3;
+    box-shadow: 0 0 0 2px rgba(11, 105, 163, 0.2);
+}
+
+.bespoken-script-meta {
+    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #596673;
+    font-variant-numeric: tabular-nums;
+}
+
+.bespoken-script-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    width: 100%;
+}

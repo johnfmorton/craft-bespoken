@@ -1532,16 +1532,23 @@
     return "invalid";
   }
   function _getMatrixViewType(element) {
-    if (element.querySelector(".nested-element-cards")) {
+    const container = element.querySelector(".nested-element-cards, .blocks, .element-index");
+    if (!container) {
+      return "unknown";
+    }
+    if (container.classList.contains("nested-element-cards")) {
       return "cards";
     }
-    if (element.querySelector(".blocks")) {
+    if (container.classList.contains("blocks")) {
       return "inline-editable-elements";
     }
-    if (element.querySelector(".element-index")) {
-      return "element-index";
-    }
-    return "unknown";
+    return "element-index";
+  }
+  function _getOwnMatrixBlocks(blocksContainer) {
+    return Array.from(blocksContainer.querySelectorAll(".matrixblock")).filter((block) => block.closest(".blocks") === blocksContainer);
+  }
+  function _getOwnBlockFields(block) {
+    return Array.from(block.querySelectorAll(".fields .field")).filter((field) => field.closest(".matrixblock") === block);
   }
   function _parseFieldHandles(input) {
     const result = [];
@@ -2159,22 +2166,18 @@
                   case "inline-editable-elements": {
                     let targetFieldInline = targetField.querySelector(".blocks");
                     if (targetFieldInline) {
-                      const blocks = Array.from(targetFieldInline.querySelectorAll(".matrixblock"));
+                      const blocks = _getOwnMatrixBlocks(targetFieldInline);
                       const statuses = await _getElementStatuses(blocks.map((b3) => b3.getAttribute("data-id")), actionUrl);
                       for (const block of blocks) {
                         const id = block.getAttribute("data-id");
-                        const enabledInput = block.querySelector('input[name$="[enabled]"]');
+                        const enabledInput = block.querySelector(':scope > input[name$="[enabled]"]');
                         const domDisabled = block.classList.contains("disabled-entry") || enabledInput !== null && enabledInput.value === "";
                         const serverStatus = id !== null ? statuses[id] : void 0;
                         const serverDisabled = serverStatus != null && serverStatus !== "live";
                         if (domDisabled || serverDisabled) {
                           continue;
                         }
-                        const fieldsContainerElement = block.querySelector(".fields");
-                        if (!fieldsContainerElement) {
-                          continue;
-                        }
-                        const fieldElements = Array.from(fieldsContainerElement.querySelectorAll(".field"));
+                        const fieldElements = _getOwnBlockFields(block);
                         for (const field of fieldElements) {
                           const fieldHandle = field.getAttribute("data-attribute");
                           for (const nestedHandle of nestedHandles) {

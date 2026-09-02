@@ -410,17 +410,66 @@ export function _getFieldType(element: HTMLElement): 'plain-text' | 'ckeditor' |
 }
 
 
+/*
+* _getMatrixViewType
+* description: Detect how a Matrix field is displayed in the editor (cards,
+* inline-editable blocks, or an element index) from its container markup.
+*
+* The three containers are queried together so the outermost one wins:
+* querySelector returns the first match in document order, and a Matrix
+* field's own container always precedes anything rendered inside its blocks.
+* Checking the selectors one at a time would let a nested Matrix field's
+* container win instead — e.g. a cards-mode Matrix inside an inline-editable
+* block would make the whole field look like it was in cards mode.
+ */
 export function _getMatrixViewType(element: HTMLElement):  'cards' | 'inline-editable-elements' | 'element-index' | 'unknown' {
-    if (element.querySelector('.nested-element-cards')) {
+    const container = element.querySelector('.nested-element-cards, .blocks, .element-index');
+    if (!container) {
+        return 'unknown';
+    }
+    if (container.classList.contains('nested-element-cards')) {
         return 'cards';
     }
-    if (element.querySelector('.blocks')) {
+    if (container.classList.contains('blocks')) {
         return 'inline-editable-elements';
     }
-    if (element.querySelector('.element-index')) {
-        return 'element-index';
-    }
-    return 'unknown';
+    return 'element-index';
+}
+
+/*
+* _getOwnMatrixBlocks
+* params: blocksContainer: the Matrix field's `.blocks` list
+* description: The inline-editable blocks that belong directly to this Matrix
+* field — not the blocks of a Matrix field nested inside one of them.
+*
+* Craft renders a nested Matrix field's blocks inside the parent block's
+* `.fields` wrapper, so a plain descendant query for `.matrixblock` returns
+* the nested blocks as well. Their text would then be scraped twice: once
+* through the parent block's fields and again as blocks in their own right
+* (issue #33). Only nested Matrix fields in blocks view render this way; in
+* cards or index view the nested blocks are not in the DOM at all.
+ */
+export function _getOwnMatrixBlocks(blocksContainer: Element): HTMLElement[] {
+    return Array.from(blocksContainer.querySelectorAll<HTMLElement>('.matrixblock'))
+        .filter(block => block.closest('.blocks') === blocksContainer);
+}
+
+/*
+* _getOwnBlockFields
+* params: block: a `.matrixblock` element
+* description: The `.field` wrappers in the block's own field layout — not
+* the fields of blocks in a nested Matrix field, which sit inside their own
+* `.matrixblock` further down the tree. A nested Matrix field's wrapper
+* itself is still included (it is one of the block's own fields); it just
+* contributes no text, as _getFieldText only reads text-type fields.
+*
+* Ownership is decided by the nearest `.matrixblock` ancestor rather than by
+* direct parentage, because Craft wraps a block's fields in tab containers
+* (`.flex-fields`) between `.fields` and each `.field`.
+ */
+export function _getOwnBlockFields(block: Element): HTMLElement[] {
+    return Array.from(block.querySelectorAll<HTMLElement>('.fields .field'))
+        .filter(field => field.closest('.matrixblock') === block);
 }
 
 

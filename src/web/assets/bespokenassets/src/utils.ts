@@ -510,3 +510,63 @@ function _isHTML(input: string): boolean {
   const htmlTagRegex = /<\/?[a-z][\s\S]*?>/i;
   return htmlTagRegex.test(input);
 }
+
+/**
+ * Whitespace shape shared with the server's text prep: horizontal runs collapse
+ * to one space, every run of newlines (with any spaces around it) becomes exactly
+ * one blank line, and the ends are trimmed. Applied to the generated script so
+ * the preview shows exactly the paragraph structure that is sent.
+ */
+export function normalizeScriptWhitespace(text: string): string {
+  return (text || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n[\n ]*/g, '\n\n')
+    .trim();
+}
+
+// Characters the TTS services can't voice: emoji and pictographic blocks, their
+// modifiers (variation selectors, ZWJ, keycaps, regional-indicator flags), and
+// angle brackets (read as markup). Same set the server strips.
+const UNSUPPORTED_SCRIPT_CHARS = /[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F0FF}\u{1F100}-\u{1F2FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{2190}-\u{21FF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{20E3}<>]/gu;
+
+export interface FinalizedScript {
+  text: string;
+  removedCount: number;
+}
+
+/**
+ * Bring a hand-edited script into the shape an entry-derived script has when it
+ * leaves the client: unsupported characters removed, whitespace normalized, and
+ * every paragraph ending in a sentence mark (dropping a trailing comma, colon,
+ * or semicolon first). Mirrors the block prep applied to entry content, so what
+ * the editor sees in the preview is what the TTS service receives.
+ */
+export function finalizeEditedScript(input: string): FinalizedScript {
+  let removedCount = 0;
+  let text = (input || '').replace(UNSUPPORTED_SCRIPT_CHARS, () => {
+    removedCount++;
+    return '';
+  });
+  text = normalizeScriptWhitespace(text);
+
+  const paragraphs = text
+    .split('\n\n')
+    .map(paragraph => {
+      paragraph = paragraph.trim();
+      if (paragraph === '') {
+        return '';
+      }
+      if (!/[.!?]['"\u201D\u2019]?$/.test(paragraph)) {
+        paragraph = paragraph.replace(/[,;:]+$/, '').replace(/\s+$/, '');
+        if (paragraph !== '') {
+          paragraph += '.';
+        }
+      }
+      return paragraph;
+    })
+    .filter(paragraph => paragraph !== '');
+
+  return { text: paragraphs.join('\n\n'), removedCount };
+}

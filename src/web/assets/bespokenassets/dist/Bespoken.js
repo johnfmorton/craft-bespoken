@@ -1,9 +1,19 @@
 (() => {
   // src/web/assets/bespokenassets/src/bespoken-modal.ts
-  var ModalDialog = class extends HTMLElement {
+  var ModalDialog = class _ModalDialog extends HTMLElement {
     constructor() {
       super();
-      this.debounceTimeout = null;
+      this.opener = null;
+      this.resizeObserver = null;
+      this.documentKeydownBound = false;
+      // Escape closes — but only this dialog, and only while it is open, so several
+      // dialogs on one page don't all react to the same keypress.
+      this.onDocumentKeydown = (event) => {
+        if (event.key === "Escape" && this.isOpen) {
+          event.preventDefault();
+          this.close();
+        }
+      };
       const shadow = this.attachShadow({ mode: "open" });
       const style = document.createElement("style");
       style.textContent = `
@@ -39,6 +49,10 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        min-height: 0;
+      }
+      :host([wide]) .inner-container {
+        max-width: 900px;
       }
       .close-button {
         position: absolute;
@@ -47,6 +61,8 @@
         background: none;
         border: none;
         font-size: 20px;
+        line-height: 1;
+        padding: 4px 8px;
         cursor: pointer;
       }
       .title {
@@ -54,6 +70,7 @@
         font-size: 1.25em;
         font-weight: bold;
         margin-bottom: 4px;
+        padding-right: 32px;
         flex: 0 0 auto;
       }
       .description {
@@ -68,13 +85,29 @@
         margin: 10px 0;
         flex: 0 0 auto;
       }
+      /* min-height: 0 lets the flex item shrink below its content size so the
+         body scrolls inside the 85vh dialog instead of overflowing it. */
       .content-container {
         flex: 1 1 auto;
         overflow-y: auto;
+        min-height: 0;
+        outline-offset: -2px;
       }
       .content {
         font-size: 1em;
         white-space: pre-wrap;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+        margin-top: 12px;
+      }
+      .actions.is-empty {
+        display: none;
       }
     `;
       shadow.appendChild(style);
@@ -82,9 +115,13 @@
       this.modal.className = "modal";
       this.innerContainer = document.createElement("div");
       this.innerContainer.className = "inner-container";
+      this.innerContainer.setAttribute("role", "dialog");
+      this.innerContainer.setAttribute("aria-modal", "true");
       this.closeButton = document.createElement("button");
+      this.closeButton.type = "button";
       this.closeButton.className = "close-button";
       this.closeButton.textContent = "X";
+      this.closeButton.setAttribute("aria-label", "Close dialog");
       this.closeButton.addEventListener("click", () => this.close());
       this.innerContainer.appendChild(this.closeButton);
       const titleSlot = document.createElement("slot");
@@ -97,15 +134,26 @@
       separator.className = "separator";
       this.contentContainer = document.createElement("section");
       this.contentContainer.className = "content-container";
-      this.contentContainer.tabIndex = 0;
+      this.contentContainer.tabIndex = -1;
       const contentSlot = document.createElement("slot");
       contentSlot.name = "content";
       contentSlot.className = "content";
+      contentSlot.addEventListener("slotchange", () => this.updateScrollRegionFocusability());
+      this.contentContainer.appendChild(contentSlot);
+      this.actionsContainer = document.createElement("div");
+      this.actionsContainer.className = "actions is-empty";
+      const actionsSlot = document.createElement("slot");
+      actionsSlot.name = "actions";
+      actionsSlot.addEventListener("slotchange", () => {
+        const hasActions = actionsSlot.assignedElements().length > 0;
+        this.actionsContainer.classList.toggle("is-empty", !hasActions);
+      });
+      this.actionsContainer.appendChild(actionsSlot);
       this.innerContainer.appendChild(titleSlot);
       this.innerContainer.appendChild(descriptionSlot);
       this.innerContainer.appendChild(separator);
-      this.contentContainer.appendChild(contentSlot);
       this.innerContainer.appendChild(this.contentContainer);
+      this.innerContainer.appendChild(this.actionsContainer);
       this.modal.appendChild(this.innerContainer);
       shadow.appendChild(this.modal);
       if (this.hasAttribute("x-cloak")) {
@@ -116,120 +164,62 @@
           this.close();
         }
       });
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          this.close();
-        }
-      });
       this.modal.addEventListener("keydown", (event) => {
-        if (event.key === "Tab" && this.modal.classList.contains("show")) {
+        if (event.key === "Tab" && this.isOpen) {
           this.trapFocus(event);
         }
       });
-      this.resizeObserver = new ResizeObserver(() => {
-        this.debouncedHandleResize();
-      });
+      if (typeof ResizeObserver !== "undefined") {
+        this.resizeObserver = new ResizeObserver(() => this.updateScrollRegionFocusability());
+      }
     }
-    // Method to open the modal dialog
+    static {
+      this.FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    }
+    /** Whether the dialog is currently shown. */
+    get isOpen() {
+      return this.modal.classList.contains("show");
+    }
+    /** Show the dialog and move focus into it. */
     open() {
+      if (this.isOpen) {
+        return;
+      }
+      this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      this.syncAriaLabel();
       this.modal.classList.add("show");
       document.body.style.overflow = "hidden";
-      this.calculateContentHeight();
-      this.resizeObserver.observe(document.body);
+      if (this.resizeObserver) {
+        this.resizeObserver.observe(this.contentContainer);
+      }
+      this.updateScrollRegionFocusability();
       this.focusFirstElement();
+      this.dispatchEvent(new CustomEvent("bespoken-modal-open", { bubbles: true, composed: true }));
     }
-    // Method to close the modal dialog
+    /** Hide the dialog and return focus to whatever opened it. */
     close() {
+      if (!this.isOpen) {
+        return;
+      }
       this.modal.classList.remove("show");
       document.body.style.overflow = "";
-      this.resizeObserver.unobserve(document.body);
-    }
-    // Method to calculate and set the content container's max height dynamically
-    calculateContentHeight() {
-      const innerContainerHeight = this.innerContainer.getBoundingClientRect().height;
-      const otherElementsHeight = this.closeButton.offsetHeight + 40;
-      const maxHeight = innerContainerHeight - otherElementsHeight;
-      this.contentContainer.style.maxHeight = `${maxHeight}px`;
-    }
-    // Debounced function to handle window resize events
-    debouncedHandleResize() {
-      if (this.debounceTimeout) {
-        clearTimeout(this.debounceTimeout);
+      if (this.resizeObserver) {
+        this.resizeObserver.unobserve(this.contentContainer);
       }
-      this.debounceTimeout = window.setTimeout(() => {
-        this.calculateContentHeight();
-      }, 200);
+      this.dispatchEvent(new CustomEvent("bespoken-modal-close", { bubbles: true, composed: true }));
+      const opener = this.opener;
+      this.opener = null;
+      if (opener && document.contains(opener)) {
+        opener.focus();
+      }
     }
-    // Method to set the title content
     setTitle(title) {
-      let titleElement = this.querySelector('[slot="title"]');
-      if (title) {
-        if (!titleElement) {
-          titleElement = document.createElement("span");
-          titleElement.slot = "title";
-          this.appendChild(titleElement);
-        }
-        titleElement.textContent = title;
-        titleElement.style.display = "block";
-      } else if (titleElement) {
-        titleElement.style.display = "none";
-      }
+      this.setSlotText("title", title);
     }
-    // Method to set the description content
     setDescription(description) {
-      let descriptionElement = this.querySelector('[slot="description"]');
-      if (description) {
-        if (!descriptionElement) {
-          descriptionElement = document.createElement("span");
-          descriptionElement.slot = "description";
-          this.appendChild(descriptionElement);
-        }
-        descriptionElement.textContent = description;
-        descriptionElement.style.display = "block";
-      } else if (descriptionElement) {
-        descriptionElement.style.display = "none";
-      }
+      this.setSlotText("description", description);
     }
-    // Trap focus inside the modal
-    // Trap focus inside the modal
-    trapFocus(event) {
-      const focusableElements = this.shadowRoot.querySelectorAll(
-        ".close-button, .content-container"
-      );
-      const focusArray = Array.from(focusableElements);
-      const activeElement = this.shadowRoot.activeElement;
-      const currentIndex = focusArray.indexOf(activeElement);
-      if (event.shiftKey && currentIndex === 0) {
-        focusArray[focusArray.length - 1].focus();
-        event.preventDefault();
-      } else if (!event.shiftKey && currentIndex === focusArray.length - 1) {
-        focusArray[0].focus();
-        event.preventDefault();
-      }
-    }
-    // Focus the first focusable element in the modal
-    focusFirstElement() {
-      const focusableElements = this.shadowRoot.querySelectorAll(
-        ".close-button, .content-container"
-      );
-      if (focusableElements.length > 0) {
-        focusableElements[0].focus();
-      }
-    }
-    // Lifecycle hook that runs when the component is added to the DOM
-    connectedCallback() {
-      this.initializeSlots();
-    }
-    // Method to initialize slots and apply styles if default content is present
-    initializeSlots() {
-      const descriptionElement = this.querySelector('[slot="description"]');
-      if (descriptionElement && descriptionElement.textContent.trim() !== "") {
-        descriptionElement.style.display = "block";
-      } else if (descriptionElement) {
-        descriptionElement.style.display = "none";
-      }
-    }
-    // Method to set the main content
+    /** Replace the body with plain text (rendered pre-wrap) or an element. */
     setContent(content) {
       let contentElement = this.querySelector('[slot="content"]');
       if (!contentElement) {
@@ -243,16 +233,134 @@
         contentElement.innerHTML = "";
         contentElement.appendChild(content);
       }
+      this.updateScrollRegionFocusability();
     }
-    // Lifecycle hook that runs when the component is removed from the DOM
-    disconnectedCallback() {
-      if (this.debounceTimeout) {
-        clearTimeout(this.debounceTimeout);
+    /**
+     * Replace the footer buttons. Pass null to remove the footer entirely; it is
+     * also hidden automatically while the slot is empty.
+     */
+    setActions(actions) {
+      const existing = this.querySelector('[slot="actions"]');
+      if (existing) {
+        existing.remove();
       }
-      this.resizeObserver.disconnect();
+      if (actions) {
+        actions.slot = "actions";
+        this.appendChild(actions);
+      }
+      this.actionsContainer.classList.toggle("is-empty", !actions);
+    }
+    connectedCallback() {
+      this.initializeSlots();
+      if (!this.documentKeydownBound) {
+        document.addEventListener("keydown", this.onDocumentKeydown);
+        this.documentKeydownBound = true;
+      }
+    }
+    disconnectedCallback() {
+      if (this.documentKeydownBound) {
+        document.removeEventListener("keydown", this.onDocumentKeydown);
+        this.documentKeydownBound = false;
+      }
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+      }
+      if (this.isOpen) {
+        document.body.style.overflow = "";
+      }
+    }
+    setSlotText(slotName, text) {
+      let element = this.querySelector(`[slot="${slotName}"]`);
+      if (text) {
+        if (!element) {
+          element = document.createElement("span");
+          element.slot = slotName;
+          this.appendChild(element);
+        }
+        element.textContent = text;
+        element.style.display = "block";
+      } else if (element) {
+        element.style.display = "none";
+      }
+    }
+    initializeSlots() {
+      const description = this.querySelector('[slot="description"]');
+      if (description) {
+        description.style.display = description.textContent.trim() !== "" ? "block" : "none";
+      }
+    }
+    /** Label the dialog for assistive tech from its title slot. */
+    syncAriaLabel() {
+      const title = this.querySelector('[slot="title"]');
+      const label = title ? title.textContent.trim() : "";
+      if (label) {
+        this.innerContainer.setAttribute("aria-label", label);
+      } else {
+        this.innerContainer.removeAttribute("aria-label");
+      }
+    }
+    /**
+     * The scroll region is keyboard-focusable only while it actually scrolls, so
+     * Tab doesn't stop on an inert box when the content fits.
+     */
+    updateScrollRegionFocusability() {
+      const scrolls = this.contentContainer.scrollHeight > this.contentContainer.clientHeight + 1;
+      this.contentContainer.tabIndex = scrolls ? 0 : -1;
+    }
+    /**
+     * Everything Tab can reach, in the order the browser visits it: the close
+     * button, focusables slotted into the header, the scroll region (when it
+     * scrolls), focusables slotted into the body, then the footer buttons.
+     */
+    focusableElements() {
+      const slotted = (slotName) => {
+        const found = [];
+        this.querySelectorAll(`[slot="${slotName}"]`).forEach((root) => {
+          if (root.matches(_ModalDialog.FOCUSABLE)) {
+            found.push(root);
+          }
+          root.querySelectorAll(_ModalDialog.FOCUSABLE).forEach((el) => found.push(el));
+        });
+        return found.filter((el) => el.getClientRects().length > 0);
+      };
+      const elements = [this.closeButton];
+      elements.push(...slotted("title"), ...slotted("description"));
+      if (this.contentContainer.tabIndex === 0) {
+        elements.push(this.contentContainer);
+      }
+      elements.push(...slotted("content"), ...slotted("actions"));
+      return elements;
+    }
+    /** The focused element, whether it lives in the shadow tree or is slotted. */
+    currentFocus() {
+      return this.shadowRoot.activeElement || document.activeElement;
+    }
+    trapFocus(event) {
+      const elements = this.focusableElements();
+      if (elements.length === 0) {
+        return;
+      }
+      const index = elements.indexOf(this.currentFocus());
+      if (event.shiftKey) {
+        if (index <= 0) {
+          elements[elements.length - 1].focus();
+          event.preventDefault();
+        }
+      } else if (index === -1 || index === elements.length - 1) {
+        elements[0].focus();
+        event.preventDefault();
+      }
+    }
+    focusFirstElement() {
+      const elements = this.focusableElements();
+      if (elements.length > 0) {
+        elements[0].focus();
+      }
     }
   };
-  customElements.define("modal-dialog", ModalDialog);
+  if (!customElements.get("modal-dialog")) {
+    customElements.define("modal-dialog", ModalDialog);
+  }
 
   // node_modules/@lit/reactive-element/css-tag.js
   var t = globalThis;
@@ -1570,6 +1678,104 @@
     const htmlTagRegex = /<\/?[a-z][\s\S]*?>/i;
     return htmlTagRegex.test(input);
   }
+  function normalizeScriptWhitespace(text) {
+    return (text || "").replace(/\r\n?/g, "\n").replace(/\u00A0/g, " ").replace(/[^\S\n]+/g, " ").replace(/ *\n[\n ]*/g, "\n\n").trim();
+  }
+  var UNSUPPORTED_SCRIPT_CHARS = /[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F0FF}\u{1F100}-\u{1F2FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{2190}-\u{21FF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{20E3}<>]/gu;
+  function finalizeEditedScript(input) {
+    let removedCount = 0;
+    let text = (input || "").replace(UNSUPPORTED_SCRIPT_CHARS, () => {
+      removedCount++;
+      return "";
+    });
+    text = normalizeScriptWhitespace(text);
+    const paragraphs = text.split("\n\n").map((paragraph) => {
+      paragraph = paragraph.trim();
+      if (paragraph === "") {
+        return "";
+      }
+      if (!/[.!?]['"\u201D\u2019]?$/.test(paragraph)) {
+        paragraph = paragraph.replace(/[,;:]+$/, "").replace(/\s+$/, "");
+        if (paragraph !== "") {
+          paragraph += ".";
+        }
+      }
+      return paragraph;
+    }).filter((paragraph) => paragraph !== "");
+    return { text: paragraphs.join("\n\n"), removedCount };
+  }
+
+  // src/web/assets/bespokenassets/src/scriptState.ts
+  var STORAGE_PREFIX = "bespoken:script:";
+  var memory = /* @__PURE__ */ new Map();
+  var fallbackKeys = /* @__PURE__ */ new WeakMap();
+  var fallbackCounter = 0;
+  function scriptStorageKey(fieldGroup) {
+    const elementId = inputValue('input[name="elementId"]');
+    const siteId = inputValue('input[name="siteId"]');
+    const handle = fieldGroup.getAttribute("data-bespoken-field-handle") || "";
+    if (elementId && handle) {
+      return `${STORAGE_PREFIX}${siteId}:${elementId}:${handle}`;
+    }
+    let key = fallbackKeys.get(fieldGroup);
+    if (!key) {
+      key = `${STORAGE_PREFIX}mem:${++fallbackCounter}`;
+      fallbackKeys.set(fieldGroup, key);
+    }
+    return key;
+  }
+  function loadEditedScript(key) {
+    const cached = memory.get(key);
+    if (cached) {
+      return cached;
+    }
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.text === "string" && typeof parsed.baseHash === "string") {
+        const script = {
+          text: parsed.text,
+          baseHash: parsed.baseHash,
+          updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now()
+        };
+        memory.set(key, script);
+        return script;
+      }
+    } catch (e5) {
+    }
+    return null;
+  }
+  function saveEditedScript(key, text, baseHash) {
+    const script = { text, baseHash, updatedAt: Date.now() };
+    memory.set(key, script);
+    try {
+      sessionStorage.setItem(key, JSON.stringify(script));
+    } catch (e5) {
+    }
+    return script;
+  }
+  function clearEditedScript(key) {
+    memory.delete(key);
+    try {
+      sessionStorage.removeItem(key);
+    } catch (e5) {
+    }
+  }
+  function hashText(text) {
+    let hash = 2166136261;
+    for (let i5 = 0; i5 < text.length; i5++) {
+      hash ^= text.charCodeAt(i5);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    return ("00000000" + hash.toString(16)).slice(-8);
+  }
+  function inputValue(selector) {
+    const input = document.querySelector(selector);
+    return input ? input.value : "";
+  }
 
   // src/web/assets/bespokenassets/src/Bespoken.ts
   document.addEventListener("DOMContentLoaded", () => {
@@ -1594,6 +1800,7 @@
     });
     const fieldGroups = document.querySelectorAll(".bespoken-fields");
     fieldGroups.forEach((fieldGroup) => {
+      initScriptStatus(fieldGroup);
       const creditInfoEl = fieldGroup.querySelector(".bespoken-credit-info");
       if (creditInfoEl) {
         fetchCreditInfo(creditInfoEl).then(() => {
@@ -1610,76 +1817,28 @@
     const button = event.target.closest(".bespoken-generate");
     if (!button) return;
     button.classList.add("disabled");
-    const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
-    const fieldGroup = event.target.closest(".bespoken-fields");
-    const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
-    const elementId = _getInputValue('input[name="elementId"]');
-    const title = _cleanTitle(_getInputValue("#title") || elementId);
-    const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
-    const voiceId = voiceSelect.value;
-    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]');
-    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]');
-    const voiceModelKeyValuePairs = voiceModelField.value;
-    const pronunciationRuleSetKeyValuePairs = pronunciationRuleSetField.value;
-    const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
-    const pronunciationRuleSetKeyValuePairsObject = JSON.parse(pronunciationRuleSetKeyValuePairs);
-    const voiceModelSelected = voiceModelKeyValuePairsObject[voiceId];
-    const pronunciationRuleSetSelected = pronunciationRuleSetKeyValuePairsObject[voiceId];
-    let fileNamePrefix = null;
-    fieldGroup.querySelectorAll('input[type="hidden"]').forEach((input) => {
-      if (input.name.includes("fileNamePrefix")) {
-        fileNamePrefix = input.value;
-      }
-    });
-    const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
-    console.log("Generated script:", text);
-    const creditInfoEl = fieldGroup.querySelector(".bespoken-credit-info");
-    showCreditEstimate(text.length, creditInfoEl, voiceModelSelected);
-    if (text.length === 0) {
+    const fieldGroup = button.closest(".bespoken-fields");
+    const active = await resolveActiveScript(fieldGroup);
+    if (active.mode === "edited" && active.stale) {
       button.classList.remove("disabled");
-      updateProgressComponent(progressComponent, {
-        progress: 0,
-        success: false,
-        message: "No text to generate audio from.",
-        textColor: "rgb(126,7,7)"
-      });
+      reportStaleScript(fieldGroup, active);
       return;
     }
-    const actionUrlProcessText = button.getAttribute("data-process-text-action-url") || "";
-    updateProgressComponent(progressComponent, {
-      progress: 0.1,
-      success: true,
-      message: "Preparing data",
-      textColor: "rgb(89, 102, 115)"
-    });
-    processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, pronunciationRuleSetSelected, voiceModelSelected);
+    startGeneration(fieldGroup, active.text);
   }
   async function handlePreviewButtonClick(event) {
     const button = event.target.closest(".bespoken-preview");
-    const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
     if (!button) return;
-    const elementId = _getInputValue('input[name="elementId"]');
-    const title = _cleanTitle(_getInputValue("#title") || elementId);
-    const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
-    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
-    const parentElement = event.target.closest(".bespoken-fields");
-    const creditInfoEl = parentElement.querySelector(".bespoken-credit-info");
-    const voiceSelect = parentElement.querySelector(".bespoken-voice-select select");
-    const voiceModelField = parentElement.querySelector('input[name*="voiceModel"]');
-    let previewVoiceModel = "";
-    if (voiceSelect && voiceModelField) {
-      try {
-        const voiceModelMap = JSON.parse(voiceModelField.value);
-        previewVoiceModel = voiceModelMap[voiceSelect.value] || "";
-      } catch (e5) {
-      }
-    }
-    showCreditEstimate(text.length, creditInfoEl, previewVoiceModel);
-    const modal = parentElement.querySelector(".bespoken-dialog");
-    if (modal) {
-      modal.setContent(text);
-      modal.open();
+    const fieldGroup = button.closest(".bespoken-fields");
+    button.classList.add("disabled");
+    try {
+      const active = await resolveActiveScript(fieldGroup);
+      const creditInfoEl = fieldGroup.querySelector(".bespoken-credit-info");
+      showCreditEstimate(active.text.length, creditInfoEl, getVoiceContext(fieldGroup).voiceModel);
+      renderScriptStatus(fieldGroup, active);
+      openScriptDialog(fieldGroup, active);
+    } finally {
+      button.classList.remove("disabled");
     }
   }
   async function handleHistoryButtonClick(event) {
@@ -1743,34 +1902,30 @@
     const button = event.target.closest(".bespoken-create-project");
     if (!button) return;
     button.classList.add("disabled");
-    const fieldGroup = event.target.closest(".bespoken-fields");
+    const fieldGroup = button.closest(".bespoken-fields");
     const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
-    const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
-    const actionUrlCreateProject = button.getAttribute("data-create-project-action-url") || "";
-    const elementId = _getInputValue('input[name="elementId"]');
-    const title = _cleanTitle(_getInputValue("#title") || elementId);
-    const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
-    const voiceId = voiceSelect ? voiceSelect.value : "";
-    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]');
-    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]');
-    let voiceModelSelected = "";
-    let pronunciationRuleSetSelected = "";
-    try {
-      voiceModelSelected = JSON.parse(voiceModelField?.value || "{}")[voiceId] || "";
-    } catch (e5) {
-    }
-    try {
-      pronunciationRuleSetSelected = JSON.parse(pronunciationRuleSetField?.value || "{}")[voiceId] || "";
-    } catch (e5) {
-    }
-    const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
     updateProgressComponent(progressComponent, {
       progress: 0.1,
       success: true,
       message: "Gathering text\u2026",
       textColor: "rgb(89, 102, 115)"
     });
-    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
+    const active = await resolveActiveScript(fieldGroup);
+    if (active.mode === "edited" && active.stale) {
+      button.classList.remove("disabled");
+      reportStaleScript(fieldGroup, active);
+      return;
+    }
+    await startCreateProject(fieldGroup, active.text);
+  }
+  async function startCreateProject(fieldGroup, text) {
+    const button = fieldGroup.querySelector(".bespoken-create-project");
+    if (!button) return;
+    button.classList.add("disabled");
+    const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
+    const actionUrlCreateProject = button.getAttribute("data-create-project-action-url") || "";
+    const elementId = _getInputValue('input[name="elementId"]');
+    const voice = getVoiceContext(fieldGroup);
     if (!text || text.length === 0) {
       button.classList.remove("disabled");
       updateProgressComponent(progressComponent, {
@@ -1792,17 +1947,14 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Send Craft's CSRF token so the create-project endpoint can
-          // keep default CSRF validation on. Craft exposes the token
-          // globally in the control panel.
           "X-CSRF-Token": window.Craft?.csrfTokenValue ?? ""
         },
         body: JSON.stringify({
           text,
-          voiceId,
+          voiceId: voice.voiceId,
           elementId,
-          voiceModel: voiceModelSelected,
-          pronunciationRuleSet: pronunciationRuleSetSelected
+          voiceModel: voice.voiceModel,
+          pronunciationRuleSet: voice.pronunciationRuleSet
         })
       });
       const data = await response.json();
@@ -1972,8 +2124,8 @@
     const elementId = _getInputValue('input[name="elementId"]');
     const title = _cleanTitle(_getInputValue("#title") || elementId);
     try {
-      const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
-      showCreditEstimate(text.length, creditInfoEl, voiceModelName);
+      const active = await resolveActiveScript(fieldGroup);
+      showCreditEstimate(active.text.length, creditInfoEl, voiceModelName);
     } catch (e5) {
       console.error("Failed to calculate credit estimate:", e5);
     }
@@ -2220,9 +2372,333 @@
           }
         }
       }
-      text = text.trim();
+      text = normalizeScriptWhitespace(text);
     }
     return text;
+  }
+  async function generateEntryScript(fieldGroup) {
+    const source = fieldGroup.querySelector("[data-target-field]");
+    const targetFieldHandles = source?.getAttribute("data-target-field") || "";
+    const actionUrl = source?.getAttribute("data-get-element-content-action-url") || "";
+    const elementId = _getInputValue('input[name="elementId"]');
+    const title = _cleanTitle(_getInputValue("#title") || elementId);
+    return generateScript(targetFieldHandles, title, actionUrl);
+  }
+  async function resolveActiveScript(fieldGroup) {
+    const entryText = await generateEntryScript(fieldGroup);
+    const edited = loadEditedScript(scriptStorageKey(fieldGroup));
+    if (edited) {
+      return {
+        // Stored text may be mid-edit (autosaved raw); finalizing is idempotent.
+        text: finalizeEditedScript(edited.text).text,
+        mode: "edited",
+        stale: hashText(entryText) !== edited.baseHash,
+        entryText
+      };
+    }
+    return { text: entryText, mode: "entry", stale: false, entryText };
+  }
+  function getVoiceContext(fieldGroup) {
+    const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
+    const voiceId = voiceSelect ? voiceSelect.value : "";
+    const lookup = (selector) => {
+      const input = fieldGroup.querySelector(selector);
+      if (!input) return "";
+      try {
+        return JSON.parse(input.value || "{}")[voiceId] || "";
+      } catch (e5) {
+        return "";
+      }
+    };
+    return {
+      voiceId,
+      voiceModel: lookup('input[name*="voiceModel"]'),
+      pronunciationRuleSet: lookup('input[name*="pronunciationRuleSet"]')
+    };
+  }
+  function startGeneration(fieldGroup, text) {
+    const button = fieldGroup.querySelector(".bespoken-generate");
+    if (!button) return;
+    button.classList.add("disabled");
+    const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
+    const elementId = _getInputValue('input[name="elementId"]');
+    const voice = getVoiceContext(fieldGroup);
+    const fileNamePrefixInput = fieldGroup.querySelector('input[type="hidden"][name*="fileNamePrefix"]');
+    const fileNamePrefix = fileNamePrefixInput ? fileNamePrefixInput.value : "";
+    console.log("Generated script:", text);
+    const creditInfoEl = fieldGroup.querySelector(".bespoken-credit-info");
+    showCreditEstimate(text.length, creditInfoEl, voice.voiceModel);
+    if (text.length === 0) {
+      button.classList.remove("disabled");
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: "No text to generate audio from.",
+        textColor: "rgb(126,7,7)"
+      });
+      return;
+    }
+    const actionUrlProcessText = button.getAttribute("data-process-text-action-url") || "";
+    updateProgressComponent(progressComponent, {
+      progress: 0.1,
+      success: true,
+      message: "Preparing data",
+      textColor: "rgb(89, 102, 115)"
+    });
+    processText(text, voice.voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, voice.pronunciationRuleSet, voice.voiceModel);
+  }
+  function reportStaleScript(fieldGroup, active) {
+    const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
+    if (progressComponent) {
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: "The entry has changed since the narration script was edited. Review the script, then try again.",
+        textColor: "rgb(126,7,7)"
+      });
+    }
+    renderScriptStatus(fieldGroup, active);
+    openScriptDialog(fieldGroup, active);
+  }
+  var SCRIPT_AUTOSAVE_DELAY_MS = 300;
+  function openScriptDialog(fieldGroup, active) {
+    const dialog = fieldGroup.querySelector(".bespoken-dialog");
+    if (!dialog) return;
+    const key = scriptStorageKey(fieldGroup);
+    const isAlias = fieldGroup.getAttribute("data-bespoken-provider") === "alias";
+    const providerName = isAlias ? "the Alias TTS service" : "ElevenLabs";
+    const canCreateProject = isAlias && !!fieldGroup.querySelector(".bespoken-create-project");
+    const entryText = active.entryText;
+    let text = active.text;
+    let mode = active.mode;
+    let stale = active.stale;
+    let editing = false;
+    let textarea = null;
+    let removedCount = 0;
+    let autosaveTimer = null;
+    const body = document.createElement("div");
+    body.className = "bespoken-script-body";
+    const footer = document.createElement("div");
+    footer.className = "bespoken-script-actions";
+    const makeButton = (label, primary, onClick) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = primary ? "btn submit" : "btn";
+      button.textContent = label;
+      button.addEventListener("click", onClick);
+      return button;
+    };
+    const describe = () => {
+      if (stale) {
+        return "The entry has changed since this script was edited. Keep your edited script, or revert to the entry text.";
+      }
+      if (mode === "edited") {
+        return `You are using an edited script. It will be sent to ${providerName}; your entry has not been changed.`;
+      }
+      return `This is the text that will be sent to ${providerName}. Edit it to change what is narrated; your entry is not modified.`;
+    };
+    const clearAutosave = () => {
+      if (autosaveTimer !== null) {
+        window.clearTimeout(autosaveTimer);
+        autosaveTimer = null;
+      }
+    };
+    const commitEdits = () => {
+      if (!textarea) return;
+      clearAutosave();
+      const finalized = finalizeEditedScript(textarea.value);
+      removedCount = finalized.removedCount;
+      textarea = null;
+      editing = false;
+      if (finalized.text === "" || finalized.text === entryText) {
+        clearEditedScript(key);
+        text = entryText;
+        mode = "entry";
+      } else {
+        saveEditedScript(key, finalized.text, hashText(entryText));
+        text = finalized.text;
+        mode = "edited";
+      }
+      stale = false;
+    };
+    const syncField = () => {
+      renderScriptStatus(fieldGroup, { mode, stale });
+      updateCreditEstimate(fieldGroup);
+    };
+    const revert = () => {
+      clearAutosave();
+      clearEditedScript(key);
+      text = entryText;
+      mode = "entry";
+      stale = false;
+      editing = false;
+      textarea = null;
+      removedCount = 0;
+      render();
+      syncField();
+    };
+    const keepEdited = () => {
+      saveEditedScript(key, text, hashText(entryText));
+      stale = false;
+      render();
+      syncField();
+    };
+    const startEditing = () => {
+      editing = true;
+      dialog.setAttribute("wide", "");
+      render();
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(0, 0);
+      }
+    };
+    const finishEditing = () => {
+      commitEdits();
+      render();
+      syncField();
+    };
+    const runAction = (action) => {
+      if (editing) {
+        commitEdits();
+      }
+      renderScriptStatus(fieldGroup, { mode, stale });
+      dialog.close();
+      action(fieldGroup, text);
+    };
+    const renderMeta = (metaEl, length) => {
+      const parts = [`${length.toLocaleString()} characters`];
+      if (!isAlias) {
+        const voiceModel = getVoiceContext(fieldGroup).voiceModel;
+        const credits = getCreditsForText(length, voiceModel);
+        const modelName = MODEL_DISPLAY_NAMES[voiceModel] || voiceModel;
+        parts.push(`~${credits.toLocaleString()} credits` + (modelName ? ` (${modelName})` : ""));
+      }
+      metaEl.textContent = parts.join(" \xB7 ");
+    };
+    const render = () => {
+      dialog.setDescription(describe());
+      body.innerHTML = "";
+      footer.innerHTML = "";
+      if (stale) {
+        const notice = document.createElement("div");
+        notice.className = "bespoken-script-notice bespoken-script-notice--warning";
+        notice.textContent = "This edited script was based on an older version of the entry. Nothing has been sent.";
+        body.appendChild(notice);
+      } else if (mode === "edited") {
+        const notice = document.createElement("div");
+        notice.className = "bespoken-script-notice";
+        notice.textContent = removedCount > 0 ? `Edited script in use. ${removedCount} unsupported character${removedCount === 1 ? "" : "s"} (emoji or angle brackets) removed. Your entry is unchanged.` : "Edited script in use. Your entry is unchanged.";
+        body.appendChild(notice);
+      }
+      if (editing) {
+        const editor = document.createElement("textarea");
+        editor.className = "bespoken-script-editor";
+        editor.setAttribute("aria-label", "Narration script");
+        editor.spellcheck = true;
+        editor.value = text;
+        textarea = editor;
+        const meta = document.createElement("div");
+        meta.className = "bespoken-script-meta";
+        renderMeta(meta, editor.value.length);
+        const grow = () => {
+          editor.style.height = "auto";
+          editor.style.height = `${editor.scrollHeight + 2}px`;
+        };
+        editor.addEventListener("input", () => {
+          grow();
+          renderMeta(meta, editor.value.length);
+          clearAutosave();
+          autosaveTimer = window.setTimeout(() => {
+            autosaveTimer = null;
+            saveEditedScript(key, editor.value, hashText(entryText));
+          }, SCRIPT_AUTOSAVE_DELAY_MS);
+        });
+        body.appendChild(editor);
+        body.appendChild(meta);
+        requestAnimationFrame(grow);
+      } else {
+        const view = document.createElement("div");
+        view.className = "bespoken-script-view";
+        view.textContent = text;
+        body.appendChild(view);
+      }
+      if (stale) {
+        footer.appendChild(makeButton("Keep edited script", false, keepEdited));
+        footer.appendChild(makeButton("Revert to entry text", false, revert));
+      } else {
+        footer.appendChild(makeButton(editing ? "Done editing" : "Edit script", false, editing ? finishEditing : startEditing));
+        if (mode === "edited") {
+          footer.appendChild(makeButton("Revert to entry text", false, revert));
+        }
+        if (canCreateProject) {
+          footer.appendChild(makeButton("Create Alias TTS project", false, () => runAction(startCreateProject)));
+        }
+        footer.appendChild(makeButton("Generate audio", true, () => runAction(startGeneration)));
+      }
+    };
+    dialog.addEventListener("bespoken-modal-close", () => {
+      if (editing) {
+        commitEdits();
+      }
+      dialog.removeAttribute("wide");
+      syncField();
+    }, { once: true });
+    render();
+    dialog.setContent(body);
+    dialog.setActions(footer);
+    dialog.open();
+  }
+  function renderScriptStatus(fieldGroup, state) {
+    const status = fieldGroup.querySelector(".bespoken-script-status");
+    if (!status) return;
+    status.innerHTML = "";
+    status.classList.toggle("bespoken-script-status--stale", state.stale);
+    if (state.mode !== "edited") {
+      status.hidden = true;
+      return;
+    }
+    status.hidden = false;
+    const message = document.createElement("span");
+    message.className = "bespoken-script-status-text";
+    message.textContent = state.stale ? "The entry has changed since the narration script was edited. Review it before generating." : "Using an edited narration script. Your entry is unchanged.";
+    status.appendChild(message);
+    const actions = document.createElement("span");
+    actions.className = "bespoken-script-status-actions";
+    const review = document.createElement("button");
+    review.type = "button";
+    review.className = "btn small";
+    review.textContent = "Review script";
+    review.addEventListener("click", async () => {
+      review.classList.add("disabled");
+      try {
+        const active = await resolveActiveScript(fieldGroup);
+        renderScriptStatus(fieldGroup, active);
+        openScriptDialog(fieldGroup, active);
+      } finally {
+        review.classList.remove("disabled");
+      }
+    });
+    actions.appendChild(review);
+    const revert = document.createElement("button");
+    revert.type = "button";
+    revert.className = "btn small";
+    revert.textContent = "Revert to entry text";
+    revert.addEventListener("click", () => {
+      clearEditedScript(scriptStorageKey(fieldGroup));
+      renderScriptStatus(fieldGroup, { mode: "entry", stale: false });
+      updateCreditEstimate(fieldGroup);
+    });
+    actions.appendChild(revert);
+    status.appendChild(actions);
+  }
+  function initScriptStatus(fieldGroup) {
+    const edited = loadEditedScript(scriptStorageKey(fieldGroup));
+    if (!edited) {
+      renderScriptStatus(fieldGroup, { mode: "entry", stale: false });
+      return;
+    }
+    renderScriptStatus(fieldGroup, { mode: "edited", stale: false });
+    resolveActiveScript(fieldGroup).then((active) => renderScriptStatus(fieldGroup, active)).catch((error) => console.error("Could not check the edited script against the entry:", error));
   }
 })();
 /*! Bundled license information:

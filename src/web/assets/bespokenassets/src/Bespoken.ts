@@ -23,8 +23,18 @@ import {
     _getFieldType,
     _parseFieldHandles,
     _getElementStatuses,
-    _isBlockLive
+    _isBlockLive,
+    finalizeEditedScript,
+    normalizeScriptWhitespace
 } from "./utils";
+import {
+    scriptStorageKey,
+    loadEditedScript,
+    saveEditedScript,
+    clearEditedScript,
+    hashText
+} from "./scriptState";
+import type { ScriptMode } from "./scriptState";
 
 document.addEventListener('DOMContentLoaded', () => {
     // progress-component is auto-registered via its @customElement decorator on import
@@ -56,6 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch credit info then calculate estimate for each field group
     const fieldGroups: NodeListOf<HTMLElement> = document.querySelectorAll('.bespoken-fields');
     fieldGroups.forEach(fieldGroup => {
+        initScriptStatus(fieldGroup);
+
         const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
         if (creditInfoEl) {
             // Fetch credit info first, then calculate estimate
@@ -74,143 +86,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function handleGenerateButtonClick(event: Event): Promise<void> {
     const button = (event.target as HTMLElement).closest('.bespoken-generate') as HTMLButtonElement | null;
-
     if (!button) return;
-    // Disable the button
+
     button.classList.add('disabled');
+    const fieldGroup = button.closest('.bespoken-fields') as HTMLElement;
 
-    const actionUrlGetElementContent: string = button.getAttribute('data-get-element-content-action-url');
-
-    const fieldGroup = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
-    const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
-
-    // Get the Element ID of the Element being edited in the CMS
-    const elementId: string = _getInputValue('input[name="elementId"]');
-
-    // Get the title of the Element being edited in the CMS
-    const title: string = _cleanTitle(_getInputValue('#title') || elementId);
-
-    // Get the voice ID of the selected voice
-    const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement;
-    const voiceId: string = voiceSelect.value;
-
-    // Get the voice model and pronunciation rule set from the voiceModeltoVoiceIdForField and pronunciationRuleSettoVoiceIdForField objects.
-    // The fields that are hidden and have a name containing 'voiceModel' and 'pronunciationRuleSet' are the ones we need to get the values from.
-
-    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement;
-    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]') as HTMLInputElement;
-
-    const voiceModelKeyValuePairs = voiceModelField.value;
-    const pronunciationRuleSetKeyValuePairs  = pronunciationRuleSetField.value;
-
-    // parse the voiceModelKeyValuePairs and pronunciationRuleSetKeyValuePairs into objects
-    const voiceModelKeyValuePairsObject = JSON.parse(voiceModelKeyValuePairs);
-    const pronunciationRuleSetKeyValuePairsObject = JSON.parse(pronunciationRuleSetKeyValuePairs);
-
-    // now we need to find the voiceId in the voiceModelKeyValuePairsObject and pronunciationRuleSetKeyValuePairsObject based on the voiceId
-    const voiceModelSelected = voiceModelKeyValuePairsObject[voiceId];
-    const pronunciationRuleSetSelected = pronunciationRuleSetKeyValuePairsObject[voiceId];
-
-    // Loop through the hidden input fields to find the one with a name containing 'fileNamePrefix'
-    let fileNamePrefix: string | null = null;
-    // Get all hidden input fields within the element with id 'my-fields' and loop through them.
-    fieldGroup.querySelectorAll('input[type="hidden"]').forEach((input: HTMLInputElement) => {
-        if (input.name.includes('fileNamePrefix')) {
-            fileNamePrefix = input.value;
-        }
-    });
-
-    const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
-
-    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
-
-    console.log('Generated script:',text);
-
-    // Show estimated credit cost
-    const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
-    showCreditEstimate(text.length, creditInfoEl, voiceModelSelected);
-
-    if (text.length === 0) {
-        // Re-enable the button
+    // Whatever script is active for this field — generated from the entry, or
+    // edited in the preview dialog — is what gets narrated. An edit whose entry
+    // has since changed is never sent silently: the dialog asks first.
+    const active = await resolveActiveScript(fieldGroup);
+    if (active.mode === 'edited' && active.stale) {
         button.classList.remove('disabled');
-        // Show an error message
-        updateProgressComponent(progressComponent, {
-            progress: 0,
-            success: false,
-            message: 'No text to generate audio from.',
-            textColor: 'rgb(126,7,7)'
-        });
+        reportStaleScript(fieldGroup, active);
         return;
     }
 
-    // Text is now ready to be processed
-    // Get the action URL from the button's data-action-url attribute - used to generate the audio
-    const actionUrlProcessText: string = button.getAttribute('data-process-text-action-url') || '';
-
-    // What's going to happen next:
-    // Generate the audio by gathering all the required data and sending it to
-    // the action URL, use the process-text function on the text: this will return
-    // the jobId and filename if the request is successful.
-    // If the request is successful, we will then
-    // need to start polling the job status to get the progress of the audio
-    // generation. Because this is an API call, the work is done in the
-    // background, and we need to poll the API to get the progress of the audio
-    // generation.
-
-    updateProgressComponent(progressComponent, {
-        progress: 0.1,
-        success: true,
-        message: 'Preparing data',
-        textColor: 'rgb(89, 102, 115)'
-    });
-
-    processText(text, voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, pronunciationRuleSetSelected, voiceModelSelected);
+    startGeneration(fieldGroup, active.text);
 }
 
 async function handlePreviewButtonClick(event: Event): Promise<void> {
     const button = (event.target as HTMLElement).closest('.bespoken-preview') as HTMLButtonElement | null;
-
-    // this action URL is used to get an element's field data from the Craft API if needed
-    const actionUrlGetElementContent: string = button.getAttribute('data-get-element-content-action-url');
-
     if (!button) return;
 
-    // Get the Element ID of the Element being edited in the CMS
-    const elementId: string = _getInputValue('input[name="elementId"]');
+    const fieldGroup = button.closest('.bespoken-fields') as HTMLElement;
+    button.classList.add('disabled');
+    try {
+        const active = await resolveActiveScript(fieldGroup);
 
-    // Get the title of the Element being edited in the CMS
-    const title: string = _cleanTitle(_getInputValue('#title') || elementId);
+        // Show estimated credit cost for the active script
+        const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
+        showCreditEstimate(active.text.length, creditInfoEl, getVoiceContext(fieldGroup).voiceModel);
 
-    const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
-
-    // const text = generateScript(targetFieldHandles, title);
-    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
-
-    // Show estimated credit cost on preview too
-    const parentElement = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
-    const creditInfoEl = parentElement.querySelector('.bespoken-credit-info') as HTMLElement | null;
-
-    // Get voice model for the selected voice
-    const voiceSelect = parentElement.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
-    const voiceModelField = parentElement.querySelector('input[name*="voiceModel"]') as HTMLInputElement | null;
-    let previewVoiceModel = '';
-    if (voiceSelect && voiceModelField) {
-        try {
-            const voiceModelMap = JSON.parse(voiceModelField.value);
-            previewVoiceModel = voiceModelMap[voiceSelect.value] || '';
-        } catch (e) { /* ignore */ }
+        renderScriptStatus(fieldGroup, active);
+        openScriptDialog(fieldGroup, active);
+    } finally {
+        button.classList.remove('disabled');
     }
-    showCreditEstimate(text.length, creditInfoEl, previewVoiceModel);
-
-    // find .bespoken-dialog in the parentElement
-    const modal = parentElement.querySelector('.bespoken-dialog') as ModalDialog | null;
-
-    if (modal)
-    {
-        modal.setContent(text);
-        modal.open();
-    }
-
 }
 
 async function handleHistoryButtonClick(event: Event): Promise<void> {
@@ -310,28 +221,8 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
     if (!button) return;
 
     button.classList.add('disabled');
-
-    const fieldGroup = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
+    const fieldGroup = button.closest('.bespoken-fields') as HTMLElement;
     const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
-
-    const actionUrlGetElementContent: string = button.getAttribute('data-get-element-content-action-url');
-    const actionUrlCreateProject: string = button.getAttribute('data-create-project-action-url') || '';
-
-    const elementId: string = _getInputValue('input[name="elementId"]');
-    const title: string = _cleanTitle(_getInputValue('#title') || elementId);
-
-    const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
-    const voiceId: string = voiceSelect ? voiceSelect.value : '';
-
-    // Resolve the per-voice model + pronunciation rule set, same as generate.
-    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement | null;
-    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]') as HTMLInputElement | null;
-    let voiceModelSelected = '';
-    let pronunciationRuleSetSelected = '';
-    try { voiceModelSelected = JSON.parse(voiceModelField?.value || '{}')[voiceId] || ''; } catch (e) { /* ignore */ }
-    try { pronunciationRuleSetSelected = JSON.parse(pronunciationRuleSetField?.value || '{}')[voiceId] || ''; } catch (e) { /* ignore */ }
-
-    const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
 
     updateProgressComponent(progressComponent, {
         progress: 0.1,
@@ -340,7 +231,29 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
         textColor: 'rgb(89, 102, 115)',
     });
 
-    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
+    const active = await resolveActiveScript(fieldGroup);
+    if (active.mode === 'edited' && active.stale) {
+        button.classList.remove('disabled');
+        reportStaleScript(fieldGroup, active);
+        return;
+    }
+
+    await startCreateProject(fieldGroup, active.text);
+}
+
+/**
+ * Send a script to the Alias TTS service's create-project endpoint and show the
+ * "open project" dialog. Shared by the field button and the preview dialog.
+ */
+async function startCreateProject(fieldGroup: HTMLElement, text: string): Promise<void> {
+    const button = fieldGroup.querySelector('.bespoken-create-project') as HTMLButtonElement | null;
+    if (!button) return;
+
+    button.classList.add('disabled');
+    const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
+    const actionUrlCreateProject: string = button.getAttribute('data-create-project-action-url') || '';
+    const elementId: string = _getInputValue('input[name="elementId"]');
+    const voice = getVoiceContext(fieldGroup);
 
     if (!text || text.length === 0) {
         button.classList.remove('disabled');
@@ -365,17 +278,14 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // Send Craft's CSRF token so the create-project endpoint can
-                // keep default CSRF validation on. Craft exposes the token
-                // globally in the control panel.
                 'X-CSRF-Token': (window as any).Craft?.csrfTokenValue ?? '',
             },
             body: JSON.stringify({
                 text,
-                voiceId,
+                voiceId: voice.voiceId,
                 elementId,
-                voiceModel: voiceModelSelected,
-                pronunciationRuleSet: pronunciationRuleSetSelected,
+                voiceModel: voice.voiceModel,
+                pronunciationRuleSet: voice.pronunciationRuleSet,
             }),
         });
 
@@ -413,8 +323,6 @@ async function handleCreateProjectButtonClick(event: Event): Promise<void> {
     }
 }
 
-// Show the "project created" modal with a link into the Alias TTS control panel
-// for the new project. The user clicks it and signs in there as usual.
 async function showProjectCreatedModal(parentElement: HTMLElement, data: any): Promise<void> {
     const content = document.createElement('div');
     content.style.cssText = 'font-size: 14px; line-height: 1.5;';
@@ -607,8 +515,8 @@ async function updateCreditEstimate(fieldGroup: HTMLElement): Promise<void> {
     const title: string = _cleanTitle(_getInputValue('#title') || elementId);
 
     try {
-        const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
-        showCreditEstimate(text.length, creditInfoEl, voiceModelName);
+        const active = await resolveActiveScript(fieldGroup);
+        showCreditEstimate(active.text.length, creditInfoEl, voiceModelName);
     } catch (e) {
         console.error('Failed to calculate credit estimate:', e);
     }
@@ -969,7 +877,432 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                 }
             }
         }
-        text = text.trim();
+        // Same whitespace shape the server sends (single spaces, one blank line per
+        // paragraph break), so the preview is exactly what the TTS service receives.
+        text = normalizeScriptWhitespace(text);
     }
     return text;
+}
+
+/* ---------------------------------------------------------------------------
+ * Active script: the text a field will narrate — generated from the entry, or
+ * edited in the preview dialog. See scriptState.ts for the persistence rules.
+ * ------------------------------------------------------------------------- */
+
+interface ActiveScript {
+    /** The text that will be sent if the user generates now. */
+    text: string;
+    mode: ScriptMode;
+    /** True when the entry's content changed after the script was edited. */
+    stale: boolean;
+    /** The script generated from the entry right now (the revert target). */
+    entryText: string;
+}
+
+interface VoiceContext {
+    voiceId: string;
+    voiceModel: string;
+    pronunciationRuleSet: string;
+}
+
+/** Regenerate the entry-derived script for a field. */
+async function generateEntryScript(fieldGroup: HTMLElement): Promise<string> {
+    // Every action button on the field carries the source handles + content URL.
+    const source = fieldGroup.querySelector('[data-target-field]') as HTMLElement | null;
+    const targetFieldHandles: string = source?.getAttribute('data-target-field') || '';
+    const actionUrl: string = source?.getAttribute('data-get-element-content-action-url') || '';
+    const elementId: string = _getInputValue('input[name="elementId"]');
+    const title: string = _cleanTitle(_getInputValue('#title') || elementId);
+    return generateScript(targetFieldHandles, title, actionUrl);
+}
+
+async function resolveActiveScript(fieldGroup: HTMLElement): Promise<ActiveScript> {
+    const entryText = await generateEntryScript(fieldGroup);
+    const edited = loadEditedScript(scriptStorageKey(fieldGroup));
+    if (edited) {
+        return {
+            // Stored text may be mid-edit (autosaved raw); finalizing is idempotent.
+            text: finalizeEditedScript(edited.text).text,
+            mode: 'edited',
+            stale: hashText(entryText) !== edited.baseHash,
+            entryText,
+        };
+    }
+    return { text: entryText, mode: 'entry', stale: false, entryText };
+}
+
+/** The selected voice and its per-voice model + pronunciation rule set. */
+function getVoiceContext(fieldGroup: HTMLElement): VoiceContext {
+    const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
+    const voiceId = voiceSelect ? voiceSelect.value : '';
+    const lookup = (selector: string): string => {
+        const input = fieldGroup.querySelector(selector) as HTMLInputElement | null;
+        if (!input) return '';
+        try {
+            return JSON.parse(input.value || '{}')[voiceId] || '';
+        } catch (e) {
+            return '';
+        }
+    };
+    return {
+        voiceId,
+        voiceModel: lookup('input[name*="voiceModel"]'),
+        pronunciationRuleSet: lookup('input[name*="pronunciationRuleSet"]'),
+    };
+}
+
+/**
+ * Queue audio generation for a script. Shared by the field's Generate button
+ * and the preview dialog's Generate button.
+ */
+function startGeneration(fieldGroup: HTMLElement, text: string): void {
+    const button = fieldGroup.querySelector('.bespoken-generate') as HTMLButtonElement | null;
+    if (!button) return;
+
+    button.classList.add('disabled');
+    const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
+    const elementId: string = _getInputValue('input[name="elementId"]');
+    const voice = getVoiceContext(fieldGroup);
+    const fileNamePrefixInput = fieldGroup.querySelector('input[type="hidden"][name*="fileNamePrefix"]') as HTMLInputElement | null;
+    const fileNamePrefix: string = fileNamePrefixInput ? fileNamePrefixInput.value : '';
+
+    console.log('Generated script:', text);
+
+    const creditInfoEl = fieldGroup.querySelector('.bespoken-credit-info') as HTMLElement | null;
+    showCreditEstimate(text.length, creditInfoEl, voice.voiceModel);
+
+    if (text.length === 0) {
+        button.classList.remove('disabled');
+        updateProgressComponent(progressComponent, {
+            progress: 0,
+            success: false,
+            message: 'No text to generate audio from.',
+            textColor: 'rgb(126,7,7)'
+        });
+        return;
+    }
+
+    const actionUrlProcessText: string = button.getAttribute('data-process-text-action-url') || '';
+
+    updateProgressComponent(progressComponent, {
+        progress: 0.1,
+        success: true,
+        message: 'Preparing data',
+        textColor: 'rgb(89, 102, 115)'
+    });
+
+    // processText posts the script, then polls the queue job for progress.
+    processText(text, voice.voiceId, elementId, fileNamePrefix, progressComponent, button, actionUrlProcessText, voice.pronunciationRuleSet, voice.voiceModel);
+}
+
+/** An edited script whose entry has changed: say so, and open the dialog to decide. */
+function reportStaleScript(fieldGroup: HTMLElement, active: ActiveScript): void {
+    const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent | null;
+    if (progressComponent) {
+        updateProgressComponent(progressComponent, {
+            progress: 0,
+            success: false,
+            message: 'The entry has changed since the narration script was edited. Review the script, then try again.',
+            textColor: 'rgb(126,7,7)',
+        });
+    }
+    renderScriptStatus(fieldGroup, active);
+    openScriptDialog(fieldGroup, active);
+}
+
+/* ---------------------------------------------------------------------------
+ * Preview / edit dialog
+ * ------------------------------------------------------------------------- */
+
+const SCRIPT_AUTOSAVE_DELAY_MS = 300;
+
+function openScriptDialog(fieldGroup: HTMLElement, active: ActiveScript): void {
+    const dialog = fieldGroup.querySelector('.bespoken-dialog') as ModalDialog | null;
+    if (!dialog) return;
+
+    const key = scriptStorageKey(fieldGroup);
+    const isAlias = fieldGroup.getAttribute('data-bespoken-provider') === 'alias';
+    const providerName = isAlias ? 'the Alias TTS service' : 'ElevenLabs';
+    const canCreateProject = isAlias && !!fieldGroup.querySelector('.bespoken-create-project');
+
+    // Mutable state for this opening of the dialog
+    const entryText = active.entryText;
+    let text = active.text;
+    let mode: ScriptMode = active.mode;
+    let stale = active.stale;
+    let editing = false;
+    let textarea: HTMLTextAreaElement | null = null;
+    let removedCount = 0;
+    let autosaveTimer: number | null = null;
+
+    const body = document.createElement('div');
+    body.className = 'bespoken-script-body';
+    const footer = document.createElement('div');
+    footer.className = 'bespoken-script-actions';
+
+    const makeButton = (label: string, primary: boolean, onClick: () => void): HTMLButtonElement => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = primary ? 'btn submit' : 'btn';
+        button.textContent = label;
+        button.addEventListener('click', onClick);
+        return button;
+    };
+
+    const describe = (): string => {
+        if (stale) {
+            return 'The entry has changed since this script was edited. Keep your edited script, or revert to the entry text.';
+        }
+        if (mode === 'edited') {
+            return `You are using an edited script. It will be sent to ${providerName}; your entry has not been changed.`;
+        }
+        return `This is the text that will be sent to ${providerName}. Edit it to change what is narrated; your entry is not modified.`;
+    };
+
+    const clearAutosave = (): void => {
+        if (autosaveTimer !== null) {
+            window.clearTimeout(autosaveTimer);
+            autosaveTimer = null;
+        }
+    };
+
+    const commitEdits = (): void => {
+        if (!textarea) return;
+        clearAutosave();
+        const finalized = finalizeEditedScript(textarea.value);
+        removedCount = finalized.removedCount;
+        textarea = null;
+        editing = false;
+
+        if (finalized.text === '' || finalized.text === entryText) {
+            // Nothing left, or back to what the entry says: no edit to keep.
+            clearEditedScript(key);
+            text = entryText;
+            mode = 'entry';
+        } else {
+            saveEditedScript(key, finalized.text, hashText(entryText));
+            text = finalized.text;
+            mode = 'edited';
+        }
+        stale = false;
+    };
+
+    const syncField = (): void => {
+        renderScriptStatus(fieldGroup, { mode, stale });
+        updateCreditEstimate(fieldGroup);
+    };
+
+    const revert = (): void => {
+        clearAutosave();
+        clearEditedScript(key);
+        text = entryText;
+        mode = 'entry';
+        stale = false;
+        editing = false;
+        textarea = null;
+        removedCount = 0;
+        render();
+        syncField();
+    };
+
+    const keepEdited = (): void => {
+        // Acknowledge the entry change: the edit is now based on the current entry.
+        saveEditedScript(key, text, hashText(entryText));
+        stale = false;
+        render();
+        syncField();
+    };
+
+    const startEditing = (): void => {
+        editing = true;
+        dialog.setAttribute('wide', '');
+        render();
+        if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(0, 0);
+        }
+    };
+
+    const finishEditing = (): void => {
+        commitEdits();
+        render();
+        syncField();
+    };
+
+    const runAction = (action: (fieldGroup: HTMLElement, text: string) => void): void => {
+        if (editing) {
+            commitEdits();
+        }
+        renderScriptStatus(fieldGroup, { mode, stale });
+        dialog.close();
+        action(fieldGroup, text);
+    };
+
+    const renderMeta = (metaEl: HTMLElement, length: number): void => {
+        const parts: string[] = [`${length.toLocaleString()} characters`];
+        if (!isAlias) {
+            const voiceModel = getVoiceContext(fieldGroup).voiceModel;
+            const credits = getCreditsForText(length, voiceModel);
+            const modelName = MODEL_DISPLAY_NAMES[voiceModel] || voiceModel;
+            parts.push(`~${credits.toLocaleString()} credits` + (modelName ? ` (${modelName})` : ''));
+        }
+        metaEl.textContent = parts.join(' · ');
+    };
+
+    const render = (): void => {
+        dialog.setDescription(describe());
+        body.innerHTML = '';
+        footer.innerHTML = '';
+
+        if (stale) {
+            const notice = document.createElement('div');
+            notice.className = 'bespoken-script-notice bespoken-script-notice--warning';
+            notice.textContent = 'This edited script was based on an older version of the entry. Nothing has been sent.';
+            body.appendChild(notice);
+        } else if (mode === 'edited') {
+            const notice = document.createElement('div');
+            notice.className = 'bespoken-script-notice';
+            notice.textContent = removedCount > 0
+                ? `Edited script in use. ${removedCount} unsupported character${removedCount === 1 ? '' : 's'} (emoji or angle brackets) removed. Your entry is unchanged.`
+                : 'Edited script in use. Your entry is unchanged.';
+            body.appendChild(notice);
+        }
+
+        if (editing) {
+            const editor = document.createElement('textarea');
+            editor.className = 'bespoken-script-editor';
+            editor.setAttribute('aria-label', 'Narration script');
+            editor.spellcheck = true;
+            editor.value = text;
+            textarea = editor;
+
+            const meta = document.createElement('div');
+            meta.className = 'bespoken-script-meta';
+            renderMeta(meta, editor.value.length);
+
+            const grow = (): void => {
+                editor.style.height = 'auto';
+                editor.style.height = `${editor.scrollHeight + 2}px`;
+            };
+            editor.addEventListener('input', () => {
+                grow();
+                renderMeta(meta, editor.value.length);
+                clearAutosave();
+                autosaveTimer = window.setTimeout(() => {
+                    autosaveTimer = null;
+                    // Autosave the raw text while typing so a reload restores it verbatim.
+                    saveEditedScript(key, editor.value, hashText(entryText));
+                }, SCRIPT_AUTOSAVE_DELAY_MS);
+            });
+
+            body.appendChild(editor);
+            body.appendChild(meta);
+            requestAnimationFrame(grow);
+        } else {
+            const view = document.createElement('div');
+            view.className = 'bespoken-script-view';
+            view.textContent = text;
+            body.appendChild(view);
+        }
+
+        if (stale) {
+            footer.appendChild(makeButton('Keep edited script', false, keepEdited));
+            footer.appendChild(makeButton('Revert to entry text', false, revert));
+        } else {
+            footer.appendChild(makeButton(editing ? 'Done editing' : 'Edit script', false, editing ? finishEditing : startEditing));
+            if (mode === 'edited') {
+                footer.appendChild(makeButton('Revert to entry text', false, revert));
+            }
+            if (canCreateProject) {
+                footer.appendChild(makeButton('Create Alias TTS project', false, () => runAction(startCreateProject)));
+            }
+            footer.appendChild(makeButton('Generate audio', true, () => runAction(startGeneration)));
+        }
+    };
+
+    // Closing keeps edits: whatever is in the textarea is finalized and kept
+    // as the field's active script, and the field's status line says so.
+    dialog.addEventListener('bespoken-modal-close', () => {
+        if (editing) {
+            commitEdits();
+        }
+        dialog.removeAttribute('wide');
+        syncField();
+    }, { once: true });
+
+    render();
+    dialog.setContent(body);
+    dialog.setActions(footer);
+    dialog.open();
+}
+
+/* ---------------------------------------------------------------------------
+ * Field status line: always shows which script the buttons will send when it
+ * isn't the entry's own text.
+ * ------------------------------------------------------------------------- */
+
+function renderScriptStatus(fieldGroup: HTMLElement, state: { mode: ScriptMode; stale: boolean }): void {
+    const status = fieldGroup.querySelector('.bespoken-script-status') as HTMLElement | null;
+    if (!status) return;
+
+    status.innerHTML = '';
+    status.classList.toggle('bespoken-script-status--stale', state.stale);
+
+    if (state.mode !== 'edited') {
+        status.hidden = true;
+        return;
+    }
+    status.hidden = false;
+
+    const message = document.createElement('span');
+    message.className = 'bespoken-script-status-text';
+    message.textContent = state.stale
+        ? 'The entry has changed since the narration script was edited. Review it before generating.'
+        : 'Using an edited narration script. Your entry is unchanged.';
+    status.appendChild(message);
+
+    const actions = document.createElement('span');
+    actions.className = 'bespoken-script-status-actions';
+
+    const review = document.createElement('button');
+    review.type = 'button';
+    review.className = 'btn small';
+    review.textContent = 'Review script';
+    review.addEventListener('click', async () => {
+        review.classList.add('disabled');
+        try {
+            const active = await resolveActiveScript(fieldGroup);
+            renderScriptStatus(fieldGroup, active);
+            openScriptDialog(fieldGroup, active);
+        } finally {
+            review.classList.remove('disabled');
+        }
+    });
+    actions.appendChild(review);
+
+    const revert = document.createElement('button');
+    revert.type = 'button';
+    revert.className = 'btn small';
+    revert.textContent = 'Revert to entry text';
+    revert.addEventListener('click', () => {
+        clearEditedScript(scriptStorageKey(fieldGroup));
+        renderScriptStatus(fieldGroup, { mode: 'entry', stale: false });
+        updateCreditEstimate(fieldGroup);
+    });
+    actions.appendChild(revert);
+
+    status.appendChild(actions);
+}
+
+/** On page load: surface a stored edit right away, then check it against the entry. */
+function initScriptStatus(fieldGroup: HTMLElement): void {
+    const edited = loadEditedScript(scriptStorageKey(fieldGroup));
+    if (!edited) {
+        renderScriptStatus(fieldGroup, { mode: 'entry', stale: false });
+        return;
+    }
+    renderScriptStatus(fieldGroup, { mode: 'edited', stale: false });
+    resolveActiveScript(fieldGroup)
+        .then(active => renderScriptStatus(fieldGroup, active))
+        .catch(error => console.error('Could not check the edited script against the entry:', error));
 }

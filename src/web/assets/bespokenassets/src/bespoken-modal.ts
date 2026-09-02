@@ -1,19 +1,49 @@
-// Define a TypeScript class for a custom modal dialog web component.
+/**
+ * <modal-dialog> — Bespoken's dialog web component.
+ *
+ * Slots (light DOM children with a `slot` attribute):
+ *   - title        heading text
+ *   - description  one-line explanation under the heading
+ *   - content      the scrollable body (plain text renders with pre-wrap)
+ *   - actions      footer buttons; the footer is hidden while the slot is empty
+ *
+ * API:
+ *   open() / close() / isOpen
+ *   setTitle(text) / setDescription(text) / setContent(text | element)
+ *   setActions(element | null)
+ *
+ * Events (bubble through the shadow boundary):
+ *   'bespoken-modal-open', 'bespoken-modal-close'
+ *
+ * Attributes:
+ *   wide — widen the dialog (for editing long scripts)
+ *
+ * Keyboard: Tab / Shift+Tab cycle through the close button, the scroll region
+ * (only while it actually scrolls), and every focusable element slotted into
+ * the dialog, so buttons and text areas placed in the content or actions slots
+ * take part in the trap. Escape closes. Closing returns focus to whatever
+ * opened the dialog.
+ */
 export default class ModalDialog extends HTMLElement {
+  private static readonly FOCUSABLE =
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
   private modal: HTMLElement;
   private innerContainer: HTMLElement;
-  private closeButton: HTMLElement;
+  private closeButton: HTMLButtonElement;
   private contentContainer: HTMLElement;
-  private resizeObserver: ResizeObserver;
-  private debounceTimeout: number | null = null;
+  private actionsContainer: HTMLElement;
+  private opener: HTMLElement | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private documentKeydownBound = false;
 
   constructor() {
     super();
 
-    // Attach shadow DOM to encapsulate styles and structure
     const shadow = this.attachShadow({ mode: 'open' });
 
-    // Create the style first to prevent unstyled content flash
+    // Styles first, so there is no flash of unstyled content.
     const style = document.createElement('style');
     style.textContent = `
       .modal {
@@ -48,6 +78,10 @@ export default class ModalDialog extends HTMLElement {
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        min-height: 0;
+      }
+      :host([wide]) .inner-container {
+        max-width: 900px;
       }
       .close-button {
         position: absolute;
@@ -56,6 +90,8 @@ export default class ModalDialog extends HTMLElement {
         background: none;
         border: none;
         font-size: 20px;
+        line-height: 1;
+        padding: 4px 8px;
         cursor: pointer;
       }
       .title {
@@ -63,6 +99,7 @@ export default class ModalDialog extends HTMLElement {
         font-size: 1.25em;
         font-weight: bold;
         margin-bottom: 4px;
+        padding-right: 32px;
         flex: 0 0 auto;
       }
       .description {
@@ -77,35 +114,53 @@ export default class ModalDialog extends HTMLElement {
         margin: 10px 0;
         flex: 0 0 auto;
       }
+      /* min-height: 0 lets the flex item shrink below its content size so the
+         body scrolls inside the 85vh dialog instead of overflowing it. */
       .content-container {
         flex: 1 1 auto;
         overflow-y: auto;
+        min-height: 0;
+        outline-offset: -2px;
       }
       .content {
         font-size: 1em;
         white-space: pre-wrap;
       }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+        margin-top: 12px;
+      }
+      .actions.is-empty {
+        display: none;
+      }
     `;
     shadow.appendChild(style);
 
-    // Create the main modal container (the overlay)
+    // Overlay
     this.modal = document.createElement('div');
     this.modal.className = 'modal';
 
-    // Create the inner container that holds all dialog content
+    // Dialog box
     this.innerContainer = document.createElement('div');
     this.innerContainer.className = 'inner-container';
+    this.innerContainer.setAttribute('role', 'dialog');
+    this.innerContainer.setAttribute('aria-modal', 'true');
 
-    // Create a close button for the modal
+    // Close button
     this.closeButton = document.createElement('button');
+    this.closeButton.type = 'button';
     this.closeButton.className = 'close-button';
     this.closeButton.textContent = 'X';
+    this.closeButton.setAttribute('aria-label', 'Close dialog');
     this.closeButton.addEventListener('click', () => this.close());
-
-    // Append the close button to the inner container
     this.innerContainer.appendChild(this.closeButton);
 
-    // Create the slots for title, description, and content
+    // Title + description slots
     const titleSlot = document.createElement('slot');
     titleSlot.name = 'title';
     titleSlot.className = 'title';
@@ -114,189 +169,114 @@ export default class ModalDialog extends HTMLElement {
     descriptionSlot.name = 'description';
     descriptionSlot.className = 'description';
 
-    // Create an <hr> element for visual separation before the content
     const separator = document.createElement('hr');
     separator.className = 'separator';
 
-    // Create the content container
-    this.contentContainer = document.createElement('section'); // Change to section for semantic meaning
+    // Scrollable body
+    this.contentContainer = document.createElement('section');
     this.contentContainer.className = 'content-container';
-    this.contentContainer.tabIndex = 0; // Make content container focusable
+    this.contentContainer.tabIndex = -1; // becomes 0 only while it scrolls
 
     const contentSlot = document.createElement('slot');
     contentSlot.name = 'content';
     contentSlot.className = 'content';
+    contentSlot.addEventListener('slotchange', () => this.updateScrollRegionFocusability());
+    this.contentContainer.appendChild(contentSlot);
 
-    // Append the slots to the inner container
+    // Footer actions
+    this.actionsContainer = document.createElement('div');
+    this.actionsContainer.className = 'actions is-empty';
+    const actionsSlot = document.createElement('slot');
+    actionsSlot.name = 'actions';
+    actionsSlot.addEventListener('slotchange', () => {
+      const hasActions = actionsSlot.assignedElements().length > 0;
+      this.actionsContainer.classList.toggle('is-empty', !hasActions);
+    });
+    this.actionsContainer.appendChild(actionsSlot);
+
     this.innerContainer.appendChild(titleSlot);
     this.innerContainer.appendChild(descriptionSlot);
     this.innerContainer.appendChild(separator);
-
-    // Append the content slot to the content container
-    this.contentContainer.appendChild(contentSlot);
-
-    // Append the content container to the inner container
     this.innerContainer.appendChild(this.contentContainer);
-
-    // Append the inner container to the modal
+    this.innerContainer.appendChild(this.actionsContainer);
     this.modal.appendChild(this.innerContainer);
-
-    // Append the modal to the shadow DOM
     shadow.appendChild(this.modal);
 
-    // Remove x-cloak attribute if present
     if (this.hasAttribute('x-cloak')) {
       this.removeAttribute('x-cloak');
     }
 
-    // Close the modal if clicked outside the inner container
+    // Backdrop click closes
     this.modal.addEventListener('click', (event) => {
       if (event.target === this.modal) {
         this.close();
       }
     });
 
-    // Close the modal if the ESC key is pressed
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        this.close();
-      }
-    });
-
-    // Trap focus within the modal when open
-    this.modal.addEventListener('keydown', (event) => {
-      if (event.key === 'Tab' && this.modal.classList.contains('show')) {
+    // Keep Tab inside the dialog while open. Keydown events from slotted
+    // light-DOM elements bubble through their slot, so this catches them too.
+    this.modal.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && this.isOpen) {
         this.trapFocus(event);
       }
     });
 
-    // Create a ResizeObserver to handle resizing
-    this.resizeObserver = new ResizeObserver(() => {
-      this.debouncedHandleResize();
-    });
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.updateScrollRegionFocusability());
+    }
   }
 
-  // Method to open the modal dialog
-  open() {
+  /** Whether the dialog is currently shown. */
+  get isOpen(): boolean {
+    return this.modal.classList.contains('show');
+  }
+
+  /** Show the dialog and move focus into it. */
+  open(): void {
+    if (this.isOpen) {
+      return;
+    }
+    this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.syncAriaLabel();
     this.modal.classList.add('show');
-    document.body.style.overflow = 'hidden'; // Prevent scrolling of the background when the modal is open
-    this.calculateContentHeight();
-    this.resizeObserver.observe(document.body);
-    // debugger;
+    document.body.style.overflow = 'hidden'; // no background scrolling while open
+    if (this.resizeObserver) {
+      this.resizeObserver.observe(this.contentContainer);
+    }
+    this.updateScrollRegionFocusability();
     this.focusFirstElement();
-
+    this.dispatchEvent(new CustomEvent('bespoken-modal-open', { bubbles: true, composed: true }));
   }
 
-  // Method to close the modal dialog
-  close() {
+  /** Hide the dialog and return focus to whatever opened it. */
+  close(): void {
+    if (!this.isOpen) {
+      return;
+    }
     this.modal.classList.remove('show');
-    document.body.style.overflow = ''; // Restore scrolling of the background when the modal is closed
-    this.resizeObserver.unobserve(document.body);
-  }
-
-  // Method to calculate and set the content container's max height dynamically
-  private calculateContentHeight() {
-    const innerContainerHeight = this.innerContainer.getBoundingClientRect().height;
-    const otherElementsHeight = this.closeButton.offsetHeight + 40; // Close button height + padding
-    const maxHeight = innerContainerHeight - otherElementsHeight;
-    this.contentContainer.style.maxHeight = `${maxHeight}px`;
-  }
-
-  // Debounced function to handle window resize events
-  private debouncedHandleResize() {
-    if (this.debounceTimeout) {
-      clearTimeout(this.debounceTimeout);
+    document.body.style.overflow = '';
+    if (this.resizeObserver) {
+      this.resizeObserver.unobserve(this.contentContainer);
     }
-    this.debounceTimeout = window.setTimeout(() => {
-      this.calculateContentHeight();
-    }, 200);
-  }
-
-  // Method to set the title content
-  setTitle(title: string) {
-    let titleElement = this.querySelector('[slot="title"]');
-    if (title) {
-      if (!titleElement) {
-        titleElement = document.createElement('span');
-        titleElement.slot = 'title';
-        this.appendChild(titleElement);
-      }
-      titleElement.textContent = title;
-      (titleElement as HTMLElement).style.display = 'block';
-    } else if (titleElement) {
-      (titleElement as HTMLElement).style.display = 'none';
+    this.dispatchEvent(new CustomEvent('bespoken-modal-close', { bubbles: true, composed: true }));
+    const opener = this.opener;
+    this.opener = null;
+    if (opener && document.contains(opener)) {
+      opener.focus();
     }
   }
 
-  // Method to set the description content
-  setDescription(description: string) {
-    let descriptionElement = this.querySelector('[slot="description"]');
-    if (description) {
-      if (!descriptionElement) {
-        descriptionElement = document.createElement('span');
-        descriptionElement.slot = 'description';
-        this.appendChild(descriptionElement);
-      }
-      descriptionElement.textContent = description;
-      (descriptionElement as HTMLElement).style.display = 'block';
-    } else if (descriptionElement) {
-      (descriptionElement as HTMLElement).style.display = 'none';
-    }
+  setTitle(title: string): void {
+    this.setSlotText('title', title);
   }
 
-  // Trap focus inside the modal
-  // Trap focus inside the modal
-private trapFocus(event: KeyboardEvent) {
-  const focusableElements = this.shadowRoot!.querySelectorAll<HTMLElement>(
-    '.close-button, .content-container'
-  );
-  const focusArray = Array.from(focusableElements);
-  const activeElement = this.shadowRoot!.activeElement as HTMLElement; // Get the active element within the shadow DOM
-  const currentIndex = focusArray.indexOf(activeElement);
-
-  if (event.shiftKey && currentIndex === 0) {
-    // Shift + Tab, focus last element
-    focusArray[focusArray.length - 1].focus();
-    event.preventDefault();
-  } else if (!event.shiftKey && currentIndex === focusArray.length - 1) {
-    // Tab, focus first element
-    focusArray[0].focus();
-    event.preventDefault();
-  }
-}
-
-
-  // Focus the first focusable element in the modal
-  private focusFirstElement() {
-    const focusableElements = this.shadowRoot!.querySelectorAll<HTMLElement>(
-      '.close-button, .content-container'
-    );
-    if (focusableElements.length > 0) {
-      focusableElements[0].focus();
-    }
+  setDescription(description: string): void {
+    this.setSlotText('description', description);
   }
 
-
-
-  // Lifecycle hook that runs when the component is added to the DOM
-  connectedCallback() {
-    // Set up any additional behavior if necessary when the component is attached to the DOM
-    this.initializeSlots();
-  }
-
-  // Method to initialize slots and apply styles if default content is present
-  private initializeSlots() {
-    const descriptionElement = this.querySelector('[slot="description"]');
-    if (descriptionElement && descriptionElement.textContent.trim() !== '') {
-      (descriptionElement as HTMLElement).style.display = 'block';
-    } else if (descriptionElement) {
-      (descriptionElement as HTMLElement).style.display = 'none';
-    }
-  }
-
-  // Method to set the main content
-  setContent(content: string | HTMLElement) {
-    let contentElement = this.querySelector('[slot="content"]');
+  /** Replace the body with plain text (rendered pre-wrap) or an element. */
+  setContent(content: string | HTMLElement): void {
+    let contentElement = this.querySelector<HTMLElement>('[slot="content"]');
     if (!contentElement) {
       contentElement = document.createElement('div');
       contentElement.slot = 'content';
@@ -308,40 +288,175 @@ private trapFocus(event: KeyboardEvent) {
       contentElement.innerHTML = '';
       contentElement.appendChild(content);
     }
+    this.updateScrollRegionFocusability();
   }
 
-  // Lifecycle hook that runs when the component is removed from the DOM
-  disconnectedCallback() {
-    // Clean up any resources if necessary when the component is detached from the DOM
-    if (this.debounceTimeout) {
-      clearTimeout(this.debounceTimeout);
+  /**
+   * Replace the footer buttons. Pass null to remove the footer entirely; it is
+   * also hidden automatically while the slot is empty.
+   */
+  setActions(actions: HTMLElement | null): void {
+    const existing = this.querySelector<HTMLElement>('[slot="actions"]');
+    if (existing) {
+      existing.remove();
     }
-    this.resizeObserver.disconnect();
+    if (actions) {
+      actions.slot = 'actions';
+      this.appendChild(actions);
+    }
+    // slotchange fires asynchronously; toggle now so a caller that sets actions
+    // and opens in the same tick gets a visible footer and a complete focus trap.
+    this.actionsContainer.classList.toggle('is-empty', !actions);
+  }
+
+  connectedCallback(): void {
+    this.initializeSlots();
+    if (!this.documentKeydownBound) {
+      document.addEventListener('keydown', this.onDocumentKeydown);
+      this.documentKeydownBound = true;
+    }
+  }
+
+  disconnectedCallback(): void {
+    if (this.documentKeydownBound) {
+      document.removeEventListener('keydown', this.onDocumentKeydown);
+      this.documentKeydownBound = false;
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    if (this.isOpen) {
+      document.body.style.overflow = '';
+    }
+  }
+
+  // Escape closes — but only this dialog, and only while it is open, so several
+  // dialogs on one page don't all react to the same keypress.
+  private onDocumentKeydown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && this.isOpen) {
+      event.preventDefault();
+      this.close();
+    }
+  };
+
+  private setSlotText(slotName: 'title' | 'description', text: string): void {
+    let element = this.querySelector<HTMLElement>(`[slot="${slotName}"]`);
+    if (text) {
+      if (!element) {
+        element = document.createElement('span');
+        element.slot = slotName;
+        this.appendChild(element);
+      }
+      element.textContent = text;
+      element.style.display = 'block';
+    } else if (element) {
+      element.style.display = 'none';
+    }
+  }
+
+  private initializeSlots(): void {
+    const description = this.querySelector<HTMLElement>('[slot="description"]');
+    if (description) {
+      description.style.display = description.textContent.trim() !== '' ? 'block' : 'none';
+    }
+  }
+
+  /** Label the dialog for assistive tech from its title slot. */
+  private syncAriaLabel(): void {
+    const title = this.querySelector<HTMLElement>('[slot="title"]');
+    const label = title ? title.textContent.trim() : '';
+    if (label) {
+      this.innerContainer.setAttribute('aria-label', label);
+    } else {
+      this.innerContainer.removeAttribute('aria-label');
+    }
+  }
+
+  /**
+   * The scroll region is keyboard-focusable only while it actually scrolls, so
+   * Tab doesn't stop on an inert box when the content fits.
+   */
+  private updateScrollRegionFocusability(): void {
+    const scrolls = this.contentContainer.scrollHeight > this.contentContainer.clientHeight + 1;
+    this.contentContainer.tabIndex = scrolls ? 0 : -1;
+  }
+
+  /**
+   * Everything Tab can reach, in the order the browser visits it: the close
+   * button, focusables slotted into the header, the scroll region (when it
+   * scrolls), focusables slotted into the body, then the footer buttons.
+   */
+  private focusableElements(): HTMLElement[] {
+    const slotted = (slotName: string): HTMLElement[] => {
+      const found: HTMLElement[] = [];
+      this.querySelectorAll<HTMLElement>(`[slot="${slotName}"]`).forEach((root) => {
+        if (root.matches(ModalDialog.FOCUSABLE)) {
+          found.push(root);
+        }
+        root.querySelectorAll<HTMLElement>(ModalDialog.FOCUSABLE).forEach((el) => found.push(el));
+      });
+      // Skip anything display:none / detached.
+      return found.filter((el) => el.getClientRects().length > 0);
+    };
+
+    const elements: HTMLElement[] = [this.closeButton];
+    elements.push(...slotted('title'), ...slotted('description'));
+    if (this.contentContainer.tabIndex === 0) {
+      elements.push(this.contentContainer);
+    }
+    elements.push(...slotted('content'), ...slotted('actions'));
+    return elements;
+  }
+
+  /** The focused element, whether it lives in the shadow tree or is slotted. */
+  private currentFocus(): Element | null {
+    return this.shadowRoot!.activeElement || document.activeElement;
+  }
+
+  private trapFocus(event: KeyboardEvent): void {
+    const elements = this.focusableElements();
+    if (elements.length === 0) {
+      return;
+    }
+    const index = elements.indexOf(this.currentFocus() as HTMLElement);
+    if (event.shiftKey) {
+      if (index <= 0) {
+        elements[elements.length - 1].focus();
+        event.preventDefault();
+      }
+    } else if (index === -1 || index === elements.length - 1) {
+      elements[0].focus();
+      event.preventDefault();
+    }
+  }
+
+  private focusFirstElement(): void {
+    const elements = this.focusableElements();
+    if (elements.length > 0) {
+      elements[0].focus();
+    }
   }
 }
 
-// Define the custom element with the name 'modal-dialog'
-customElements.define('modal-dialog', ModalDialog);
+// Registered here so importing the module is enough; Bespoken.ts also guards
+// against a double definition.
+if (!customElements.get('modal-dialog')) {
+  customElements.define('modal-dialog', ModalDialog);
+}
 
-// Usage Example (in HTML):
-// <!-- in the HTML head, include the rule to prevent flash of unstyled content -->
-// <style>[x-cloak] { display: none !important; }</style>
+// Usage (HTML):
+//   <style>[x-cloak] { display: none !important; }</style>
+//   <modal-dialog id="myDialog" x-cloak>
+//     <span slot="title">Dialog Title</span>
+//     <span slot="description">What this dialog is for</span>
+//     <div slot="content"><p>Body content.</p></div>
+//     <div slot="actions"><button type="button">Do the thing</button></div>
+//   </modal-dialog>
 //
-// <!-- note the x-cloak attribute which will be removed in the initialization process -->
-// <modal-dialog id="myDialog" x-cloak>
-//   <span slot="title">Dialog Title</span>
-//   <span slot="description">This is a description for the dialog</span>
-//   <div slot="content">
-//     <p>Your HTML content goes here.</p>
-//   </div>
-// </modal-dialog>
-//
-// <script>
-//   const myDialog = document.getElementById('myDialog');
-//   myDialog.open();
-//   myDialog.setTitle('New Title');
-//   myDialog.setDescription('Updated description text.');
-//   myDialog.setContent('This is the updated main content.');
-//   // To close the dialog: myDialog.close();
-// </script>
-// x-cloak class name "borrowed" from Alpine.js - https://alpinejs.dev/directives/cloak
+// Usage (JS):
+//   const dialog = document.getElementById('myDialog');
+//   dialog.setContent('Plain text keeps its line breaks.');
+//   dialog.setActions(buttonsElement);   // or null to remove the footer
+//   dialog.addEventListener('bespoken-modal-close', () => { /* persist edits */ });
+//   dialog.open();
+// x-cloak is borrowed from Alpine.js: https://alpinejs.dev/directives/cloak

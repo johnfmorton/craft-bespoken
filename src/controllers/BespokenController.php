@@ -22,11 +22,10 @@ class BespokenController extends Controller
      */
     public function actionIndex(): Response
     {
-
         $message = 'You are using the Bespoken plugin action method. Showing you this text is all it does.';
         $data = [
             'success' => true,
-            'message' => $message
+            'message' => $message,
         ];
         return $this->asJson(
             $data
@@ -53,82 +52,14 @@ class BespokenController extends Controller
 
         $pronunciationRuleSet = $postData['pronunciationRuleSet'];
 
-        // Accommodate for users who have not updated their settings: If the voiceModel and pronunciationRuleSet values are not set, we need to use the default values.
+        // Accommodate for users who have not updated their settings: default the
+        // voice model when unset. (The pronunciation rule set is defaulted inside
+        // _prepareTextForTts, which the create-project path also uses.)
         if (!$voiceModel or $voiceModel == '') {
             $voiceModel = 'multilingual_v2';
         }
-        if (!$pronunciationRuleSet or $pronunciationRuleSet == '') {
-            $pronunciationRuleSet = 'language1';
-        }
 
-        // Get the full list of pronunciations from the settings model. This is the list of pronunciations that will be used to replace the words with the pronunciations.
-        $pronunciations = BespokenPlugin::getInstance()->getSettings()->pronunciations;
-
-        BespokenPlugin::info('Pronunciations: ' . json_encode($pronunciations));
-
-        /* sample of legacy version of the pronunciations array:
-        [{"word":"DDEV","pronunciation":"deedev"},{"word":"colonel","pronunciation":"kernel"},{"word":"bologna","pronunciation":"baloney"},{"word":"fish","pronunciation":"bacon"}]
-        */
-
-        /* sample of the pronunciations array that is expected:
-        [{"word":"DDEV","pronunciation":"deedev","pronunciationRuleSet":"language1"},{"word":"colonel","pronunciation":"kernel","pronunciationRuleSet":"language1"},{"word":"bologna","pronunciation":"baloney","pronunciationRuleSet":"language1"},{"word":"fish","pronunciation":"bacon","pronunciationRuleSet":"language1"}]
-        */
-
-        // if the user still has the legacy version of the pronunciations array, we need to convert it to the new version and default the pronunciationRuleSet to language1
-        if (count($pronunciations) > 0 and count($pronunciations[0]) == 2) {
-            $pronunciations = array_map(function($pronunciation) {
-                return ['word' => $pronunciation['word'], 'pronunciation' => $pronunciation['pronunciation'], 'pronunciationRuleSet' => 'language1'];
-            }, $pronunciations);
-        }
-
-        // filter the pronunciations array to only include the values that match the pronunciationRuleSet value
-        $filteredPronunciations = array_filter($pronunciations, function($pronunciation) use ($pronunciationRuleSet) {
-            return $pronunciation['pronunciationRuleSet'] == $pronunciationRuleSet;
-        });
-
-        BespokenPlugin::info('Filtered pronunciations: ' . json_encode($filteredPronunciations));
-
-        // Decode HTML entities so pronunciation rules match the actual characters
-        // (e.g., CKEditor encodes "->" as "-&gt;")
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        // Loop through the pronunciations and replace the word with the pronunciation, regardless of case, using the filteredPronunciations array
-        // This allows different voices to have different pronunciations for the same word which is useful for multilingual sites.
-
-        foreach ($filteredPronunciations as $pronunciation) {
-            $word = trim($pronunciation['word']);
-            $replacement = trim($pronunciation['pronunciation']);
-
-            if ($word === '') {
-                continue;
-            }
-
-            // Pad with spaces: non-empty gets surrounding spaces, empty gets a single space (word removal)
-            $paddedReplacement = $replacement !== '' ? ' ' . $replacement . ' ' : ' ';
-            $text = str_ireplace($word, $paddedReplacement, $text);
-        }
-
-        BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
-
-        // remove any   characters
-        $text = str_replace(' ', ' ', $text);
-
-        // Collapse horizontal whitespace (spaces, tabs, nbsp) but preserve paragraph markers (\n\n)
-        $text = preg_replace('/[^\S\n]+/', ' ', $text);
-        $text = preg_replace('/\n{3,}/', "\n\n", $text);
-        $text = preg_replace('/\n([^\n])/', "\n\n$1", $text);
-
-        // Strip angle brackets that survive pronunciation rules — ElevenLabs
-        // interprets stray "<" as SSML/XML markup, silently swallowing content.
-        $text = str_replace(['<', '>'], ' ', $text);
-
-        // trim leading/trailing spaces that padding may have introduced
-        $text = trim($text);
-
-        // Collapse any double-spaces introduced by the angle-bracket removal
-        $text = preg_replace('/[^\S\n]+/', ' ', $text);
-
-        BespokenPlugin::info('Text after pronunciation replacement: ' . $text);
+        $text = $this->_prepareTextForTts($text, $pronunciationRuleSet);
 
         $voiceId = $postData['voiceId'];
         $fileNamePrefix = $postData['fileNamePrefix'];
@@ -175,6 +106,72 @@ class BespokenController extends Controller
 
         // call the sendTextToElevenLabsApi service method
         $result = BespokenPlugin::getInstance()->bespokenService->sendTextToElevenLabsApi($elementId, $text, $voiceId, $entryTitle, $fileNamePrefix, $voiceModel, $siteId);
+
+        return $this->asJson($result);
+    }
+
+    /**
+     * Create an editable project on the Alias TTS service from this field's
+     * text + selected voice, instead of generating audio. Returns the new
+     * project's details and a link into the service's control panel. Mirrors
+     * actionProcessText's text preparation so the project's chunks match what
+     * generation would produce. Alias TTS service only.
+     *
+     * @throws MethodNotAllowedHttpException
+     */
+    public function actionCreateProject(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireLogin();
+
+        $settings = BespokenPlugin::getInstance()->getSettings();
+
+        // The create-project endpoint only exists on the self-hosted service.
+        if (!$settings->usesCustomEndpoint()) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Creating a project is only available with the Alias TTS service endpoint.',
+            ]);
+        }
+
+        $postData = Craft::$app->request->post();
+
+        $text = $postData['text'] ?? '';
+        $voiceModel = $postData['voiceModel'] ?? '';
+        $pronunciationRuleSet = $postData['pronunciationRuleSet'] ?? '';
+
+        if (!$voiceModel or $voiceModel == '') {
+            $voiceModel = 'multilingual_v2';
+        }
+
+        $text = $this->_prepareTextForTts($text, $pronunciationRuleSet);
+
+        $voiceId = $postData['voiceId'] ?? '';
+        $elementId = $this->_confirmAndCastToInt($postData['elementId'] ?? '');
+
+        if ($elementId === 0) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Element ID is missing or invalid',
+            ]);
+        }
+
+        // Resolve the element so the project can be named after the entry. A
+        // missing element just means an empty title — the service then falls back
+        // to its own auto-generated "Audio project #N" name.
+        $siteId = $this->_resolveRequestSiteId();
+        $element = Craft::$app->elements->getElementById($elementId, null, $siteId);
+        if (!$element) {
+            $element = \craft\elements\Entry::find()
+                ->id($elementId)
+                ->siteId('*')
+                ->status(null)
+                ->one();
+        }
+
+        $title = $element ? $this->_cleanTitle($element->title, 56) : '';
+
+        $result = BespokenPlugin::getInstance()->bespokenService->createProject($text, $voiceId, $title, $voiceModel);
 
         return $this->asJson($result);
     }
@@ -272,14 +269,14 @@ class BespokenController extends Controller
         if (!$element) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Element not found'
+                'message' => 'Element not found',
             ]);
         }
 
         return $this->asJson([
 
             'success' => true,
-            'element' => $element
+            'element' => $element,
         ]);
     }
 
@@ -290,6 +287,7 @@ class BespokenController extends Controller
     {
         $this->requireLogin();
 
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = BespokenPlugin::getInstance()->getSettings();
         $apiKey = App::parseEnv($settings->elevenlabsApiKey);
 
@@ -300,9 +298,18 @@ class BespokenController extends Controller
             ]);
         }
 
+        // Character usage is an ElevenLabs-specific endpoint; skip it for
+        // self-hosted / compatible endpoints that don't implement it.
+        if ($settings->usesCustomEndpoint()) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Character usage is only available with the ElevenLabs endpoint.',
+            ]);
+        }
+
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.elevenlabs.io/v1/user/subscription',
+            CURLOPT_URL => $settings->getSubscriptionUrl(),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
             CURLOPT_HTTPHEADER => [
@@ -377,7 +384,128 @@ class BespokenController extends Controller
             $this->enableCsrfValidation = false;
         }
 
+        // create-project keeps default CSRF validation on: it's a state-changing
+        // POST and the TypeScript caller sends Craft's CSRF token (X-CSRF-Token).
+
         return parent::beforeAction($action);
+    }
+
+    /**
+     * Apply the plugin's pronunciation rules and the shared text cleanup the TTS
+     * engines need (HTML-entity decode, whitespace collapse, angle-bracket and
+     * emoji stripping, punctuation tidy). Shared by the audio-generation path
+     * (actionProcessText) and the create-project path (actionCreateProject), so a
+     * project's chunks match exactly what generation would produce.
+     */
+    private function _prepareTextForTts(string $text, string $pronunciationRuleSet): string
+    {
+        // Accommodate users who have not updated their settings.
+        if (!$pronunciationRuleSet) {
+            $pronunciationRuleSet = 'language1';
+        }
+
+        // Pull the configured pronunciation dictionary from the plugin settings.
+        $pronunciations = BespokenPlugin::getInstance()->getSettings()->pronunciations;
+
+        // Upgrade the legacy 2-key pronunciations array (no rule set) in place,
+        // defaulting it to language1.
+        if (count($pronunciations) > 0 and count($pronunciations[0]) == 2) {
+            $pronunciations = array_map(function($pronunciation) {
+                return ['word' => $pronunciation['word'], 'pronunciation' => $pronunciation['pronunciation'], 'pronunciationRuleSet' => 'language1'];
+            }, $pronunciations);
+        }
+
+        // Keep only the rules for the active rule set (lets different voices use
+        // different pronunciations for the same word on multilingual sites).
+        $filteredPronunciations = array_filter($pronunciations, function($pronunciation) use ($pronunciationRuleSet) {
+            return $pronunciation['pronunciationRuleSet'] == $pronunciationRuleSet;
+        });
+
+        // Decode HTML entities so pronunciation rules match the actual characters
+        // (e.g., CKEditor encodes "->" as "-&gt;").
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Replace words with their pronunciations, regardless of case.
+        foreach ($filteredPronunciations as $pronunciation) {
+            $word = trim($pronunciation['word']);
+            $replacement = trim($pronunciation['pronunciation']);
+
+            if ($word === '') {
+                continue;
+            }
+
+            // Pad with spaces: non-empty gets surrounding spaces, empty gets a single space (word removal)
+            $paddedReplacement = $replacement !== '' ? ' ' . $replacement . ' ' : ' ';
+            $text = str_ireplace($word, $paddedReplacement, $text);
+        }
+
+        // Convert non-breaking spaces (U+00A0) to regular spaces.
+        $text = str_replace("\u{00A0}", ' ', $text);
+
+        // Normalize whitespace while KEEPING paragraph breaks. Horizontal runs
+        // collapse to one space; every run of newlines (with any spaces around
+        // it) becomes exactly one blank line. The client-side prep emits "\n\n"
+        // between blocks, and both providers rely on those breaks: the
+        // ElevenLabs path sends a post that fits in one request as-is, blank
+        // lines included (as it always has), and splits longer posts at
+        // paragraph boundaries first (joining paragraphs with a space inside
+        // each chunk); the Alias TTS service treats a blank line as a block
+        // seam, inserting its longer paragraph pause there instead of the short
+        // sentence gap. Normalizing to a single "\n\n" also fixes the old bug
+        // that doubled an existing break into "\n\n\n".
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace('/[^\S\n]+/', ' ', $text);
+        $text = preg_replace('/ *\n[\n ]*/', "\n\n", $text);
+
+        // Strip angle brackets — a stray "<" is interpreted as SSML/XML markup,
+        // silently swallowing content.
+        $text = str_replace(['<', '>'], ' ', $text);
+
+        // Strip emoji and pictographic symbols. The TTS engines choke on them — a
+        // stray emoji can corrupt the generated audio — so remove them entirely
+        // before sending. Covers the standard emoji Unicode blocks plus the
+        // modifiers (variation selectors, ZWJ, keycaps, regional-indicator flags).
+        $text = preg_replace(
+            '/['
+            . '\x{1F300}-\x{1FAFF}'
+            . '\x{1F000}-\x{1F0FF}'
+            . '\x{1F100}-\x{1F2FF}'
+            . '\x{2600}-\x{27BF}'
+            . '\x{2B00}-\x{2BFF}'
+            . '\x{2300}-\x{23FF}'
+            . '\x{2190}-\x{21FF}'
+            . '\x{FE00}-\x{FE0F}'
+            . '\x{1F1E6}-\x{1F1FF}'
+            . '\x{200D}'
+            . '\x{20E3}'
+            . ']/u',
+            '',
+            $text
+        );
+
+        // Trim leading/trailing spaces that padding may have introduced.
+        $text = trim($text);
+
+        // Collapse any double-spaces introduced by the angle-bracket removal, and
+        // re-tighten paragraph breaks it may have padded with spaces.
+        $text = preg_replace('/[^\S\n]+/', ' ', $text);
+        $text = preg_replace('/ *\n\n */', "\n\n", $text);
+
+        // Drop spaces left *before* end-of-token punctuation, so a replaced word
+        // at a sentence end yields "editor." not "editor .". The (?=\s|$) guard
+        // leaves dot-prefixed words (".NET", ".gitignore") untouched. Only
+        // horizontal whitespace is matched so a paragraph break is never bridged.
+        $text = preg_replace('/[^\S\n]+([.,;:!?])(?=\s|$)/', '$1', $text);
+
+        // Collapse accidental double punctuation from the client-side appended
+        // period: soft mark + period -> period; "!"/"?" + period -> keep the mark;
+        // period + period -> single (ellipsis "..." preserved). Again across
+        // horizontal whitespace only, so paragraph breaks survive.
+        $text = preg_replace('/[,;:]+[^\S\n]*\.(?=\s|$)/', '.', $text);
+        $text = preg_replace('/([!?])[^\S\n]*\.(?=\s|$)/', '$1', $text);
+        $text = preg_replace('/(?<!\.)\.[^\S\n]*\.(?=\s|$)/', '.', $text);
+
+        return $text;
     }
 
     /**
@@ -430,5 +558,4 @@ class BespokenController extends Controller
 
         return $cleanText;
     }
-
 }

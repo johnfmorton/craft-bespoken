@@ -79,7 +79,12 @@
                 value:  voiceModeltoVoiceIdForField ?? ''|json_encode,
             }) }}
 
-			<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info', siteActionParams) }}"></div>
+			{# Credit balance + usage estimate are ElevenLabs concepts (credits, model
+			   multipliers). They don't apply to a self-hosted Alias TTS service, so
+			   omit the element entirely; the JS that fills it null-checks and no-ops. #}
+			{% if not bespokenSettings.usesCustomEndpoint() %}
+				<div class="bespoken-credit-info" data-credit-info-url="{{ actionUrl('bespoken/bespoken/get-credit-info', siteActionParams) }}"></div>
+			{% endif %}
 
 			<div class=" group flex flex-row">
 
@@ -132,6 +137,27 @@
                         }
                     }
                 }) }}
+
+				{# Self-hosted Alias TTS service only: create an editable project
+				   from the text instead of generating audio. ElevenLabs has no such
+				   endpoint, so the button is hidden in ElevenLabs mode. #}
+				{% if bespokenSettings.usesCustomEndpoint() %}
+					{{ forms.button({
+                    label: 'Create project button' | t('bespoken'),
+                    class: [
+                        'btn',
+                        'bespoken-button',
+                        'bespoken-create-project',
+                    ],
+                    attributes: {
+                        data: {
+                            'target-field': field.sourceField,
+                            'create-project-action-url': actionUrl('bespoken/bespoken/create-project', siteActionParams),
+                            'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams),
+                        }
+                    }
+                }) }}
+				{% endif %}
 
 				{%  if fieldSettings.showPreview %}
 					<modal-dialog class="bespoken-dialog" x-cloak>

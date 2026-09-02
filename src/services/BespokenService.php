@@ -3,6 +3,7 @@
 namespace johnfmorton\bespoken\services;
 
 use Craft;
+use craft\helpers\App;
 use DateTime;
 use johnfmorton\bespoken\jobs\GenerateAudio;
 use johnfmorton\bespoken\records\AudioGenerationRecord;
@@ -34,10 +35,11 @@ class BespokenService extends Component
         $apiKey = $settings->elevenlabsApiKey;
         // if there is no API key, return an error
         if (!$apiKey) {
+            $providerName = $settings->usesCustomEndpoint() ? 'Alias TTS service' : 'ElevenLabs';
             return [
                 'success' => false,
                 'progress' => 0,
-                'message' => 'Eleven Labs API key is not set in the plugin settings.',
+                'message' => $providerName . ' API key is not set in the plugin settings.',
             ];
         }
 
@@ -100,6 +102,121 @@ class BespokenService extends Component
             'progress' => 0,
             'filename' => $filename,
             'bespokenJobId' => $bespokenJobId,
+        ];
+    }
+
+    /**
+     * Create an editable project on the self-hosted Alias TTS service from the
+     * given text + voice, instead of generating audio. Returns the new project's
+     * details and a link into the service's control panel for that project (the
+     * user signs in there normally). No audio is generated here — that happens
+     * later in the service's Studio. Bespoken-TTS-service only (ElevenLabs has no
+     * such endpoint); guarded so it fails clearly if called in ElevenLabs mode.
+     *
+     * @return array{success: bool, message?: string, projectId?: ?string, title?: string, projectUrl?: ?string, chunkCount?: ?int, characters?: ?int}
+     */
+    public function createProject(string $text, string $voiceId, string $title, string $voiceModel): array
+    {
+        $settings = BespokenPlugin::getInstance()->getSettings();
+
+        if (!$settings->usesCustomEndpoint()) {
+            return [
+                'success' => false,
+                'message' => 'Creating a project is only available with the Alias TTS service endpoint.',
+            ];
+        }
+
+        $apiKey = App::parseEnv($settings->elevenlabsApiKey);
+        if (!$apiKey) {
+            return [
+                'success' => false,
+                'message' => 'Alias TTS service API key is not set in the plugin settings.',
+            ];
+        }
+
+        if (trim($text) === '') {
+            return [
+                'success' => false,
+                'message' => 'No text to create a project from.',
+            ];
+        }
+
+        $requestBody = [
+            'title' => $title,
+            'voice_id' => $voiceId,
+            'text' => $text,
+            'model_id' => $voiceModel,
+            'voice_settings' => [
+                'stability' => $settings->stability,
+                'similarity_boost' => $settings->similarity_boost,
+                'style' => $settings->style,
+                'use_speaker_boost' => $settings->use_speaker_boost,
+            ],
+        ];
+
+        try {
+            $payload = json_encode($requestBody, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return [
+                'success' => false,
+                'message' => 'Could not encode the project request.',
+            ];
+        }
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $settings->getProjectsUrl(),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Content-Type: application/json',
+                'xi-api-key: ' . $apiKey,
+            ],
+        ]);
+
+        $response = curl_exec($curl);
+        $httpStatus = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($curl);
+        curl_close($curl);
+
+        if ($curlError) {
+            BespokenPlugin::error('Create project request failed: ' . $curlError);
+            return [
+                'success' => false,
+                'message' => 'Could not contact the Alias TTS service.',
+            ];
+        }
+
+        try {
+            $data = json_decode((string)$response, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return [
+                'success' => false,
+                'message' => 'Invalid response from the Alias TTS service.',
+            ];
+        }
+
+        // The service returns ElevenLabs-shaped errors: { detail: { message } }.
+        if ($httpStatus < 200 || $httpStatus >= 300) {
+            return [
+                'success' => false,
+                'message' => $data['detail']['message'] ?? 'The Alias TTS service rejected the request.',
+            ];
+        }
+
+        // The service returns a plain control-panel URL in `url` (the owner opens
+        // it and signs in normally). Older builds returned a single-use `edit_url`;
+        // accept either so the plugin keeps working across service versions.
+        return [
+            'success' => true,
+            'projectId' => $data['id'] ?? null,
+            'title' => $data['title'] ?? $title,
+            'projectUrl' => $data['url'] ?? $data['edit_url'] ?? null,
+            'chunkCount' => $data['chunk_count'] ?? null,
+            'characters' => $data['characters'] ?? null,
         ];
     }
 
@@ -218,7 +335,12 @@ class BespokenService extends Component
         if (isset($data['message'])) {
             $record->message = $data['message'];
             $log = $record->messageLog ? (json_decode($record->messageLog, true) ?? []) : [];
-            $log[] = $data['message'];
+            // Async polling repeats the same message across many polls (e.g.
+            // "Creating clip 3 of 8"), and the CP replays every new log entry —
+            // skip consecutive duplicates.
+            if (end($log) !== $data['message']) {
+                $log[] = $data['message'];
+            }
             $record->messageLog = json_encode($log, JSON_THROW_ON_ERROR);
         }
         if (isset($data['success'])) {

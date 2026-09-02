@@ -47,6 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', handleHistoryButtonClick);
     });
 
+    // Bespoken-TTS-service-only button: create an editable project from the text.
+    const createProjectButtons: NodeListOf<HTMLButtonElement> = document.querySelectorAll('.bespoken-create-project');
+    createProjectButtons.forEach(button => {
+        button.addEventListener('click', handleCreateProjectButtonClick);
+    });
+
     // Fetch credit info then calculate estimate for each field group
     const fieldGroups: NodeListOf<HTMLElement> = document.querySelectorAll('.bespoken-fields');
     fieldGroups.forEach(fieldGroup => {
@@ -293,6 +299,188 @@ async function handleHistoryButtonClick(event: Event): Promise<void> {
     } catch (error) {
         console.error('Error fetching generation history:', error);
     }
+}
+
+// Create an editable project on the Alias TTS service from this field's text +
+// selected voice, instead of generating audio. Gathers the script exactly like
+// the generate flow (so the project's chunks match what generation would
+// produce), POSTs it, then surfaces a link into the service's control panel.
+async function handleCreateProjectButtonClick(event: Event): Promise<void> {
+    const button = (event.target as HTMLElement).closest('.bespoken-create-project') as HTMLButtonElement | null;
+    if (!button) return;
+
+    button.classList.add('disabled');
+
+    const fieldGroup = (event.target as HTMLElement).closest('.bespoken-fields') as HTMLElement;
+    const progressComponent = fieldGroup.querySelector('.bespoken-progress-component') as ProgressComponent;
+
+    const actionUrlGetElementContent: string = button.getAttribute('data-get-element-content-action-url');
+    const actionUrlCreateProject: string = button.getAttribute('data-create-project-action-url') || '';
+
+    const elementId: string = _getInputValue('input[name="elementId"]');
+    const title: string = _cleanTitle(_getInputValue('#title') || elementId);
+
+    const voiceSelect = fieldGroup.querySelector('.bespoken-voice-select select') as HTMLSelectElement | null;
+    const voiceId: string = voiceSelect ? voiceSelect.value : '';
+
+    // Resolve the per-voice model + pronunciation rule set, same as generate.
+    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]') as HTMLInputElement | null;
+    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]') as HTMLInputElement | null;
+    let voiceModelSelected = '';
+    let pronunciationRuleSetSelected = '';
+    try { voiceModelSelected = JSON.parse(voiceModelField?.value || '{}')[voiceId] || ''; } catch (e) { /* ignore */ }
+    try { pronunciationRuleSetSelected = JSON.parse(pronunciationRuleSetField?.value || '{}')[voiceId] || ''; } catch (e) { /* ignore */ }
+
+    const targetFieldHandles: string | undefined = button.getAttribute('data-target-field') || undefined;
+
+    updateProgressComponent(progressComponent, {
+        progress: 0.1,
+        success: true,
+        message: 'Gathering text…',
+        textColor: 'rgb(89, 102, 115)',
+    });
+
+    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
+
+    if (!text || text.length === 0) {
+        button.classList.remove('disabled');
+        updateProgressComponent(progressComponent, {
+            progress: 0,
+            success: false,
+            message: 'No text to create a project from.',
+            textColor: 'rgb(126,7,7)',
+        });
+        return;
+    }
+
+    updateProgressComponent(progressComponent, {
+        progress: 0.4,
+        success: true,
+        message: 'Creating project on the Alias TTS service…',
+        textColor: 'rgb(89, 102, 115)',
+    });
+
+    try {
+        const response = await fetch(actionUrlCreateProject, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Send Craft's CSRF token so the create-project endpoint can
+                // keep default CSRF validation on. Craft exposes the token
+                // globally in the control panel.
+                'X-CSRF-Token': (window as any).Craft?.csrfTokenValue ?? '',
+            },
+            body: JSON.stringify({
+                text,
+                voiceId,
+                elementId,
+                voiceModel: voiceModelSelected,
+                pronunciationRuleSet: pronunciationRuleSetSelected,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!data || !data.success || !data.projectUrl) {
+            button.classList.remove('disabled');
+            updateProgressComponent(progressComponent, {
+                progress: 0,
+                success: false,
+                message: (data && data.message) ? data.message : 'Could not create the project.',
+                textColor: 'rgb(126,7,7)',
+            });
+            return;
+        }
+
+        updateProgressComponent(progressComponent, {
+            progress: 1,
+            success: true,
+            message: 'Project created.',
+            textColor: 'rgb(34, 113, 71)',
+        });
+        button.classList.remove('disabled');
+
+        await showProjectCreatedModal(fieldGroup, data);
+    } catch (error) {
+        console.error('Error creating project:', error);
+        button.classList.remove('disabled');
+        updateProgressComponent(progressComponent, {
+            progress: 0,
+            success: false,
+            message: 'Error creating the project.',
+            textColor: 'rgb(126,7,7)',
+        });
+    }
+}
+
+// Show the "project created" modal with a link into the Alias TTS control panel
+// for the new project. The user clicks it and signs in there as usual.
+async function showProjectCreatedModal(parentElement: HTMLElement, data: any): Promise<void> {
+    const content = document.createElement('div');
+    content.style.cssText = 'font-size: 14px; line-height: 1.5;';
+
+    const intro = document.createElement('p');
+    intro.textContent = data.title
+        ? `Created the project “${data.title}”.`
+        : 'Created the project.';
+    content.appendChild(intro);
+
+    if (typeof data.chunkCount === 'number') {
+        const meta = document.createElement('p');
+        meta.style.cssText = 'color: #666; font-size: 13px; margin: 4px 0;';
+        meta.textContent = `${data.chunkCount} chunk${data.chunkCount === 1 ? '' : 's'} ready to generate.`;
+        content.appendChild(meta);
+    }
+
+    const link = document.createElement('a');
+    link.href = data.projectUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.classList.add('btn', 'submit');
+    link.textContent = 'Open project in Alias TTS →';
+    // Keep Craft's .btn flex centering (don't override display with inline-block,
+    // which would left/top-align the label); just add top spacing.
+    link.style.cssText = 'display: inline-flex; align-items: center; margin-top: 8px;';
+    content.appendChild(link);
+
+    const note = document.createElement('p');
+    note.style.cssText = 'color: #888; font-size: 12px; margin-top: 10px;';
+    note.textContent = 'Opens the project in Alias TTS — sign in there if you are not already.';
+    content.appendChild(note);
+
+    let modal = parentElement.querySelector('.bespoken-project-dialog') as ModalDialog | null;
+
+    if (!modal) {
+        modal = document.createElement('modal-dialog') as ModalDialog;
+        modal.classList.add('bespoken-project-dialog');
+
+        const titleSlot = document.createElement('div');
+        titleSlot.slot = 'title';
+        titleSlot.textContent = 'Alias TTS project created';
+        modal.appendChild(titleSlot);
+
+        const descSlot = document.createElement('div');
+        descSlot.slot = 'description';
+        descSlot.textContent = 'Open the project to generate and edit its audio.';
+        modal.appendChild(descSlot);
+
+        const contentSlot = document.createElement('div');
+        contentSlot.slot = 'content';
+        modal.appendChild(contentSlot);
+
+        parentElement.appendChild(modal);
+
+        await customElements.whenDefined('modal-dialog');
+        await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+
+    // Clicking the link opens the project in a new tab, so close this dialog.
+    // target="_blank" means the new tab opens independently, so closing the
+    // dialog doesn't interrupt it.
+    link.addEventListener('click', () => modal.close());
+
+    modal.setContent(content);
+    modal.open();
 }
 
 function createHistoryContent(generations: any[]): HTMLElement {

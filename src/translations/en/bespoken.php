@@ -44,6 +44,7 @@ return [
     'Asset volume instructions' => 'Choose the volume where the audio files will be saved.',
     'Start Audio Job' => 'Generate audio',
     'Preview Script button' => 'Preview script',
+    'Create project button' => 'Create Alias TTS project',
     'Bespoken field name' => 'Bespoken',
     'Prefix instructions' => 'An optional prefix to the audio filename.',
     'Source field instructions' => 'The field handle of the field that will be read aloud. To include multiple handles, separate the handles with a comma. You can include `title` to have the title of your entry have it included in your audio narration.',
@@ -63,4 +64,27 @@ return [
 <p>All values below should be left at the defaults under most circumstances. For more information, read the
 	<a href="https://elevenlabs.io/docs/speech-synthesis/voice-settings">ElevenLabs documentation for voice settings.</a>
 </p>',
+    'API endpoint URL' => 'API endpoint URL',
+    'API endpoint URL instructions' => 'The base URL of your Alias TTS service, e.g. <code>https://tts.example.com</code>. Can be an environment variable.',
+
+    // Provider toggle
+    'TTS provider' => 'TTS provider',
+    'TTS provider instructions' => 'Choose where Bespoken sends text to generate audio. <b>ElevenLabs</b> uses the hosted ElevenLabs API. <b>Alias TTS service</b> targets your own self-hosted, ElevenLabs-compatible <a href="https://github.com/johnfmorton/alias-tts" target="_blank">service</a>. The options below update to match your selection; click Save to apply it.',
+    'ElevenLabs' => 'ElevenLabs',
+    'Alias TTS service (self-hosted)' => 'Alias TTS service (self-hosted)',
+
+    // Alias TTS service mode — account details
+    'Alias TTS service account details instructions' => '<h2 class="first">Alias TTS service</h2>
+<p>Bespoken is set to use your self-hosted, ElevenLabs-compatible <a href="https://github.com/johnfmorton/alias-tts" target="_blank">Alias TTS service</a>. Enter the service&rsquo;s base URL and an API key generated in its control panel on the <i>API keys</i> page.</p>',
+    'Alias TTS service API key' => 'API key',
+    'Alias TTS service API Key instructions' => 'Generate this in your Alias TTS service control panel on the <i>API keys</i> page. Can be an environment variable.',
+    'Enter the base URL of your Alias TTS service.' => 'Enter the base URL of your Alias TTS service.',
+
+    // Alias TTS service mode — voice configuration (no ElevenLabs voice models)
+    'Voice configuration instructions (alias)' => '<p>Define the voices available in Bespoken. Each <b>Voice ID</b> must match a voice configured in your Alias TTS service (see its <i>Voices</i> page). The <b>Voice name</b> can be anything you like &mdash; it identifies the voice for your editors.</p>
+<p>You can define a <b>Pronunciation rule set</b> for each voice to customize how words are pronounced on a per-voice or per-language basis.</p>',
+
+    // Alias TTS service mode — advanced settings (only stability + style apply)
+    'Advanced settings instructions (alias)' => '<h2>Advanced settings</h2>
+<p>Your Alias TTS service maps <b>Stability</b> and <b>Style</b> onto its own voice-generation controls. The remaining ElevenLabs voice settings do not apply and are hidden.</p>',
 ];

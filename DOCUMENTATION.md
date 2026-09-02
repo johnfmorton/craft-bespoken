@@ -4,7 +4,16 @@ The Bespoken plugin for Craft CMS allows you to create audio files from text fie
 
 ## Set up the plugin
 
-Here are the basic steps in setting up the Bespoken plugin:
+Bespoken can generate audio with one of two text-to-speech providers. Choose one on the plugin settings page under **TTS provider**; the settings screen reorganizes to show only the options that apply to your choice.
+
+- **ElevenLabs** (the default): the hosted ElevenLabs API. Follow [Set up with ElevenLabs](#set-up-with-elevenlabs).
+- **Alias TTS service (self-hosted)**: your own [Alias TTS](https://github.com/johnfmorton/alias-tts) server, which speaks the ElevenLabs API. Follow [Set up with a self-hosted Alias TTS service](#set-up-with-a-self-hosted-alias-tts-service).
+
+Whichever provider you use, finish with the [common setup steps](#common-setup-steps).
+
+### Set up with ElevenLabs
+
+Here are the basic steps in setting up Bespoken with ElevenLabs:
 
 1. [Create an account with ElevenLabs](https://elevenlabs.io/?from=partnergomez2285) and get your API key. This key is found in the [control panel](https://elevenlabs.io/app/speech-synthesis/text-to-speech) in the _My Account_ menu. When creating your API key, restrict its permissions to only what Bespoken requires:
 
@@ -17,9 +26,32 @@ Here are the basic steps in setting up the Bespoken plugin:
 2. Add your API key to the plugin settings page.
 3. Customize the voices available on your site. You can include as many as you want. The Voice ID entered in the Bespoken settings must match the ID from the ElevenLabs Voice Lab. The Voice Lab page also provides a voice name, but you can use any name you prefer within Bespoken.
 4. Choose a voice model for each voice. See the [ElevenLabs Models documentation](https://elevenlabs.io/docs/overview/models) for more information about the models.
-5. Create a set of custom pronunciations for unique words used in your site. Pronunciations can be isolated to a rule set. This lets you define language-specific pronunciations for your site. Defining pronunciations is optional but can be useful if you have a lot of unique words that the voice model may not pronounce correctly. For example, the AI model might pronounce “DDEV” as “d-d-e-v” instead of “dee dev.”
-6. Create an Asset volume to store the audio files and select it in the plugin settings. This volume should have a publicly accessible URL. Since this is a normal [Craft CMS Asset](https://craftcms.com/docs/5.x/reference/element-types/assets.html) volume, the filesystem can be [local](https://craftcms.com/docs/5.x/reference/element-types/assets.html#local-filesystems) or [remote](https://craftcms.com/docs/5.x/reference/element-types/assets.html#remote-filesystems).
-7. Leave the Advanced settings as they are unless you have a specific need to change them. (Tip: Don't change them.)
+
+### Set up with a self-hosted Alias TTS service
+
+[Alias TTS](https://github.com/johnfmorton/alias-tts) is a self-hosted text-to-speech server with voice cloning. It is API-compatible with ElevenLabs, so Bespoken talks to it exactly as it talks to ElevenLabs, with a different base URL and API key. Generation runs on pay-per-use GPUs through your own [Replicate](https://replicate.com) account, and your reference clips and generated audio stay on infrastructure you control. Alias TTS support requires Bespoken 5.4.0 or later.
+
+1. Deploy Alias TTS and create an API key on its dashboard's **API keys** page. The dashboard home page's **Connect your app** panel lists everything Bespoken needs: the base URL, your API key, and the IDs of your voices. See the Alias TTS [deployment guide](https://github.com/johnfmorton/alias-tts/blob/main/docs/DEPLOYMENT.md) and its [Bespoken integration guide](https://github.com/johnfmorton/alias-tts/blob/main/docs/BESPOKEN.md).
+2. In the Bespoken settings, set **TTS provider** to **Alias TTS service (self-hosted)**.
+3. Enter the **API endpoint URL**: the base URL of your server, e.g. `https://tts.example.com`. Enter just the origin; no `/v1/…` path is needed. This field is required in Alias TTS mode and accepts an environment variable such as `$ALIAS_TTS_URL`.
+4. Enter the **API key** from your Alias TTS dashboard. This also accepts an environment variable.
+5. Add your voices. Each **Voice ID** must be a voice slug from the **Voices** page of your Alias TTS dashboard (e.g. `john`), not an ElevenLabs voice ID. A fresh Alias TTS install ships with two built-in voices, `default` and `default-female`, so you can generate audio before cloning a voice of your own.
+
+Things to know about Alias TTS mode:
+
+- **One provider per install.** The endpoint URL is a plugin-wide setting, so every voice in the voices table must exist on your Alias TTS server. You can't mix ElevenLabs voices and Alias TTS voices in one install.
+- **Hidden settings.** The ElevenLabs-only settings are hidden: Voice model, Similarity boost, Use speaker boost, and the credit balance and cost estimate normally shown on the Bespoken field. Alias TTS chooses the speech model per voice on your server, and it maps the **Stability** and **Style** advanced settings onto its own voice controls.
+- **The service does the chunking.** Bespoken sends the whole article in one request through the service's asynchronous job endpoint, then polls until the audio is ready. While it waits, the Bespoken field shows the service's own progress, such as "Creating clip 25 of 50" and "Stitching 50 clips together". This removes the request-timeout ceiling on long articles, but it requires a running queue worker on your Alias TTS server. If your server is an older version without the async endpoint, the plugin falls back to a single synchronous request.
+- **Restart long-running queue workers after changing settings.** Bespoken reads the provider, endpoint URL, and API key when a job runs, and a persistent `craft queue/listen` worker caches plugin settings when it starts. After switching providers or changing the endpoint or key, restart that worker, or it will keep using the old settings and report errors from the wrong service.
+- **Pronunciation rule sets still apply.** The plugin applies pronunciations before sending the text, so they work the same with either provider.
+
+### Common setup steps
+
+Finish the setup with these steps, which apply to both providers:
+
+1. Create a set of custom pronunciations for unique words used in your site. Pronunciations can be isolated to a rule set. This lets you define language-specific pronunciations for your site. Defining pronunciations is optional but can be useful if you have a lot of unique words that the voice model may not pronounce correctly. For example, the AI model might pronounce “DDEV” as “d-d-e-v” instead of “dee dev.”
+2. Create an Asset volume to store the audio files and select it in the plugin settings. This volume should have a publicly accessible URL. Since this is a normal [Craft CMS Asset](https://craftcms.com/docs/5.x/reference/element-types/assets.html) volume, the filesystem can be [local](https://craftcms.com/docs/5.x/reference/element-types/assets.html#local-filesystems) or [remote](https://craftcms.com/docs/5.x/reference/element-types/assets.html#remote-filesystems).
+3. Leave the Advanced settings as they are unless you have a specific need to change them. (Tip: Don't change them.)
 
 ## Bespoken field
 
@@ -64,6 +96,12 @@ The Bespoken field has a status field that will show the status of the audio fil
 In this example, you can see that the audio file creation failed because there were not enough credits left in the ElevenLabs account to create the audio file.
 
 ![Bespoken example of failed audio file creation showing error message](./documentation-assets/status-error.png)
+
+### Create Alias TTS project button
+
+When the TTS provider is set to **Alias TTS service**, the Bespoken field shows an extra **Create Alias TTS project** button. Instead of generating audio, it sends the entry's prepared script, with pronunciation rules and text cleanup already applied, along with the selected voice to your Alias TTS server. The server creates an editable Studio project named after the entry, normalized and chunked exactly as generation would be. A dialog then offers an **Open project in Alias TTS** link to the project in your server's dashboard, where you can generate and fine-tune the audio clip by clip and download the finished MP3. Sign in to the dashboard if you aren't already.
+
+The finished audio stays on your Alias TTS server; it is not saved back to Craft as an Asset. Use the **Generate audio** button when you want the audio stored in your Asset volume. The button is not shown in ElevenLabs mode, which has no equivalent endpoint.
 
 
 ### How text is processed from CKEditor and Redactor fields
@@ -214,6 +252,8 @@ If your queue is running automatically in the background via [CRON job or daemon
 
 If the queue is run only on [HTTP](https://craftcms.com/docs/5.x/system/queue.html#http), the queue may not run until you refresh the page.
 
+In Alias TTS mode, a single Craft queue job covers the whole article: it submits the text to your Alias TTS server, polls the server's job status every few seconds, and waits up to 30 minutes for the finished audio. Your Alias TTS server needs its own queue worker running as well, because it generates the audio asynchronously.
+
 ### Queue tolerance and job tracking
 
 As of version 5.1.0, Bespoken stores job status in the database rather than the cache. This provides several benefits:
@@ -243,6 +283,8 @@ The history is stored per-entry, so each entry maintains its own record of audio
 ## Development & Debugging
 
 Bespoken provides two environment variables for testing the audio chunking and concatenation pipeline without consuming ElevenLabs API credits. These are separate from the existing `BESPOKEN_DEBUG` variable (which bypasses chunking entirely and downloads a single test file).
+
+These two variables apply to ElevenLabs mode only. In Alias TTS mode the plugin does not chunk text itself; it hands the whole article to the service's async job endpoint before either variable is consulted.
 
 ### `BESPOKEN_DEV_DEBUG`
 

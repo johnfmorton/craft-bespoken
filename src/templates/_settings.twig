@@ -3,9 +3,20 @@
 
 {# All of the text for the instructions are in the translations file. #}
 
-{{ 'ElevenLabs account details instructions' | t('bespoken') | raw }}{% import '_includes/forms.twig' as forms %}
+{% import '_includes/forms.twig' as forms %}
 
-{# Define pronunciation rule sets options once to avoid duplication #}{% set pronunciationRuleSetsOptions = settings['pronunciationRuleSets'] ?? [
+{# Which TTS backend is selected drives the whole screen. A `provider` query
+   param lets the dropdown preview a mode without saving; otherwise use the saved
+   value. The choice only persists once you click Save. #}
+{% set provider = craft.app.request.getParam('provider') ?: (settings['apiProvider'] ?? 'elevenlabs') %}
+{# 'bespoken' is the legacy stored value for the Alias TTS provider (renamed
+   before release) — normalize it so the dropdown selects the right option. #}
+{% if provider == 'bespoken' %}{% set provider = 'alias' %}{% endif %}
+{% if provider not in ['elevenlabs', 'alias'] %}{% set provider = 'elevenlabs' %}{% endif %}
+{% set isAlias = provider == 'alias' %}
+
+{# Define pronunciation rule sets options once to avoid duplication #}
+{% set pronunciationRuleSetsOptions = settings['pronunciationRuleSets'] ?? [
     { label: 'Language 1', value: 'language1' },
     { label: 'Language 2', value: 'language2' },
     { label: 'Language 3', value: 'language3' },
@@ -17,21 +28,135 @@
     { label: 'Language 9', value: 'language9' },
     { label: 'Language 10', value: 'language10' }
 ] %}
+
+{{ forms.selectField({
+    label: 'TTS provider' | t('bespoken'),
+    instructions: 'TTS provider instructions' | t('bespoken'),
+    id: 'apiProvider',
+    name: 'apiProvider',
+    first: true,
+    options: [
+        { label: 'ElevenLabs' | t('bespoken'), value: 'elevenlabs' },
+        { label: 'Alias TTS service (self-hosted)' | t('bespoken'), value: 'alias' }
+    ],
+    value: provider
+}) }}
+
+{# The screen reorganizes per provider on reload. Reload in the chosen mode the
+   moment the dropdown changes (Craft namespaces the field, so match by name
+   suffix rather than a fixed id). This is a preview reload — no save happens
+   until you click Save. #}
+<script>
+(function () {
+    var sel = document.querySelector('select[name$="[apiProvider]"], select[name="apiProvider"]');
+    if (!sel) {
+        return;
+    }
+    sel.addEventListener('change', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('provider', sel.value);
+        // Skip Craft's "unsaved changes" guard for this intentional reload.
+        if (window.jQuery) {
+            window.jQuery(window).off('beforeunload');
+        }
+        window.onbeforeunload = null;
+        window.location.href = url.toString();
+    });
+})();
+</script>
+
+<hr>
+
+{% if isAlias %}
+{{ 'Alias TTS service account details instructions' | t('bespoken') | raw }}
+{% else %}
+{{ 'ElevenLabs account details instructions' | t('bespoken') | raw }}
+{% endif %}
+
+{# API key — label and help text depend on the provider #}
 {{  forms.autosuggestField({
-    label: 'ElevenLabs API key' | t('bespoken'),
-    instructions: 'ElevenLabs API Key instructions' | t('bespoken'),
+    label: (isAlias ? 'Alias TTS service API key' : 'ElevenLabs API key') | t('bespoken'),
+    instructions: (isAlias ? 'Alias TTS service API Key instructions' : 'ElevenLabs API Key instructions') | t('bespoken'),
     id: 'elevenlabs-api-key',
     suggestEnvVars: true,
     name: 'elevenlabsApiKey',
     first: false,
     value: settings['elevenlabsApiKey']})
 }}
+
+{# The endpoint URL only applies to the self-hosted Alias TTS service #}
+{% if isAlias %}
+{{  forms.autosuggestField({
+    label: 'API endpoint URL' | t('bespoken'),
+    instructions: 'API endpoint URL instructions' | t('bespoken'),
+    id: 'apiBaseUrl',
+    suggestEnvVars: true,
+    name: 'apiBaseUrl',
+    first: false,
+    placeholder: 'https://tts.example.com',
+    value: settings['apiBaseUrl'],
+    errors: settings.getErrors('apiBaseUrl')})
+}}
+{% endif %}
 <hr>
 	<h2>
 Voice configuration
 </h2>
 
+{% if isAlias %}
+{{ 'Voice configuration instructions (alias)' | t('bespoken') | raw }}
+{% else %}
 {{ 'Voice configuration instructions' | t('bespoken') | raw }}
+{% endif %}
+
+{# Voice name + Voice ID are always shown. The ElevenLabs Voice model column is
+   dropped for the Alias TTS service, which decides the model server-side. #}
+{% set voiceCols = {
+    voice: {
+        heading: 'Voice name' | t('bespoken'),
+        type: 'singleline',
+        width: isAlias ? '33%' : '25%',
+        handle: 'voice',
+        class: 'code'
+    },
+    voiceId: {
+        heading: 'Voice ID' | t('bespoken'),
+        type: 'singleline',
+        width: isAlias ? '34%' : '25%',
+        handle: 'voiceId',
+        class: 'code'
+    }
+} %}
+{% if not isAlias %}
+{% set voiceCols = voiceCols | merge({
+    voiceModel: {
+        heading: 'Voice model' | t('bespoken'),
+        type: 'select',
+        width: '25%',
+        handle: 'voiceModel',
+        options: [
+            { label: 'Eleven v3', value: 'eleven_v3', default: true },
+            { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
+            { label: 'Flash v2.5', value: 'eleven_flash_v2_5' },
+            { label: 'Flash v2', value: 'eleven_flash_v2' },
+            { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
+            { label: 'Turbo v2', value: 'eleven_turbo_v2' },
+            { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
+            { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
+        ]
+    }
+}) %}
+{% endif %}
+{% set voiceCols = voiceCols | merge({
+    pronunciationRuleSet: {
+        heading: 'Pronunciation rule set' | t('bespoken'),
+        type: 'select',
+        width: isAlias ? '33%' : '25%',
+        handle: 'pronunciationRuleSet',
+        class: 'code',
+        options: pronunciationRuleSetsOptions
+    }
+}) %}
 
 {% set input %}
 {{  forms.editableTable({
@@ -45,46 +170,7 @@ Voice configuration
     allowAdd: true,
     allowReorder: true,
     allowDelete: true,
-    cols: {
-        voice: {
-            heading: 'Voice name' | t('bespoken'),
-            type: 'singleline',
-            width: '25%',
-            handle: 'voice',
-            class: 'code'
-        },
-        voiceId: {
-            heading: 'Voice ID' | t('bespoken'),
-            type: 'singleline',
-            width: '25%',
-            handle: 'voiceId',
-            class: 'code'
-        },
-        voiceModel: {
-            heading: 'Voice model' | t('bespoken'),
-            type: 'select',
-            width: '25%',
-            handle: 'voiceModel',
-            options: [
-                { label: 'Eleven v3', value: 'eleven_v3', default: true },
-                { label: 'Multilingual v2', value: 'eleven_multilingual_v2' },
-                { label: 'Flash v2.5', value: 'eleven_flash_v2_5' },
-                { label: 'Flash v2', value: 'eleven_flash_v2' },
-                { label: 'Turbo v2.5', value: 'eleven_turbo_v2_5' },
-                { label: 'Turbo v2', value: 'eleven_turbo_v2' },
-                { label: 'English v1 (deprecated)', value: 'eleven_monolingual_v1' },
-                { label: 'Multilingual v1 (deprecated)', value: 'eleven_multilingual_v1' }
-            ]
-        },
-        pronunciationRuleSet: {
-            heading: 'Pronunciation rule set' | t('bespoken'),
-            type: 'select',
-            width: '25%',
-            handle: 'pronunciationRuleSet',
-            class: 'code',
-            options: pronunciationRuleSetsOptions
-        }
-    },
+    cols: voiceCols,
     rows: settings['voices'] ?? [],
 })
 }}
@@ -181,7 +267,11 @@ Voice configuration
 
 <hr>
 
+{% if isAlias %}
+{{ 'Advanced settings instructions (alias)' | t('bespoken') | raw }}
+{% else %}
 {{ 'Advanced settings instructions' | t('bespoken') | raw }}
+{% endif %}
 
 {{ forms.textField(
     {
@@ -195,6 +285,8 @@ Voice configuration
     }
 ) }}
 
+{# Similarity boost is an ElevenLabs-only voice setting; Chatterbox ignores it. #}
+{% if not isAlias %}
 {{ forms.textField(
     {
         label: 'Similarity boost' | t('bespoken'),
@@ -206,6 +298,7 @@ Voice configuration
         errors: settings.getErrors('similarity_boost')
     }
 ) }}
+{% endif %}
 
 {{ forms.textField(
     {
@@ -219,6 +312,8 @@ Voice configuration
     }
 ) }}
 
+{# Use speaker boost is an ElevenLabs-only voice setting; Chatterbox ignores it. #}
+{% if not isAlias %}
 {{ forms.lightSwitchField(
     {
         label: 'Use speaker boost' | t('bespoken'),
@@ -229,6 +324,7 @@ Voice configuration
         errors: settings.getErrors('use_speaker_boost')
     }
 ) }}
+{% endif %}
 
 <style>
 .bespoken-hint {

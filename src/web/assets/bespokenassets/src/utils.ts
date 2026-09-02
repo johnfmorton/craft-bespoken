@@ -265,6 +265,9 @@ function _processPlainTextField(inputText: string): string {
 
             // Check if the line ends with punctuation (including cases with a closing quote mark)
             if (!punctuationRegex.test(line)) {
+                // Drop any trailing "soft" punctuation (":", ";", ",") so the
+                // appended period doesn't create a double like "videos:.".
+                line = line.replace(/[,;:]+$/, '');
                 line += '. '; // Add a period if there's no punctuation
             }
 
@@ -360,6 +363,10 @@ function _ensureBlockFormatting(
 
     // Ensure the content ends with a period, question mark, or exclamation point, but skip adding a period to <pre> if undesired
     if (!endsWithPunctuation(trimmedContent)) {
+      // Drop any trailing "soft" punctuation (":", ";", ",") first so the
+      // appended period doesn't create a double like "videos:." — some TTS
+      // engines (e.g. Chatterbox) render that as a gap with audio artifacts.
+      trimmedContent = trimmedContent.replace(/[,;:]+$/, '');
       trimmedContent += '. ';
     } else {
         trimmedContent += ' '; // Add a space without adding a period if the content already ends with punctuation

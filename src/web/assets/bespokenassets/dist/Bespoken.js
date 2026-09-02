@@ -254,7 +254,7 @@
   };
   customElements.define("modal-dialog", ModalDialog);
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/css-tag.js
+  // node_modules/@lit/reactive-element/css-tag.js
   var t = globalThis;
   var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
   var s = Symbol();
@@ -299,7 +299,7 @@
     return r(e5);
   })(t4) : t4;
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/reactive-element.js
+  // node_modules/@lit/reactive-element/reactive-element.js
   var { is: i2, defineProperty: e2, getOwnPropertyDescriptor: h, getOwnPropertyNames: r2, getOwnPropertySymbols: o2, getPrototypeOf: n2 } = Object;
   var a = globalThis;
   var c2 = a.trustedTypes;
@@ -521,7 +521,7 @@
   };
   y.elementStyles = [], y.shadowRootOptions = { mode: "open" }, y[d("elementProperties")] = /* @__PURE__ */ new Map(), y[d("finalized")] = /* @__PURE__ */ new Map(), p?.({ ReactiveElement: y }), (a.reactiveElementVersions ??= []).push("2.1.2");
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/lit-html/lit-html.js
+  // node_modules/lit-html/lit-html.js
   var t2 = globalThis;
   var i3 = (t4) => t4;
   var s2 = t2.trustedTypes;
@@ -775,7 +775,7 @@
     return h3._$AI(t4), h3;
   };
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/lit-element/lit-element.js
+  // node_modules/lit-element/lit-element.js
   var s3 = globalThis;
   var i4 = class extends y {
     constructor() {
@@ -804,14 +804,14 @@
   o4?.({ LitElement: i4 });
   (s3.litElementVersions ??= []).push("4.2.2");
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/decorators/custom-element.js
+  // node_modules/@lit/reactive-element/decorators/custom-element.js
   var t3 = (t4) => (e5, o6) => {
     void 0 !== o6 ? o6.addInitializer(() => {
       customElements.define(t4, e5);
     }) : customElements.define(t4, e5);
   };
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/decorators/property.js
+  // node_modules/@lit/reactive-element/decorators/property.js
   var o5 = { attribute: true, type: String, converter: u, reflect: false, hasChanged: f };
   var r4 = (t4 = o5, e5, r6) => {
     const { kind: n5, metadata: i5 } = r6;
@@ -841,12 +841,12 @@
     })(t4, e5, o6);
   }
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/@lit/reactive-element/decorators/state.js
+  // node_modules/@lit/reactive-element/decorators/state.js
   function r5(r6) {
     return n4({ ...r6, state: true, attribute: false });
   }
 
-  // ../../../../../../../Users/john/git/craftpluingdev/plugins/bespoken/node_modules/progress-component/progress-component.js
+  // node_modules/progress-component/progress-component.js
   var __decorate = function(decorators, target, key, desc) {
     var c4 = arguments.length, r6 = c4 < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d3;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r6 = Reflect.decorate(decorators, target, key, desc);
@@ -1464,6 +1464,7 @@
     textArray = textArray.filter((line) => line.trim() !== "").map((line) => {
       line = line.trim();
       if (!punctuationRegex.test(line)) {
+        line = line.replace(/[,;:]+$/, "");
         line += ". ";
       }
       return line;
@@ -1506,6 +1507,7 @@
         return "";
       }
       if (!endsWithPunctuation(trimmedContent)) {
+        trimmedContent = trimmedContent.replace(/[,;:]+$/, "");
         trimmedContent += ". ";
       } else {
         trimmedContent += " ";
@@ -1585,6 +1587,10 @@
     const historyButtons = document.querySelectorAll(".bespoken-history");
     historyButtons.forEach((button) => {
       button.addEventListener("click", handleHistoryButtonClick);
+    });
+    const createProjectButtons = document.querySelectorAll(".bespoken-create-project");
+    createProjectButtons.forEach((button) => {
+      button.addEventListener("click", handleCreateProjectButtonClick);
     });
     const fieldGroups = document.querySelectorAll(".bespoken-fields");
     fieldGroups.forEach((fieldGroup) => {
@@ -1732,6 +1738,149 @@
     } catch (error) {
       console.error("Error fetching generation history:", error);
     }
+  }
+  async function handleCreateProjectButtonClick(event) {
+    const button = event.target.closest(".bespoken-create-project");
+    if (!button) return;
+    button.classList.add("disabled");
+    const fieldGroup = event.target.closest(".bespoken-fields");
+    const progressComponent = fieldGroup.querySelector(".bespoken-progress-component");
+    const actionUrlGetElementContent = button.getAttribute("data-get-element-content-action-url");
+    const actionUrlCreateProject = button.getAttribute("data-create-project-action-url") || "";
+    const elementId = _getInputValue('input[name="elementId"]');
+    const title = _cleanTitle(_getInputValue("#title") || elementId);
+    const voiceSelect = fieldGroup.querySelector(".bespoken-voice-select select");
+    const voiceId = voiceSelect ? voiceSelect.value : "";
+    const voiceModelField = fieldGroup.querySelector('input[name*="voiceModel"]');
+    const pronunciationRuleSetField = fieldGroup.querySelector('input[name*="pronunciationRuleSet"]');
+    let voiceModelSelected = "";
+    let pronunciationRuleSetSelected = "";
+    try {
+      voiceModelSelected = JSON.parse(voiceModelField?.value || "{}")[voiceId] || "";
+    } catch (e5) {
+    }
+    try {
+      pronunciationRuleSetSelected = JSON.parse(pronunciationRuleSetField?.value || "{}")[voiceId] || "";
+    } catch (e5) {
+    }
+    const targetFieldHandles = button.getAttribute("data-target-field") || void 0;
+    updateProgressComponent(progressComponent, {
+      progress: 0.1,
+      success: true,
+      message: "Gathering text\u2026",
+      textColor: "rgb(89, 102, 115)"
+    });
+    const text = await generateScript(targetFieldHandles, title, actionUrlGetElementContent);
+    if (!text || text.length === 0) {
+      button.classList.remove("disabled");
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: "No text to create a project from.",
+        textColor: "rgb(126,7,7)"
+      });
+      return;
+    }
+    updateProgressComponent(progressComponent, {
+      progress: 0.4,
+      success: true,
+      message: "Creating project on the Alias TTS service\u2026",
+      textColor: "rgb(89, 102, 115)"
+    });
+    try {
+      const response = await fetch(actionUrlCreateProject, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Send Craft's CSRF token so the create-project endpoint can
+          // keep default CSRF validation on. Craft exposes the token
+          // globally in the control panel.
+          "X-CSRF-Token": window.Craft?.csrfTokenValue ?? ""
+        },
+        body: JSON.stringify({
+          text,
+          voiceId,
+          elementId,
+          voiceModel: voiceModelSelected,
+          pronunciationRuleSet: pronunciationRuleSetSelected
+        })
+      });
+      const data = await response.json();
+      if (!data || !data.success || !data.projectUrl) {
+        button.classList.remove("disabled");
+        updateProgressComponent(progressComponent, {
+          progress: 0,
+          success: false,
+          message: data && data.message ? data.message : "Could not create the project.",
+          textColor: "rgb(126,7,7)"
+        });
+        return;
+      }
+      updateProgressComponent(progressComponent, {
+        progress: 1,
+        success: true,
+        message: "Project created.",
+        textColor: "rgb(34, 113, 71)"
+      });
+      button.classList.remove("disabled");
+      await showProjectCreatedModal(fieldGroup, data);
+    } catch (error) {
+      console.error("Error creating project:", error);
+      button.classList.remove("disabled");
+      updateProgressComponent(progressComponent, {
+        progress: 0,
+        success: false,
+        message: "Error creating the project.",
+        textColor: "rgb(126,7,7)"
+      });
+    }
+  }
+  async function showProjectCreatedModal(parentElement, data) {
+    const content = document.createElement("div");
+    content.style.cssText = "font-size: 14px; line-height: 1.5;";
+    const intro = document.createElement("p");
+    intro.textContent = data.title ? `Created the project \u201C${data.title}\u201D.` : "Created the project.";
+    content.appendChild(intro);
+    if (typeof data.chunkCount === "number") {
+      const meta = document.createElement("p");
+      meta.style.cssText = "color: #666; font-size: 13px; margin: 4px 0;";
+      meta.textContent = `${data.chunkCount} chunk${data.chunkCount === 1 ? "" : "s"} ready to generate.`;
+      content.appendChild(meta);
+    }
+    const link = document.createElement("a");
+    link.href = data.projectUrl;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.classList.add("btn", "submit");
+    link.textContent = "Open project in Alias TTS \u2192";
+    link.style.cssText = "display: inline-flex; align-items: center; margin-top: 8px;";
+    content.appendChild(link);
+    const note = document.createElement("p");
+    note.style.cssText = "color: #888; font-size: 12px; margin-top: 10px;";
+    note.textContent = "Opens the project in Alias TTS \u2014 sign in there if you are not already.";
+    content.appendChild(note);
+    let modal = parentElement.querySelector(".bespoken-project-dialog");
+    if (!modal) {
+      modal = document.createElement("modal-dialog");
+      modal.classList.add("bespoken-project-dialog");
+      const titleSlot = document.createElement("div");
+      titleSlot.slot = "title";
+      titleSlot.textContent = "Alias TTS project created";
+      modal.appendChild(titleSlot);
+      const descSlot = document.createElement("div");
+      descSlot.slot = "description";
+      descSlot.textContent = "Open the project to generate and edit its audio.";
+      modal.appendChild(descSlot);
+      const contentSlot = document.createElement("div");
+      contentSlot.slot = "content";
+      modal.appendChild(contentSlot);
+      parentElement.appendChild(modal);
+      await customElements.whenDefined("modal-dialog");
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    link.addEventListener("click", () => modal.close());
+    modal.setContent(content);
+    modal.open();
   }
   function createHistoryContent(generations) {
     const container = document.createElement("div");

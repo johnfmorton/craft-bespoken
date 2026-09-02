@@ -3,6 +3,7 @@
 namespace johnfmorton\bespoken\models;
 
 use craft\base\Model;
+use craft\helpers\App;
 use johnfmorton\bespoken\validators\BespokenPronuciationValidator;
 use johnfmorton\bespoken\validators\BespokenSettingZeroToOneValidator;
 use johnfmorton\bespoken\validators\BespokenVoicesValidator;
@@ -12,43 +13,72 @@ use johnfmorton\bespoken\validators\BespokenVoicesValidator;
  */
 class Settings extends Model
 {
+    public const DEFAULT_API_BASE_URL = 'https://api.elevenlabs.io';
+
+    public const PROVIDER_ELEVENLABS = 'elevenlabs';
+    public const PROVIDER_ALIAS = 'alias';
+
+    /**
+     * Legacy stored value for {@see PROVIDER_ALIAS}. The self-hosted provider
+     * shipped as `'bespoken'` in 5.4.0 pre-releases, before the service was
+     * named **Alias TTS** to make clear it's a separate project from the
+     * Bespoken plugin. Still accepted on read so a config that already stored
+     * `'bespoken'` keeps working; new saves write `'alias'`.
+     */
+    public const PROVIDER_ALIAS_LEGACY = 'bespoken';
+
+    /**
+     * Which TTS backend to use: ElevenLabs (hosted) or a self-hosted,
+     * ElevenLabs-compatible Alias TTS service. Drives both which settings the
+     * control panel shows and which API the plugin calls.
+     */
+    public string $apiProvider = self::PROVIDER_ELEVENLABS;
+
     public string $elevenlabsApiKey = '';
+
+    /**
+     * Base URL of the self-hosted, ElevenLabs-compatible Alias TTS service
+     * (e.g. https://tts.example.com). Only used with the Alias TTS provider.
+     * Supports environment variables.
+     */
+    public string $apiBaseUrl = '';
+
     public mixed $model_id = null;
     public string $voice = '';
     public array $voices = [
         [
             'voice' => "Brian (Default)",
-            'voiceId' => "nPczCjzI2devNBz1zQrb"
-        ]
+            'voiceId' => "nPczCjzI2devNBz1zQrb",
+        ],
     ];
 
     public array $pronunciations = [
         [
             'word' => 'DDEV',
-            'pronunciation' => 'deedev'
+            'pronunciation' => 'deedev',
         ],
         [
             'word' => 'colonel',
-            'pronunciation' => 'kernel'
+            'pronunciation' => 'kernel',
         ],
         [
             'word' => 'bologna',
-            'pronunciation' => 'baloney'
-        ]
+            'pronunciation' => 'baloney',
+        ],
     ];
 
-     /**
-     * @var float | int The stability slider determines how stable the voice is and
-     * the randomness between each generation. Lowering this slider introduces
-     * a broader emotional range for the voice. As mentioned before, this is
-     * also influenced heavily by the original voice. Setting the slider too
-     * low may result in odd performances that are overly random and cause
-     * the character to speak too quickly. On the other hand, setting it too
-     * high can lead to a monotonous voice with limited emotion.
-     *
-     * ElevenLabs suggested default setting is 0.50. The range is 0-1.
-     * https://elevenlabs.io/docs/speech-synthesis/voice-settings#stability
-     */
+    /**
+    * @var float | int The stability slider determines how stable the voice is and
+    * the randomness between each generation. Lowering this slider introduces
+    * a broader emotional range for the voice. As mentioned before, this is
+    * also influenced heavily by the original voice. Setting the slider too
+    * low may result in odd performances that are overly random and cause
+    * the character to speak too quickly. On the other hand, setting it too
+    * high can lead to a monotonous voice with limited emotion.
+    *
+    * ElevenLabs suggested default setting is 0.50. The range is 0-1.
+    * https://elevenlabs.io/docs/speech-synthesis/voice-settings#stability
+    */
     public float|int $stability = 0.5;
 
     /**
@@ -96,7 +126,7 @@ class Settings extends Model
      *
      * https://elevenlabs.io/docs/overview/models
      */
-   public string $voiceModel = 'eleven_v3';
+    public string $voiceModel = 'eleven_v3';
 
     /**
      * Asset Volume Handle
@@ -115,8 +145,16 @@ class Settings extends Model
     public function rules(): array
     {
         return [
+            ['apiProvider', 'in', 'range' => [self::PROVIDER_ELEVENLABS, self::PROVIDER_ALIAS, self::PROVIDER_ALIAS_LEGACY]],
+            ['apiProvider', 'default', 'value' => self::PROVIDER_ELEVENLABS],
             ['elevenlabsApiKey', 'string'],
             ['elevenlabsApiKey', 'default', 'value' => ''],
+            ['apiBaseUrl', 'string'],
+            ['apiBaseUrl', 'default', 'value' => ''],
+            // The endpoint URL is only meaningful — and required — when pointing
+            // at a self-hosted Alias TTS service. skipOnEmpty must be false so
+            // the rule still fires when the field is left blank.
+            ['apiBaseUrl', 'validateApiBaseUrlForProvider', 'skipOnEmpty' => false],
             ['voices', BespokenVoicesValidator::class],
             ['pronunciations', BespokenPronuciationValidator::class],
             ['voiceModel', 'string'],
@@ -136,5 +174,88 @@ class Settings extends Model
             ['fileNamePrefix', 'string'],
             ['fileNamePrefix', 'default', 'value' => ''],
         ];
+    }
+
+    /**
+     * Require a base URL when the Alias TTS service provider is selected.
+     * A raw value — including an environment-variable reference such as
+     * `$BESPOKEN_TTS_URL` — counts as provided.
+     */
+    public function validateApiBaseUrlForProvider(string $attribute): void
+    {
+        if ($this->usesCustomEndpoint() && trim((string) $this->$attribute) === '') {
+            $this->addError($attribute, \Craft::t('bespoken', 'Enter the base URL of your Alias TTS service.'));
+        }
+    }
+
+    /**
+     * The configured API origin (no trailing slash, no /v1/... path). Returns
+     * ElevenLabs unless the Alias TTS service provider is selected, in which
+     * case it resolves the configured base URL (env vars supported), tolerating a
+     * full text-to-speech path being pasted in.
+     */
+    public function getApiBaseUrl(): string
+    {
+        if (!$this->usesCustomEndpoint()) {
+            return self::DEFAULT_API_BASE_URL;
+        }
+
+        $base = trim((string) App::parseEnv($this->apiBaseUrl));
+
+        if ($base === '') {
+            return self::DEFAULT_API_BASE_URL;
+        }
+
+        $base = rtrim($base, '/');
+        $base = preg_replace('#/v1/text-to-speech/?$#', '', $base);
+
+        return $base;
+    }
+
+    public function getTextToSpeechUrl(string $voiceId): string
+    {
+        return $this->getApiBaseUrl() . '/v1/text-to-speech/' . $voiceId;
+    }
+
+    /**
+     * Async generation endpoint (Alias TTS service only): POST returns a job
+     * id + poll URLs so long text isn't bound by the synchronous request timeout.
+     */
+    public function getTextToSpeechJobsUrl(string $voiceId): string
+    {
+        return $this->getTextToSpeechUrl($voiceId) . '/jobs';
+    }
+
+    public function getSubscriptionUrl(): string
+    {
+        return $this->getApiBaseUrl() . '/v1/user/subscription';
+    }
+
+    /**
+     * Create-a-project endpoint (Alias TTS service only): POST text + a voice
+     * and the service builds an editable project instead of generating audio,
+     * returning a single-use link into its control panel.
+     */
+    public function getProjectsUrl(): string
+    {
+        return $this->getApiBaseUrl() . '/v1/projects';
+    }
+
+    public function usesCustomEndpoint(): bool
+    {
+        // Accept the legacy 'bespoken' value too, so a config stored by a 5.4.0
+        // pre-release keeps resolving to the Alias TTS service.
+        return in_array($this->apiProvider, [self::PROVIDER_ALIAS, self::PROVIDER_ALIAS_LEGACY], true);
+    }
+
+    /**
+     * Human-facing name of the active TTS backend, for progress and error
+     * messages — "Alias TTS service" when self-hosted, else "ElevenLabs API".
+     * The synchronous request path is shared between providers, so messages there
+     * must use this rather than hard-coding "ElevenLabs".
+     */
+    public function getProviderLabel(): string
+    {
+        return $this->usesCustomEndpoint() ? 'Alias TTS service' : 'ElevenLabs API';
     }
 }

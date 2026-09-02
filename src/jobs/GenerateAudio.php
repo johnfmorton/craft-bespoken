@@ -40,8 +40,20 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         'eleven_english_sts_v1',
     ];
 
+    /** Seconds between async status polls. */
+    private const ASYNC_POLL_INTERVAL_SECONDS = 3;
 
-    protected string $url = 'https://api.elevenlabs.io/v1/text-to-speech/';
+    /** Hard cap (seconds) on waiting for an async job before giving up. */
+    private const ASYNC_MAX_WAIT_SECONDS = 1800;
+
+    /**
+     * Minimum progress increase reported per async poll. The CP job monitor
+     * times out after 3 minutes without a progress change, but the service's
+     * progress snapshots legitimately repeat between clips — always inch
+     * forward so a working job is never mistaken for a stalled one.
+     */
+    private const ASYNC_PROGRESS_MIN_STEP = 0.0005;
+
 
     public string $bespokenJobId;
     public int $cacheExpire = 1800; // 30 minutes
@@ -69,7 +81,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         // Log that the job has started
         Bespoken::info('Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
         try {
-
             $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename);
             Bespoken::info('Job status updated to running. Line  ' . __LINE__ . ' in ' . __FILE__);
 
@@ -84,7 +95,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
             // Call the Eleven Labs API
             $this->elevenLabsApiCall($queue, $text, $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel);
-
         } catch (\Throwable $e) {
             Bespoken::error('Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error generating audio for entry: ' . $entryTitle . ' with element ID: ' . $elementId . ' to create filename: ' . $filename . ' Error: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());
@@ -97,7 +107,6 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
      */
     protected function debugFileSaveProcess($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId): void
     {
-
         $this->setBespokeProgress($queue, $bespokenJobId, 0.25, 'Downloading a test file with CURL');
 
         // add a pause to simulate a long-running process
@@ -108,7 +117,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $publicUrlFromCraft = $site ? $site->baseUrl : Craft::$app->sites->currentSite->baseUrl;
 
         // download a test file with CURL - this must be a publicly accessible file on the same URL as the site for testing
-        $url = $publicUrlFromCraft. 'test.mp3';
+        $url = $publicUrlFromCraft . 'test.mp3';
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
         $tempFilePath = $tempDir . '/test' . $timestamp . '.mp3';
@@ -198,7 +207,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         string $voiceModel,
         ?string $previousText = null,
         ?string $nextText = null,
-        array $previousRequestIds = []
+        array $previousRequestIds = [],
     ): array {
         // Dev debug mode: return test.mp3 audio instead of calling the API
         if (getenv('BESPOKEN_DEV_DEBUG') === 'true') {
@@ -215,30 +224,17 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
             ];
         }
 
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
         $settings = Bespoken::getInstance()->getSettings();
 
         $api_key = App::parseEnv($settings->elevenlabsApiKey);
-        $stability = $settings->stability;
-        $similarity_boost = $settings->similarity_boost;
-        $style = $settings->style;
-        $use_speaker_boost = $settings->use_speaker_boost;
 
         $headers = [
             "Content-Type: application/json",
-            "xi-api-key: $api_key"
+            "xi-api-key: $api_key",
         ];
 
-        $requestBody = [
-            'text' => $text,
-            'voice_id' => $voiceId,
-            'model_id' => $voiceModel,
-            'voice_settings' => [
-                'stability' => $stability,
-                'similarity_boost' => $similarity_boost,
-                'style' => $style,
-                'use_speaker_boost' => $use_speaker_boost
-            ]
-        ];
+        $requestBody = $this->buildBaseRequestBody($text, $voiceId, $voiceModel);
 
         if ($previousText !== null) {
             $requestBody['previous_text'] = $previousText;
@@ -254,7 +250,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => $this->url . $voiceId,
+            CURLOPT_URL => $settings->getTextToSpeechUrl($voiceId),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => true,
             CURLOPT_ENCODING => "",
@@ -289,15 +285,15 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         try {
             $decodedResponse = json_decode($responseBody, true, 512, JSON_THROW_ON_ERROR);
             if ($decodedResponse) {
-                Bespoken::info('Response from ElevenLabs API: ' . print_r($decodedResponse, true));
+                Bespoken::info('Response from ' . $settings->getProviderLabel() . ': ' . print_r($decodedResponse, true));
                 if (is_array($decodedResponse) && isset($decodedResponse['detail']['message'])) {
-                    throw new \RuntimeException('ElevenLabs API error: ' . $decodedResponse['detail']['message']);
+                    throw new \RuntimeException($settings->getProviderLabel() . ' error: ' . $decodedResponse['detail']['message']);
                 }
-                throw new \RuntimeException('ElevenLabs API error: ' . print_r($decodedResponse, true));
+                throw new \RuntimeException($settings->getProviderLabel() . ' error: ' . print_r($decodedResponse, true));
             }
         } catch (\JsonException $e) {
             // Not valid JSON = binary MP3 data, which is expected
-            Bespoken::info('Response from ElevenLabs API is not JSON, which is expected for an audio file');
+            Bespoken::info('Response from ' . $settings->getProviderLabel() . ' is not JSON, which is expected for an audio file');
         }
 
         return [
@@ -313,9 +309,35 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     {
         Bespoken::info('Voice model in elevenLabsApiCall: ' . $voiceModel);
 
-        // Split text into chunks
-        $targetSize = TextChunker::getTargetSize($voiceModel);
-        $chunks = TextChunker::splitText($text, $targetSize);
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
+        $settings = Bespoken::getInstance()->getSettings();
+
+        // Custom (Alias TTS service) endpoint: every generation goes through the
+        // service's async job endpoint, which removes the ~300s synchronous
+        // timeout ceiling and streams live per-clip progress while we poll — so
+        // short entries get the same "Creating clip N of M" feedback as long
+        // articles. If the service doesn't expose the async endpoint (older
+        // version → 404), fall back to the synchronous send-whole path below.
+        if ($settings->usesCustomEndpoint()) {
+            if ($this->generateViaAsyncEndpoint($queue, trim($text), $voiceId, $filename, $entryTitle, $bespokenJobId, $voiceModel)) {
+                return;
+            }
+            Bespoken::info('Alias TTS service async endpoint unavailable (404); using synchronous send-whole.');
+        }
+
+        // Split text into chunks. A custom (Alias TTS service) endpoint does
+        // its own sentence-aware chunking and crossfade, so re-chunking here is
+        // redundant and only adds un-crossfaded seams — send the whole text in a
+        // single request and let the service own chunking. ElevenLabs still needs
+        // client-side chunking for its per-model character limits.
+        if ($settings->usesCustomEndpoint()) {
+            $targetSize = mb_strlen($text);
+            $chunks = [trim($text)];
+            Bespoken::info('Custom endpoint: sending whole text (' . $targetSize . ' chars) in one request; the service handles chunking.');
+        } else {
+            $targetSize = TextChunker::getTargetSize($voiceModel);
+            $chunks = TextChunker::splitText($text, $targetSize);
+        }
         $totalChunks = count($chunks);
 
         Bespoken::info('Text split into ' . $totalChunks . ' chunk(s) (target size: ' . $targetSize . ' chars)');
@@ -324,7 +346,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
         $debugPrefix = $isDevDebug
             ? '[DEBUG] ' . $totalChunks . ' chunk(s), target: ' . $targetSize . ' chars, text: ' . mb_strlen($text) . ' chars — '
             : '';
-        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, $debugPrefix . ($isDevDebug ? 'Using test.mp3 instead of API.' : 'Contacting ElevenLabs API. This may take a few minutes.'));
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, $debugPrefix . ($isDevDebug ? 'Using test.mp3 instead of API.' : 'Contacting ' . $settings->getProviderLabel() . '. This may take a few minutes.'));
 
         $tempDir = $this->getTempDirectory();
         $timestamp = time();
@@ -375,7 +397,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
                         ? "Failed on chunk {$chunkNum} of {$totalChunks}: " . $e->getMessage()
                         : $e->getMessage();
                     Bespoken::error($errorMsg);
-                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ElevenLabs API. Details: ' . $errorMsg, 0, AudioGenerationRecord::STATUS_FAILED, $errorMsg);
+                    $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error contacting the ' . $settings->getProviderLabel() . '. Details: ' . $errorMsg, 0, AudioGenerationRecord::STATUS_FAILED, $errorMsg);
                     return;
                 }
 
@@ -421,6 +443,296 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
     }
 
     /**
+     * Build the core request body shared by the synchronous and async paths.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildBaseRequestBody(string $text, string $voiceId, string $voiceModel): array
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+
+        return [
+            'text' => $text,
+            'voice_id' => $voiceId,
+            'model_id' => $voiceModel,
+            'voice_settings' => [
+                'stability' => $settings->stability,
+                'similarity_boost' => $settings->similarity_boost,
+                'style' => $settings->style,
+                'use_speaker_boost' => $settings->use_speaker_boost,
+            ],
+        ];
+    }
+
+    /**
+     * Generate audio via the Alias TTS service's async endpoint: submit the
+     * whole text as one job, poll until it completes (emitting steadily-changing
+     * progress so the front-end stall timer never trips), then download the MP3.
+     *
+     * Returns true on success, false if the service has no async endpoint (404)
+     * so the caller can fall back to the synchronous path. Throws on a real
+     * generation error.
+     *
+     * @throws \JsonException
+     * @throws \RuntimeException
+     */
+    protected function generateViaAsyncEndpoint($queue, string $text, string $voiceId, string $filename, string $entryTitle, string $bespokenJobId, string $voiceModel): bool
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.1, 'Submitting audio job to your Alias TTS service…');
+
+        [$status, $body] = $this->jsonRequest('POST', $settings->getTextToSpeechJobsUrl($voiceId), $this->buildBaseRequestBody($text, $voiceId, $voiceModel));
+
+        // 404 = older service without the async endpoint → signal fallback.
+        // But a 404 with an ElevenLabs-shaped error body (detail.message) is a
+        // real API error — e.g. an unknown voice_id — not a missing route.
+        if ($status === 404 && !isset($body['detail']['message'])) {
+            return false;
+        }
+
+        if ($status >= 400 || !is_array($body)) {
+            throw new \RuntimeException($this->asyncErrorMessage($body, $status, 'submit the audio job'));
+        }
+
+        $jobId = $body['id'] ?? null;
+        $statusUrl = $body['status_url'] ?? null;
+        $audioUrl = $body['audio_url'] ?? null;
+        $jobStatus = (string)($body['status'] ?? 'processing');
+        $latestBody = $body;
+
+        if (!is_string($statusUrl) || !is_string($audioUrl)) {
+            throw new \RuntimeException('The Alias TTS service returned an invalid async job response.');
+        }
+
+        Bespoken::info('Async job ' . $jobId . ' submitted to Alias TTS service; status=' . $jobStatus);
+
+        $start = time();
+        $lastReportedProgress = 0.1;
+        $lastClipKey = null;
+        $stableMessage = null;
+        while (in_array($jobStatus, ['processing', 'pending'], true)) {
+            if (time() - $start > self::ASYNC_MAX_WAIT_SECONDS) {
+                throw new \RuntimeException('Timed out after ' . self::ASYNC_MAX_WAIT_SECONDS . 's waiting for the Alias TTS service to finish generating.');
+            }
+
+            sleep(self::ASYNC_POLL_INTERVAL_SECONDS);
+
+            [$pollStatus, $pollBody] = $this->jsonRequest('GET', $statusUrl);
+            if ($pollStatus >= 400 || !is_array($pollBody)) {
+                throw new \RuntimeException($this->asyncErrorMessage($pollBody, $pollStatus, 'check the audio job status'));
+            }
+
+            $latestBody = $pollBody;
+            $jobStatus = (string)($pollBody['status'] ?? 'processing');
+
+            // Terminal poll: progress is null by contract, so skip the display
+            // update — the next state ("Downloading…" or the error) follows
+            // immediately, and a fallback message here would flash in between.
+            if (!in_array($jobStatus, ['processing', 'pending'], true)) {
+                continue;
+            }
+
+            [$targetProgress, $message, $clipKey] = $this->asyncDisplayState($pollBody, time() - $start);
+
+            // Stabilize the status line on the clip, not on every poll. The
+            // service bakes a live ETA into the message that wobbles between
+            // polls of the *same* clip ("clip 6 of 44 · about 13 min left" →
+            // "· about 22 min left"); re-logging each wobble would churn the
+            // display and bloat the message log. Keep the message captured when
+            // the clip started and only refresh it when the clip (or stage)
+            // advances. The numeric progress below still moves every poll, so
+            // the ring animates and the CP's 3-minute stall timeout never trips.
+            if ($clipKey !== null && $clipKey === $lastClipKey) {
+                $message = $stableMessage;
+            } else {
+                $lastClipKey = $clipKey;
+                $stableMessage = $message;
+            }
+
+            $lastReportedProgress = min(0.59, max($targetProgress, $lastReportedProgress + self::ASYNC_PROGRESS_MIN_STEP));
+            $this->setBespokeProgress($queue, $bespokenJobId, $lastReportedProgress, $message);
+        }
+
+        if ($jobStatus === 'failed') {
+            throw new \RuntimeException('Alias TTS service error: ' . ($latestBody['error'] ?? 'generation failed'));
+        }
+
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.6, 'Downloading the generated audio…');
+
+        $audio = $this->downloadBinary($audioUrl);
+
+        $tempDir = $this->getTempDirectory();
+        $finalPath = $tempDir . '/audio-' . time() . '.mp3';
+        file_put_contents($finalPath, $audio);
+
+        $this->setBespokeProgress($queue, $bespokenJobId, 0.65, 'Audio file processed in temporary directory');
+        $this->saveToCraftAssets($queue, $finalPath, $filename, $entryTitle, $bespokenJobId);
+
+        return true;
+    }
+
+    /**
+     * Derive the CP display state from one async poll response: the progress
+     * value (within the 0.15–0.59 generation band), a status message, and a
+     * stable "clip key" the caller uses to refresh the message only when the
+     * clip (or stage) advances rather than on every poll.
+     *
+     * The service reports real progress in a nullable `progress` object
+     * ({stage, chunks_total, chunks_done, percent, message}). It is null (or
+     * absent on services ≤ v0.56.0) when the job hasn't started, has reached a
+     * terminal status, or the server restarted mid-run — in all of those cases
+     * fall back to the previous time-based estimate and a null key (nothing
+     * stable to key on). Display only: job state is driven solely by `status`,
+     * never by `progress`.
+     *
+     * @param array<mixed> $pollBody
+     * @return array{0: float, 1: string, 2: string|null}
+     */
+    private function asyncDisplayState(array $pollBody, int $elapsed): array
+    {
+        $fallbackProgress = min(0.59, 0.15 + 0.44 * ($elapsed / self::ASYNC_MAX_WAIT_SECONDS));
+        $fallbackMessage = 'Generating audio on your Alias TTS service… (' . $elapsed . 's elapsed)';
+
+        $info = $pollBody['progress'] ?? null;
+        if (!is_array($info)) {
+            return [$fallbackProgress, $fallbackMessage, null];
+        }
+
+        $percent = is_numeric($info['percent'] ?? null) ? (int)$info['percent'] : 0;
+        $percent = max(0, min(100, $percent));
+        // Map 0–100% into 0.15–0.58, leaving headroom below the 0.59 band
+        // ceiling so the reported value can keep inching forward while a long
+        // stitching phase holds percent at 100.
+        $progress = 0.15 + 0.43 * ($percent / 100);
+
+        $message = $info['message'] ?? null;
+        $message = is_string($message) ? trim($message) : '';
+
+        // Stable key for the current clip/stage: changes when the service moves
+        // to the next clip (chunks_done) or into stitching, but NOT when only the
+        // baked-in ETA in the message wobbles. Prefer chunks_done; fall back to
+        // percent; null if the service reports neither numerically.
+        $stage = is_string($info['stage'] ?? null) ? $info['stage'] : '';
+        $clip = $info['chunks_done'] ?? ($info['percent'] ?? null);
+        $key = is_numeric($clip) ? $stage . ':' . (int)$clip : null;
+
+        return [$progress, $message !== '' ? $message : $fallbackMessage, $key];
+    }
+
+    /**
+     * Perform a JSON request to the TTS service. Returns [httpStatus, decodedBody]
+     * where decodedBody is null if the response wasn't JSON. Throws only on a
+     * cURL transport error.
+     *
+     * @param  array<string, mixed>|null  $body
+     * @return array{0: int, 1: array<mixed>|null}
+     *
+     * @throws \JsonException
+     * @throws \RuntimeException
+     */
+    private function jsonRequest(string $method, string $url, ?array $body = null): array
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+        $apiKey = App::parseEnv($settings->elevenlabsApiKey);
+
+        $headers = [
+            'Accept: application/json',
+            "xi-api-key: $apiKey",
+        ];
+
+        $options = [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => $method,
+        ];
+
+        if ($body !== null) {
+            $headers[] = 'Content-Type: application/json';
+            $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_THROW_ON_ERROR);
+        }
+
+        $options[CURLOPT_HTTPHEADER] = $headers;
+
+        $curl = curl_init();
+        curl_setopt_array($curl, $options);
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        $httpStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($err) {
+            throw new \RuntimeException('cURL Error: ' . $err);
+        }
+
+        $decoded = null;
+        if (is_string($response) && $response !== '') {
+            try {
+                $decoded = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                $decoded = null;
+            }
+        }
+
+        return [$httpStatus, is_array($decoded) ? $decoded : null];
+    }
+
+    /**
+     * Download binary audio from the TTS service (authenticated).
+     *
+     * @throws \RuntimeException
+     */
+    private function downloadBinary(string $url): string
+    {
+        $settings = Bespoken::getInstance()->getSettings();
+        $apiKey = App::parseEnv($settings->elevenlabsApiKey);
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 300,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_HTTPHEADER => ["xi-api-key: $apiKey"],
+        ]);
+
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        $httpStatus = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($err) {
+            throw new \RuntimeException('cURL Error: ' . $err);
+        }
+
+        if ($httpStatus >= 400 || !is_string($response) || $response === '') {
+            throw new \RuntimeException('Failed to download the generated audio from the Alias TTS service (HTTP ' . $httpStatus . ').');
+        }
+
+        return $response;
+    }
+
+    /**
+     * Extract an ElevenLabs-shaped error message from a response body.
+     *
+     * @param  array<mixed>|null  $body
+     */
+    private function asyncErrorMessage(?array $body, int $status, string $action): string
+    {
+        if (is_array($body) && isset($body['detail']['message'])) {
+            return 'Alias TTS service error: ' . $body['detail']['message'];
+        }
+
+        return 'Failed to ' . $action . ' on the Alias TTS service (HTTP ' . $status . ').';
+    }
+
+    /**
      * @throws \JsonException
      */
     private function saveToCraftAssets($queue, $tempFilePath, $filename, $entryTitle, $bespokenJobId): void
@@ -461,7 +773,7 @@ class GenerateAudio extends BaseJob implements RetryableJobInterface
 
         // Create a new asset
         $this->setBespokeProgress($queue, $bespokenJobId, 0.78, 'Preparing Craft asset from the audio file');
-sleep($this->sleepValue * 1);
+        sleep($this->sleepValue * 1);
         // prepare the asset
         $asset = new Asset();
         $asset->tempFilePath = $tempFilePath;
@@ -473,11 +785,11 @@ sleep($this->sleepValue * 1);
         $asset->setScenario(Asset::SCENARIO_CREATE);
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.79, 'Created the asset object');
-sleep($this->sleepValue * 1);
+        sleep($this->sleepValue * 1);
         $asset->validate();
 
         $this->setBespokeProgress($queue, $bespokenJobId, 0.8, 'Validated the asset object');
-sleep($this->sleepValue * 1);
+        sleep($this->sleepValue * 1);
         // Save the audio file to the volume
         try {
             Craft::$app->getElements()->saveElement(
@@ -492,8 +804,7 @@ sleep($this->sleepValue * 1);
                 'assetId' => $asset->id,
             ]);
 
-            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: '. $entryTitle . ' (audio) - ' . $filename, 1, AudioGenerationRecord::STATUS_COMPLETED);
-
+            $this->setBespokeProgress($queue, $bespokenJobId, 1, '✅ Audio file: ' . $entryTitle . ' (audio) - ' . $filename, 1, AudioGenerationRecord::STATUS_COMPLETED);
         } catch (\Throwable $e) {
             Bespoken::error('Error saving the audio file to the assets: ' . $e->getMessage());
             $this->setBespokeProgress($queue, $bespokenJobId, 1, 'Error saving the audio file to the assets: ' . $e->getMessage(), 0, AudioGenerationRecord::STATUS_FAILED, $e->getMessage());
@@ -513,6 +824,17 @@ sleep($this->sleepValue * 1);
      */
     public function getTtr(): int
     {
+        /** @var \johnfmorton\bespoken\models\Settings $settings */
+        $settings = Bespoken::getInstance()->getSettings();
+
+        // Custom endpoint: every generation now runs through the async job (we
+        // poll up to ASYNC_MAX_WAIT_SECONDS), falling back to a synchronous
+        // send-whole only when the service lacks the async endpoint — so reserve
+        // the async wait budget for all Alias TTS jobs.
+        if ($settings->usesCustomEndpoint()) {
+            return self::ASYNC_MAX_WAIT_SECONDS + 120;
+        }
+
         $text = $this->text ?? '';
         $voiceModel = $this->voiceModel ?? '';
 

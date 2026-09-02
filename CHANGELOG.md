@@ -1,5 +1,12 @@
 # Release Notes for Bespoken
 
+## 5.3.6 - 2026-09-02
+
+### Fixed
+
+- Nested Matrix content is no longer narrated twice ([#33](https://github.com/johnfmorton/craft-bespoken/issues/33)). When a Matrix field in the inline "blocks" view contained a block with its own nested Matrix field, and the nested blocks reused field handles named in the source field setting (e.g. `contentBlocks[title,text]`, a common Craft pattern), the script builder collected the nested blocks' text once while reading the parent block's fields and again when it treated the nested blocks as top-level blocks. Block and field collection is now scoped to the Matrix field's own blocks and to each block's own field layout. As a result, nested Matrix content is not narrated in the blocks view — which matches the cards and element index views, where each block's own fields are read via the API and nested Matrix fields were never descended into. Explicitly targeting nested content (e.g. a `contentBlocks.innerBlocks.text` path in the source field setting) is a separate enhancement.
+- A Matrix field's view mode is now detected from its own container rather than the first matching container anywhere inside it, so a nested Matrix field displayed in a different view (e.g. cards inside an inline-editable block) no longer changes how the outer field is read.
+
 ## 5.3.5 - 2026-07-17
 
 ### Fixed

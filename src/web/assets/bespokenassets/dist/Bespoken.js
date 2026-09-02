@@ -1,9 +1,19 @@
 (() => {
   // src/web/assets/bespokenassets/src/bespoken-modal.ts
-  var ModalDialog = class extends HTMLElement {
+  var ModalDialog = class _ModalDialog extends HTMLElement {
     constructor() {
       super();
-      this.debounceTimeout = null;
+      this.opener = null;
+      this.resizeObserver = null;
+      this.documentKeydownBound = false;
+      // Escape closes — but only this dialog, and only while it is open, so several
+      // dialogs on one page don't all react to the same keypress.
+      this.onDocumentKeydown = (event) => {
+        if (event.key === "Escape" && this.isOpen) {
+          event.preventDefault();
+          this.close();
+        }
+      };
       const shadow = this.attachShadow({ mode: "open" });
       const style = document.createElement("style");
       style.textContent = `
@@ -39,6 +49,10 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        min-height: 0;
+      }
+      :host([wide]) .inner-container {
+        max-width: 900px;
       }
       .close-button {
         position: absolute;
@@ -47,6 +61,8 @@
         background: none;
         border: none;
         font-size: 20px;
+        line-height: 1;
+        padding: 4px 8px;
         cursor: pointer;
       }
       .title {
@@ -54,6 +70,7 @@
         font-size: 1.25em;
         font-weight: bold;
         margin-bottom: 4px;
+        padding-right: 32px;
         flex: 0 0 auto;
       }
       .description {
@@ -68,13 +85,29 @@
         margin: 10px 0;
         flex: 0 0 auto;
       }
+      /* min-height: 0 lets the flex item shrink below its content size so the
+         body scrolls inside the 85vh dialog instead of overflowing it. */
       .content-container {
         flex: 1 1 auto;
         overflow-y: auto;
+        min-height: 0;
+        outline-offset: -2px;
       }
       .content {
         font-size: 1em;
         white-space: pre-wrap;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+        margin-top: 12px;
+      }
+      .actions.is-empty {
+        display: none;
       }
     `;
       shadow.appendChild(style);
@@ -82,9 +115,13 @@
       this.modal.className = "modal";
       this.innerContainer = document.createElement("div");
       this.innerContainer.className = "inner-container";
+      this.innerContainer.setAttribute("role", "dialog");
+      this.innerContainer.setAttribute("aria-modal", "true");
       this.closeButton = document.createElement("button");
+      this.closeButton.type = "button";
       this.closeButton.className = "close-button";
       this.closeButton.textContent = "X";
+      this.closeButton.setAttribute("aria-label", "Close dialog");
       this.closeButton.addEventListener("click", () => this.close());
       this.innerContainer.appendChild(this.closeButton);
       const titleSlot = document.createElement("slot");
@@ -97,15 +134,26 @@
       separator.className = "separator";
       this.contentContainer = document.createElement("section");
       this.contentContainer.className = "content-container";
-      this.contentContainer.tabIndex = 0;
+      this.contentContainer.tabIndex = -1;
       const contentSlot = document.createElement("slot");
       contentSlot.name = "content";
       contentSlot.className = "content";
+      contentSlot.addEventListener("slotchange", () => this.updateScrollRegionFocusability());
+      this.contentContainer.appendChild(contentSlot);
+      this.actionsContainer = document.createElement("div");
+      this.actionsContainer.className = "actions is-empty";
+      const actionsSlot = document.createElement("slot");
+      actionsSlot.name = "actions";
+      actionsSlot.addEventListener("slotchange", () => {
+        const hasActions = actionsSlot.assignedElements().length > 0;
+        this.actionsContainer.classList.toggle("is-empty", !hasActions);
+      });
+      this.actionsContainer.appendChild(actionsSlot);
       this.innerContainer.appendChild(titleSlot);
       this.innerContainer.appendChild(descriptionSlot);
       this.innerContainer.appendChild(separator);
-      this.contentContainer.appendChild(contentSlot);
       this.innerContainer.appendChild(this.contentContainer);
+      this.innerContainer.appendChild(this.actionsContainer);
       this.modal.appendChild(this.innerContainer);
       shadow.appendChild(this.modal);
       if (this.hasAttribute("x-cloak")) {
@@ -116,120 +164,62 @@
           this.close();
         }
       });
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          this.close();
-        }
-      });
       this.modal.addEventListener("keydown", (event) => {
-        if (event.key === "Tab" && this.modal.classList.contains("show")) {
+        if (event.key === "Tab" && this.isOpen) {
           this.trapFocus(event);
         }
       });
-      this.resizeObserver = new ResizeObserver(() => {
-        this.debouncedHandleResize();
-      });
+      if (typeof ResizeObserver !== "undefined") {
+        this.resizeObserver = new ResizeObserver(() => this.updateScrollRegionFocusability());
+      }
     }
-    // Method to open the modal dialog
+    static {
+      this.FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    }
+    /** Whether the dialog is currently shown. */
+    get isOpen() {
+      return this.modal.classList.contains("show");
+    }
+    /** Show the dialog and move focus into it. */
     open() {
+      if (this.isOpen) {
+        return;
+      }
+      this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      this.syncAriaLabel();
       this.modal.classList.add("show");
       document.body.style.overflow = "hidden";
-      this.calculateContentHeight();
-      this.resizeObserver.observe(document.body);
+      if (this.resizeObserver) {
+        this.resizeObserver.observe(this.contentContainer);
+      }
+      this.updateScrollRegionFocusability();
       this.focusFirstElement();
+      this.dispatchEvent(new CustomEvent("bespoken-modal-open", { bubbles: true, composed: true }));
     }
-    // Method to close the modal dialog
+    /** Hide the dialog and return focus to whatever opened it. */
     close() {
+      if (!this.isOpen) {
+        return;
+      }
       this.modal.classList.remove("show");
       document.body.style.overflow = "";
-      this.resizeObserver.unobserve(document.body);
-    }
-    // Method to calculate and set the content container's max height dynamically
-    calculateContentHeight() {
-      const innerContainerHeight = this.innerContainer.getBoundingClientRect().height;
-      const otherElementsHeight = this.closeButton.offsetHeight + 40;
-      const maxHeight = innerContainerHeight - otherElementsHeight;
-      this.contentContainer.style.maxHeight = `${maxHeight}px`;
-    }
-    // Debounced function to handle window resize events
-    debouncedHandleResize() {
-      if (this.debounceTimeout) {
-        clearTimeout(this.debounceTimeout);
+      if (this.resizeObserver) {
+        this.resizeObserver.unobserve(this.contentContainer);
       }
-      this.debounceTimeout = window.setTimeout(() => {
-        this.calculateContentHeight();
-      }, 200);
+      this.dispatchEvent(new CustomEvent("bespoken-modal-close", { bubbles: true, composed: true }));
+      const opener = this.opener;
+      this.opener = null;
+      if (opener && document.contains(opener)) {
+        opener.focus();
+      }
     }
-    // Method to set the title content
     setTitle(title) {
-      let titleElement = this.querySelector('[slot="title"]');
-      if (title) {
-        if (!titleElement) {
-          titleElement = document.createElement("span");
-          titleElement.slot = "title";
-          this.appendChild(titleElement);
-        }
-        titleElement.textContent = title;
-        titleElement.style.display = "block";
-      } else if (titleElement) {
-        titleElement.style.display = "none";
-      }
+      this.setSlotText("title", title);
     }
-    // Method to set the description content
     setDescription(description) {
-      let descriptionElement = this.querySelector('[slot="description"]');
-      if (description) {
-        if (!descriptionElement) {
-          descriptionElement = document.createElement("span");
-          descriptionElement.slot = "description";
-          this.appendChild(descriptionElement);
-        }
-        descriptionElement.textContent = description;
-        descriptionElement.style.display = "block";
-      } else if (descriptionElement) {
-        descriptionElement.style.display = "none";
-      }
+      this.setSlotText("description", description);
     }
-    // Trap focus inside the modal
-    // Trap focus inside the modal
-    trapFocus(event) {
-      const focusableElements = this.shadowRoot.querySelectorAll(
-        ".close-button, .content-container"
-      );
-      const focusArray = Array.from(focusableElements);
-      const activeElement = this.shadowRoot.activeElement;
-      const currentIndex = focusArray.indexOf(activeElement);
-      if (event.shiftKey && currentIndex === 0) {
-        focusArray[focusArray.length - 1].focus();
-        event.preventDefault();
-      } else if (!event.shiftKey && currentIndex === focusArray.length - 1) {
-        focusArray[0].focus();
-        event.preventDefault();
-      }
-    }
-    // Focus the first focusable element in the modal
-    focusFirstElement() {
-      const focusableElements = this.shadowRoot.querySelectorAll(
-        ".close-button, .content-container"
-      );
-      if (focusableElements.length > 0) {
-        focusableElements[0].focus();
-      }
-    }
-    // Lifecycle hook that runs when the component is added to the DOM
-    connectedCallback() {
-      this.initializeSlots();
-    }
-    // Method to initialize slots and apply styles if default content is present
-    initializeSlots() {
-      const descriptionElement = this.querySelector('[slot="description"]');
-      if (descriptionElement && descriptionElement.textContent.trim() !== "") {
-        descriptionElement.style.display = "block";
-      } else if (descriptionElement) {
-        descriptionElement.style.display = "none";
-      }
-    }
-    // Method to set the main content
+    /** Replace the body with plain text (rendered pre-wrap) or an element. */
     setContent(content) {
       let contentElement = this.querySelector('[slot="content"]');
       if (!contentElement) {
@@ -243,16 +233,134 @@
         contentElement.innerHTML = "";
         contentElement.appendChild(content);
       }
+      this.updateScrollRegionFocusability();
     }
-    // Lifecycle hook that runs when the component is removed from the DOM
-    disconnectedCallback() {
-      if (this.debounceTimeout) {
-        clearTimeout(this.debounceTimeout);
+    /**
+     * Replace the footer buttons. Pass null to remove the footer entirely; it is
+     * also hidden automatically while the slot is empty.
+     */
+    setActions(actions) {
+      const existing = this.querySelector('[slot="actions"]');
+      if (existing) {
+        existing.remove();
       }
-      this.resizeObserver.disconnect();
+      if (actions) {
+        actions.slot = "actions";
+        this.appendChild(actions);
+      }
+      this.actionsContainer.classList.toggle("is-empty", !actions);
+    }
+    connectedCallback() {
+      this.initializeSlots();
+      if (!this.documentKeydownBound) {
+        document.addEventListener("keydown", this.onDocumentKeydown);
+        this.documentKeydownBound = true;
+      }
+    }
+    disconnectedCallback() {
+      if (this.documentKeydownBound) {
+        document.removeEventListener("keydown", this.onDocumentKeydown);
+        this.documentKeydownBound = false;
+      }
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+      }
+      if (this.isOpen) {
+        document.body.style.overflow = "";
+      }
+    }
+    setSlotText(slotName, text) {
+      let element = this.querySelector(`[slot="${slotName}"]`);
+      if (text) {
+        if (!element) {
+          element = document.createElement("span");
+          element.slot = slotName;
+          this.appendChild(element);
+        }
+        element.textContent = text;
+        element.style.display = "block";
+      } else if (element) {
+        element.style.display = "none";
+      }
+    }
+    initializeSlots() {
+      const description = this.querySelector('[slot="description"]');
+      if (description) {
+        description.style.display = description.textContent.trim() !== "" ? "block" : "none";
+      }
+    }
+    /** Label the dialog for assistive tech from its title slot. */
+    syncAriaLabel() {
+      const title = this.querySelector('[slot="title"]');
+      const label = title ? title.textContent.trim() : "";
+      if (label) {
+        this.innerContainer.setAttribute("aria-label", label);
+      } else {
+        this.innerContainer.removeAttribute("aria-label");
+      }
+    }
+    /**
+     * The scroll region is keyboard-focusable only while it actually scrolls, so
+     * Tab doesn't stop on an inert box when the content fits.
+     */
+    updateScrollRegionFocusability() {
+      const scrolls = this.contentContainer.scrollHeight > this.contentContainer.clientHeight + 1;
+      this.contentContainer.tabIndex = scrolls ? 0 : -1;
+    }
+    /**
+     * Everything Tab can reach, in the order the browser visits it: the close
+     * button, focusables slotted into the header, the scroll region (when it
+     * scrolls), focusables slotted into the body, then the footer buttons.
+     */
+    focusableElements() {
+      const slotted = (slotName) => {
+        const found = [];
+        this.querySelectorAll(`[slot="${slotName}"]`).forEach((root) => {
+          if (root.matches(_ModalDialog.FOCUSABLE)) {
+            found.push(root);
+          }
+          root.querySelectorAll(_ModalDialog.FOCUSABLE).forEach((el) => found.push(el));
+        });
+        return found.filter((el) => el.getClientRects().length > 0);
+      };
+      const elements = [this.closeButton];
+      elements.push(...slotted("title"), ...slotted("description"));
+      if (this.contentContainer.tabIndex === 0) {
+        elements.push(this.contentContainer);
+      }
+      elements.push(...slotted("content"), ...slotted("actions"));
+      return elements;
+    }
+    /** The focused element, whether it lives in the shadow tree or is slotted. */
+    currentFocus() {
+      return this.shadowRoot.activeElement || document.activeElement;
+    }
+    trapFocus(event) {
+      const elements = this.focusableElements();
+      if (elements.length === 0) {
+        return;
+      }
+      const index = elements.indexOf(this.currentFocus());
+      if (event.shiftKey) {
+        if (index <= 0) {
+          elements[elements.length - 1].focus();
+          event.preventDefault();
+        }
+      } else if (index === -1 || index === elements.length - 1) {
+        elements[0].focus();
+        event.preventDefault();
+      }
+    }
+    focusFirstElement() {
+      const elements = this.focusableElements();
+      if (elements.length > 0) {
+        elements[0].focus();
+      }
     }
   };
-  customElements.define("modal-dialog", ModalDialog);
+  if (!customElements.get("modal-dialog")) {
+    customElements.define("modal-dialog", ModalDialog);
+  }
 
   // node_modules/@lit/reactive-element/css-tag.js
   var t = globalThis;

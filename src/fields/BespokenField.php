@@ -9,6 +9,7 @@ use craft\helpers\StringHelper;
 use Twig\Error\LoaderError;
 use Twig\Error\RuntimeError;
 use Twig\Error\SyntaxError;
+use Twig\Source;
 use yii\base\Exception;
 use yii\db\ExpressionInterface;
 use yii\db\Schema;
@@ -18,11 +19,29 @@ use yii\db\Schema;
  */
 class BespokenField extends Field
 {
+    public const SOURCE_HANDLES = 'handles';
+    public const SOURCE_TEMPLATE = 'template';
+
+    /**
+     * Where the narration script comes from: the field handles in
+     * $sourceField (the default), or the Twig template in $scriptTemplate.
+     */
+    public string $scriptSource = self::SOURCE_HANDLES;
+
     /**
      * The source field to use for the audio file.
      * @return string
      */
     public string $sourceField = '';
+
+    /**
+     * A Twig object template that produces the narration script. It is
+     * rendered server-side against the element being edited (available as
+     * `entry` and `object`), so it can reach nested Matrix blocks, related
+     * elements, and anything else Twig can. Used when $scriptSource is
+     * 'template'.
+     */
+    public string $scriptTemplate = '';
 
     /**
      * File Name Prefix
@@ -67,8 +86,51 @@ class BespokenField extends Field
     protected function defineRules(): array
     {
         return array_merge(parent::defineRules(), [
-            // ...
+            [['scriptSource'], 'in', 'range' => [self::SOURCE_HANDLES, self::SOURCE_TEMPLATE]],
+            [
+                ['scriptTemplate'],
+                'required',
+                'when' => fn(self $field) => $field->usesTemplate(),
+                'message' => Craft::t('bespoken', 'Enter a Twig template, or switch the script source to field handles.'),
+            ],
+            [['scriptTemplate'], 'validateScriptTemplate'],
         ]);
+    }
+
+    /**
+     * Whether the narration script is rendered from the Twig template rather
+     * than read from the field handles.
+     */
+    public function usesTemplate(): bool
+    {
+        return $this->scriptSource === self::SOURCE_TEMPLATE;
+    }
+
+    /**
+     * Rejects a script template Twig can't parse, so a typo is caught when the
+     * field is saved rather than every time an editor asks for a preview. The
+     * same shortcut syntax as Craft's own object templates (`{title}`) is
+     * allowed, so the template is normalized the way it will be at render time.
+     */
+    public function validateScriptTemplate(string $attribute): void
+    {
+        if (!$this->usesTemplate() || $this->scriptTemplate === '') {
+            return;
+        }
+
+        $view = Craft::$app->getView();
+        $twig = $view->getTwig();
+
+        try {
+            $twig->parse($twig->tokenize(new Source(
+                $view->normalizeObjectTemplate($this->scriptTemplate),
+                'bespoken-script-template',
+            )));
+        } catch (SyntaxError $e) {
+            $this->addError($attribute, Craft::t('bespoken', 'The template has a syntax error: {message}', [
+                'message' => $e->getMessage(),
+            ]));
+        }
     }
 
     /**

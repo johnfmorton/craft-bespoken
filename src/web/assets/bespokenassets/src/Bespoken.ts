@@ -20,7 +20,8 @@ import {
     _getFieldType,
     _parseFieldHandles,
     finalizeEditedScript,
-    normalizeScriptWhitespace
+    normalizeScriptWhitespace,
+    scriptFromRenderedTemplate
 } from "./utils";
 import type { HandleSpec } from "./utils";
 import {
@@ -714,7 +715,7 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
         for (const handle of fieldHandlesArray) {
             // If "title" is one of the target fields, use the title of the element being edited in the CMS
             // "title" is not technically a field handle in the CMS, but we treat it as one here
-            if (handle === 'title') {
+            if (handle === 'title' || (typeof handle !== 'string' && 'title' in handle)) {
                 // if title does not end with a period, add one
                 const titleToAdd = title.endsWith('.') ? title : title + '.';
                 text += (titleToAdd + " ");
@@ -793,13 +794,111 @@ interface VoiceContext {
 
 /** Regenerate the entry-derived script for a field. */
 async function generateEntryScript(fieldGroup: HTMLElement): Promise<string> {
-    // Every action button on the field carries the source handles + content URL.
-    const source = fieldGroup.querySelector('[data-target-field]') as HTMLElement | null;
+    // Every action button on the field carries the script source, the source
+    // handles, and the action URLs.
+    const source = fieldGroup.querySelector('[data-script-source]') as HTMLElement | null;
+    if (source?.getAttribute('data-script-source') === 'template') {
+        return renderTemplateScript(source);
+    }
     const targetFieldHandles: string = source?.getAttribute('data-target-field') || '';
     const actionUrl: string = source?.getAttribute('data-get-element-content-action-url') || '';
     const elementId: string = _getInputValue('input[name="elementId"]');
     const title: string = _cleanTitle(_getInputValue('#title') || elementId);
     return generateScript(targetFieldHandles, title, actionUrl);
+}
+
+/**
+ * Template mode: the server renders the field's Twig script template against
+ * the entry's current draft, and the output gets the same cleanup as field
+ * HTML. Craft's element editor is asked to save pending changes to the draft
+ * first, so unsaved edits are reflected. Returns '' (and reports the error in
+ * the control panel) when the template can't be rendered, so nothing
+ * misleading is narrated.
+ */
+async function renderTemplateScript(source: HTMLElement): Promise<string> {
+    const actionUrl = source.getAttribute('data-render-script-action-url') || '';
+    const fieldId = source.getAttribute('data-field-id') || '';
+    const editor = await flushDraft();
+
+    const url = new URL(actionUrl);
+    url.searchParams.set('fieldId', fieldId);
+    // After a draft save the editor's settings point at the draft's element,
+    // which is what the server should render.
+    const elementId = editor?.settings?.elementId || _getInputValue('input[name="elementId"]');
+    url.searchParams.set('elementId', String(elementId));
+    if (editor?.settings?.draftId) {
+        url.searchParams.set('draftId', String(editor.settings.draftId));
+    }
+
+    try {
+        const result = await fetch(url.toString(), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!result.ok) {
+            throw new Error(`HTTP error! Status: ${result.status}`);
+        }
+        const data = await result.json();
+        if (!data.success) {
+            throw new Error(data.message || 'The script template could not be rendered.');
+        }
+        return scriptFromRenderedTemplate(data.html || '');
+    } catch (error) {
+        console.error('Error rendering the script template:', error);
+        reportCpError(error instanceof Error ? error.message : String(error));
+        return '';
+    }
+}
+
+/** Craft's element editor for the page's main form, if there is one. */
+function elementEditor(): any | null {
+    const craft = (window as any).Craft;
+    return craft?.cp?.$primaryForm?.data?.('elementEditor') || null;
+}
+
+/** How long to wait for the editor to save a draft before rendering anyway. */
+const DRAFT_FLUSH_TIMEOUT_MS = 10000;
+
+/**
+ * Ask Craft's element editor to save pending changes to the draft, so a
+ * server-side render sees what the editor shows. The editor's own
+ * checkForm() is not used because its promise never settles when there is
+ * nothing to save; instead the form is compared with the last saved state the
+ * same way checkForm() does, and saveDraft() is called only when it differs.
+ * Fails open: on any problem, or after a timeout, rendering proceeds against
+ * the last saved state.
+ */
+async function flushDraft(): Promise<any | null> {
+    const editor = elementEditor();
+    if (
+        !editor
+        || typeof editor.serializeForm !== 'function'
+        || typeof editor.saveDraft !== 'function'
+        || editor.settings?.revisionId
+    ) {
+        return editor;
+    }
+    try {
+        const lastSaved = editor.lastSerializedValue || editor.$container?.data('initialSerializedValue');
+        if (lastSaved === undefined || editor.serializeForm(true) === lastSaved) {
+            return editor;
+        }
+        await Promise.race([
+            editor.saveDraft(),
+            new Promise<void>(resolve => setTimeout(resolve, DRAFT_FLUSH_TIMEOUT_MS)),
+        ]);
+    } catch (error) {
+        console.warn('Bespoken: could not save the draft before rendering the script:', error);
+    }
+    return editor;
+}
+
+/** Show an error notice in the control panel, when Craft's UI is available. */
+function reportCpError(message: string): void {
+    const craft = (window as any).Craft;
+    if (craft?.cp && typeof craft.cp.displayError === 'function') {
+        craft.cp.displayError(message);
+    }
 }
 
 async function resolveActiveScript(fieldGroup: HTMLElement): Promise<ActiveScript> {

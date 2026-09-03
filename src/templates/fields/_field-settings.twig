@@ -24,6 +24,79 @@
 {#{% set sourceFieldSettings = craft.app.fields.getFieldByUid(sourceField) %}#}
 
 
+{# The script source picks which of the two inputs below applies; Craft's
+   field toggle shows the matching container (id = targetPrefix + value). #}
+{{ forms.radioGroupField({
+    label: 'Narration script source' | t('bespoken'),
+    instructions: 'Script source instructions' | t('bespoken'),
+    id: 'scriptSource',
+    name: 'scriptSource',
+    options: [
+        { value: 'handles', label: 'Field handles' | t('bespoken') },
+        { value: 'template', label: 'Twig template' | t('bespoken') },
+    ],
+    value: field.scriptSource,
+    toggle: true,
+    targetPrefix: 'script-source-',
+}) }}
+
+{# Entry types the starter generator can describe: those used by a section,
+   listed once each even when several sections share one. #}
+{% set starterOptions = [] %}
+{% set starterTypeIds = [] %}
+{% for section in craft.app.entries.getAllSections() %}
+    {% for entryType in section.getEntryTypes() %}
+        {% if entryType.id not in starterTypeIds %}
+            {% set starterTypeIds = starterTypeIds|merge([entryType.id]) %}
+            {% set starterOptions = starterOptions|merge([{ value: entryType.id, label: section.name ~ ' › ' ~ entryType.name }]) %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+
+{# An entry type picker + button that fills the container's input with a
+   generated starter, in the given format ('handles' or 'template'). #}
+{% macro starterPicker(options, format, label, buttonLabel, confirm, instructions) %}
+    {% import "_includes/forms" as forms %}
+    {% set input %}
+        <div class="flex">
+            <div data-bespoken-starter-select>
+                {{ forms.select({
+                    id: 'starterEntryType-' ~ format,
+                    options: options,
+                }) }}
+            </div>
+            {{ forms.button({
+                label: buttonLabel,
+                class: 'btn',
+                attributes: {
+                    data: {
+                        'bespoken-starter-button': true,
+                        'bespoken-starter-format': format,
+                        'confirm': confirm,
+                    },
+                },
+            }) }}
+        </div>
+    {% endset %}
+    {{ forms.field({
+        label: label,
+        instructions: instructions,
+        id: 'starterField-' ~ format,
+    }, input) }}
+{% endmacro %}
+{% import _self as bespoken %}
+
+<div id="script-source-handles"{% if field.scriptSource != 'handles' %} class="hidden"{% endif %} data-bespoken-starter-root>
+{% if starterOptions|length %}
+    {{ bespoken.starterPicker(
+        starterOptions,
+        'handles',
+        'Starter handles' | t('bespoken'),
+        'Insert starter handles' | t('bespoken'),
+        'Replace the current field handles with a generated list?' | t('bespoken'),
+        'Starter handles instructions' | t('bespoken')
+    ) }}
+{% endif %}
 {{ forms.textField({
     label: 'Field handle(s) of text' | t('bespoken'),
     instructions: 'Source field instructions' | t('bespoken'),
@@ -31,8 +104,87 @@
     name: 'sourceField',
     placeholder: 'title,body',
     value: field['sourceField'],
+    errors: field.getErrors('sourceField'),
     readonly: false,
 }) }}
+</div>
+
+<div id="script-source-template"{% if field.scriptSource != 'template' %} class="hidden"{% endif %} data-bespoken-starter-root>
+{% if starterOptions|length %}
+    {{ bespoken.starterPicker(
+        starterOptions,
+        'template',
+        'Starter template' | t('bespoken'),
+        'Insert starter template' | t('bespoken'),
+        'Replace the current template with a starter template?' | t('bespoken'),
+        'Starter template instructions' | t('bespoken')
+    ) }}
+{% endif %}
+{{ forms.textareaField({
+    label: 'Script template' | t('bespoken'),
+    instructions: 'Script template instructions' | t('bespoken'),
+    id: 'scriptTemplate',
+    name: 'scriptTemplate',
+    class: 'code',
+    rows: 14,
+    placeholder: "{{ entry.title }}.\n{{ entry.body }}",
+    value: field.scriptTemplate,
+    errors: field.getErrors('scriptTemplate'),
+}) }}
+</div>
+
+{% js %}
+(function() {
+    // Delegated once: the settings HTML is re-rendered when the field type
+    // changes, and this must keep working for the new copy.
+    if (window.bespokenStarterReady) {
+        return;
+    }
+    window.bespokenStarterReady = true;
+
+    document.addEventListener('click', function(event) {
+        var button = event.target.closest('[data-bespoken-starter-button]');
+        if (!button) {
+            return;
+        }
+        event.preventDefault();
+
+        var root = button.closest('[data-bespoken-starter-root]');
+        var select = root ? root.querySelector('[data-bespoken-starter-select] select') : null;
+        // The handles container holds a text input, the template container a textarea.
+        var target = root ? root.querySelector('textarea, input[type="text"]') : null;
+        if (!select || !target) {
+            return;
+        }
+        if (target.value.trim() !== '' && !window.confirm(button.getAttribute('data-confirm'))) {
+            return;
+        }
+
+        button.classList.add('loading');
+        Craft.sendActionRequest('GET', 'bespoken/bespoken/starter-template', {
+            params: { entryTypeId: select.value, format: button.getAttribute('data-bespoken-starter-format') }
+        })
+            .then(function(response) {
+                if (!response.data || !response.data.success) {
+                    throw new Error((response.data && response.data.message) || 'Could not build a starter.');
+                }
+                target.value = response.data.value;
+                target.dispatchEvent(new Event('input', { bubbles: true }));
+                target.focus();
+                if (response.data.skipped && response.data.skipped.length) {
+                    Craft.cp.displayNotice({{ 'Left out (not text): {fields}' | t('bespoken') | json_encode | raw }}.replace('{fields}', response.data.skipped.join(', ')));
+                }
+            })
+            .catch(function(error) {
+                var message = (error.response && error.response.data && error.response.data.message) || error.message;
+                Craft.cp.displayError(message);
+            })
+            .finally(function() {
+                button.classList.remove('loading');
+            });
+    });
+})();
+{% endjs %}
 
 {% set input %}
 

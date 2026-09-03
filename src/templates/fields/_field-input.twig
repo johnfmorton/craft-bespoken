@@ -40,13 +40,14 @@
 {% set environment = craft.app.config.env %}
 	{# The field handle keys the editable preview's per-field script state; the
 	   provider tells the dialog which actions and wording apply. #}
-	<div class="bespoken-fields" data-bespoken-field-handle="{{ field.handle }}" data-bespoken-provider="{{ bespokenSettings.usesCustomEndpoint() ? 'alias' : 'elevenlabs' }}"> {% if voiceIdNameOptionsForField|length == 0 or fieldSettings.sourceField| length == 0 %}
+	<div class="bespoken-fields" data-bespoken-field-handle="{{ field.handle }}" data-bespoken-provider="{{ bespokenSettings.usesCustomEndpoint() ? 'alias' : 'elevenlabs' }}"> {% set scriptSourceValue = field.usesTemplate() ? field.scriptTemplate : field.sourceField %}
+	{% if voiceIdNameOptionsForField|length == 0 or scriptSourceValue|length == 0 %}
 
 		{% if voiceIdNameOptionsForField|length == 0 %}
 			<div class="bespoken-error">{{ 'No voice options available for field'|t('bespoken') }}</div>
 		{% endif %}
 
-		{% if fieldSettings.sourceField| length == 0 %}
+		{% if scriptSourceValue|length == 0 %}
 			<div class="bespoken-error">{{ 'No source set for this field'|t('bespoken') }}</div>
 		{% endif %}
 	{% else %}
@@ -101,6 +102,9 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
+                            'script-source': field.scriptSource,
+                            'field-id': field.id,
+                            'render-script-action-url': actionUrl('bespoken/bespoken/render-script', siteActionParams),
                             'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams)
                         }
                     }
@@ -118,6 +122,9 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
+                            'script-source': field.scriptSource,
+                            'field-id': field.id,
+                            'render-script-action-url': actionUrl('bespoken/bespoken/render-script', siteActionParams),
                             'process-text-action-url': actionUrl('bespoken/bespoken/process-text', siteActionParams),
                             'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams),
                             'pronunciation-rule-set': 'TEST',
@@ -154,6 +161,9 @@
                     attributes: {
                         data: {
                             'target-field': field.sourceField,
+                            'script-source': field.scriptSource,
+                            'field-id': field.id,
+                            'render-script-action-url': actionUrl('bespoken/bespoken/render-script', siteActionParams),
                             'create-project-action-url': actionUrl('bespoken/bespoken/create-project', siteActionParams),
                             'get-element-content-action-url': actionUrl('bespoken/bespoken/get-element-content', siteActionParams),
                         }

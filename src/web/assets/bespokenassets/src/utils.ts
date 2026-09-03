@@ -98,6 +98,10 @@ function _textFromContent(content: NarrationContent, spec: HandleSpec[]): string
             for (const block of blocks) {
                 text += _textFromContent(block, item[handle]) + ' ';
             }
+        } else if (typeof blocks === 'string' && blocks !== '') {
+            // Brackets on a non-Matrix handle: the server sent its text, so
+            // read it as if the brackets weren't there.
+            text += (_isHTML(blocks) ? _processCKEditorFields(blocks) : _processPlainTextField(blocks)) + ' ';
         }
     }
     return text;
@@ -594,8 +598,15 @@ export async function _getMatrixFieldText(
                             if (item === handle) {
                                 text += _getFieldText(child) + ' ';
                             }
-                        } else if (handle in item && _getFieldType(child) === 'matrix') {
-                            text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + ' ';
+                        } else if (handle in item) {
+                            if (_getFieldType(child) === 'matrix') {
+                                text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + ' ';
+                            } else {
+                                // Brackets on a non-Matrix handle: read the
+                                // field as if they weren't there rather than
+                                // silently dropping it.
+                                text += _getFieldText(child) + ' ';
+                            }
                         }
                     }
                 }
@@ -753,13 +764,22 @@ export interface FinalizedScript {
  */
 export function finalizeEditedScript(input: string): FinalizedScript {
   let removedCount = 0;
-  let text = (input || '').replace(UNSUPPORTED_SCRIPT_CHARS, () => {
+  const text = (input || '').replace(UNSUPPORTED_SCRIPT_CHARS, () => {
     removedCount++;
     return '';
   });
-  text = normalizeScriptWhitespace(text);
 
-  const paragraphs = text
+  return { text: ensureParagraphPunctuation(text), removedCount };
+}
+
+/**
+ * Normalize whitespace and give every paragraph a sentence-ending mark,
+ * dropping a trailing comma, colon, or semicolon first. Shared by edited
+ * scripts and template-rendered scripts, so a bare heading on its own line
+ * reads as a sentence either way.
+ */
+export function ensureParagraphPunctuation(input: string): string {
+  return normalizeScriptWhitespace(input)
     .split('\n\n')
     .map(paragraph => {
       paragraph = paragraph.trim();
@@ -774,7 +794,18 @@ export function finalizeEditedScript(input: string): FinalizedScript {
       }
       return paragraph;
     })
-    .filter(paragraph => paragraph !== '');
+    .filter(paragraph => paragraph !== '')
+    .join('\n\n');
+}
 
-  return { text: paragraphs.join('\n\n'), removedCount };
+/**
+ * The narration script from a rendered Twig script template. The template's
+ * output is treated as one HTML document and cleaned exactly like a CKEditor
+ * field value (figures and `.bespoken-exclude` elements dropped, block
+ * elements given sentence-ending punctuation and paragraph breaks, tags
+ * stripped, entities decoded), so `{{ block.text }}` can be a CKEditor field
+ * as-is. Every line of plain output then becomes a punctuated paragraph.
+ */
+export function scriptFromRenderedTemplate(html: string): string {
+  return ensureParagraphPunctuation(_processCKEditorFields(html || ''));
 }

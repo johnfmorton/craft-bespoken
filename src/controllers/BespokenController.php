@@ -7,11 +7,15 @@ use craft\base\ElementInterface;
 use craft\base\FieldInterface;
 use craft\elements\db\EntryQuery;
 use craft\elements\ElementCollection;
+use craft\elements\Entry;
 use craft\fields\Matrix;
 use craft\helpers\App;
 use craft\helpers\Json;
 use craft\web\Controller;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
+use johnfmorton\bespoken\fields\BespokenField;
+use johnfmorton\bespoken\helpers\StarterTemplate;
+use yii\web\ForbiddenHttpException;
 use yii\web\MethodNotAllowedHttpException;
 use yii\web\Response;
 
@@ -439,6 +443,140 @@ class BespokenController extends Controller
         }
 
         return [];
+    }
+
+    /**
+     * Action to render a Bespoken field's Twig script template against the
+     * element being edited.
+     *
+     * Used by the field JS when the field's script source is a template. The
+     * template is read from the field's settings, never from the request, and
+     * rendered server-side with `entry` and `object` set to the element, so it
+     * can reach nested Matrix blocks, related elements, and anything else Twig
+     * can, regardless of how the fields are displayed in the editor. The JS
+     * asks Craft's element editor to save pending changes to the draft first
+     * and passes the draft ID, so the render reflects what the editor shows.
+     *
+     * The rendered output is returned as HTML; the field JS turns it into
+     * speech text with the same cleanup that field values get.
+     *
+     * @return Response
+     */
+    public function actionRenderScript(): Response
+    {
+        $this->requireLogin();
+        $request = Craft::$app->request;
+
+        $field = Craft::$app->fields->getFieldById((int)$request->get('fieldId'));
+        if (!$field instanceof BespokenField || !$field->usesTemplate()) {
+            return $this->asJson([
+                'success' => false,
+                'message' => Craft::t('bespoken', 'This Bespoken field does not use a script template.'),
+            ]);
+        }
+
+        $element = $this->_resolveEditedElement(
+            (int)$request->get('elementId'),
+            (int)$request->get('draftId') ?: null,
+            $this->_resolveRequestSiteId(),
+        );
+
+        if ($element === null) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Element not found',
+            ]);
+        }
+
+        if (!Craft::$app->elements->canView($element)) {
+            throw new ForbiddenHttpException('User is not permitted to view this element');
+        }
+
+        try {
+            $html = Craft::$app->view->renderObjectTemplate($field->scriptTemplate, $element, [
+                'entry' => $element,
+                'element' => $element,
+            ]);
+        } catch (\Throwable $e) {
+            Craft::warning("Bespoken script template for field \"{$field->handle}\" failed to render: {$e->getMessage()}", __METHOD__);
+            return $this->asJson([
+                'success' => false,
+                'message' => Craft::t('bespoken', 'The script template could not be rendered: {message}', [
+                    'message' => $e->getMessage(),
+                ]),
+            ]);
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'html' => $html,
+        ]);
+    }
+
+    /**
+     * Action to build a starter script definition for an entry type, as a Twig
+     * template (`format=template`, the default) or a field-handle list
+     * (`format=handles`).
+     *
+     * Used by the "Insert starter …" buttons on a Bespoken field's settings
+     * page: it walks the entry type's field layout and writes out the text
+     * fields and Matrix blocks, nested as deep as the content model goes, for
+     * the developer to edit from there, so a large model doesn't have to be
+     * typed out by hand. Admins only, since it describes the content model.
+     *
+     * @return Response
+     */
+    public function actionStarterTemplate(): Response
+    {
+        $this->requireLogin();
+        $this->requireAdmin(false);
+        $request = Craft::$app->request;
+
+        $entryType = Craft::$app->entries->getEntryTypeById((int)$request->get('entryTypeId'));
+        if ($entryType === null) {
+            return $this->asJson([
+                'success' => false,
+                'message' => Craft::t('bespoken', 'Entry type not found.'),
+            ]);
+        }
+
+        if ($request->get('format') === 'handles') {
+            $result = StarterTemplate::handleListForEntryType($entryType);
+            return $this->asJson([
+                'success' => true,
+                'value' => $result['handles'],
+                'skipped' => $result['skipped'],
+            ]);
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'value' => StarterTemplate::forEntryType($entryType),
+            // The template names the left-out fields in a comment already.
+            'skipped' => [],
+        ]);
+    }
+
+    /**
+     * The element the editor is showing: the given draft when there is one
+     * (Craft autosaves edits to a provisional draft), otherwise the element
+     * itself.
+     */
+    private function _resolveEditedElement(int $elementId, ?int $draftId, int $siteId): ?ElementInterface
+    {
+        if ($draftId) {
+            $draft = Entry::find()
+                ->draftId($draftId)
+                ->provisionalDrafts(null)
+                ->siteId($siteId)
+                ->status(null)
+                ->one();
+            if ($draft) {
+                return $draft;
+            }
+        }
+
+        return Craft::$app->elements->getElementById($elementId, null, $siteId);
     }
 
     /**

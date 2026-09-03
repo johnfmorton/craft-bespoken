@@ -1490,6 +1490,8 @@
         for (const block of blocks) {
           text += _textFromContent(block, item[handle]) + " ";
         }
+      } else if (typeof blocks === "string" && blocks !== "") {
+        text += (_isHTML(blocks) ? _processCKEditorFields(blocks) : _processPlainTextField(blocks)) + " ";
       }
     }
     return text;
@@ -1716,8 +1718,12 @@
                 if (item === handle) {
                   text += _getFieldText(child) + " ";
                 }
-              } else if (handle in item && _getFieldType(child) === "matrix") {
-                text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + " ";
+              } else if (handle in item) {
+                if (_getFieldType(child) === "matrix") {
+                  text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + " ";
+                } else {
+                  text += _getFieldText(child) + " ";
+                }
               }
             }
           }
@@ -1799,12 +1805,14 @@
   var UNSUPPORTED_SCRIPT_CHARS = /[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F0FF}\u{1F100}-\u{1F2FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{2190}-\u{21FF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{20E3}<>]/gu;
   function finalizeEditedScript(input) {
     let removedCount = 0;
-    let text = (input || "").replace(UNSUPPORTED_SCRIPT_CHARS, () => {
+    const text = (input || "").replace(UNSUPPORTED_SCRIPT_CHARS, () => {
       removedCount++;
       return "";
     });
-    text = normalizeScriptWhitespace(text);
-    const paragraphs = text.split("\n\n").map((paragraph) => {
+    return { text: ensureParagraphPunctuation(text), removedCount };
+  }
+  function ensureParagraphPunctuation(input) {
+    return normalizeScriptWhitespace(input).split("\n\n").map((paragraph) => {
       paragraph = paragraph.trim();
       if (paragraph === "") {
         return "";
@@ -1816,8 +1824,10 @@
         }
       }
       return paragraph;
-    }).filter((paragraph) => paragraph !== "");
-    return { text: paragraphs.join("\n\n"), removedCount };
+    }).filter((paragraph) => paragraph !== "").join("\n\n");
+  }
+  function scriptFromRenderedTemplate(html) {
+    return ensureParagraphPunctuation(_processCKEditorFields(html || ""));
   }
 
   // src/web/assets/bespokenassets/src/scriptState.ts
@@ -2387,7 +2397,7 @@
     if (targetFieldHandles) {
       const fieldHandlesArray = _parseFieldHandles(targetFieldHandles);
       for (const handle of fieldHandlesArray) {
-        if (handle === "title") {
+        if (handle === "title" || typeof handle !== "string" && "title" in handle) {
           const titleToAdd = title.endsWith(".") ? title : title + ".";
           text += titleToAdd + " ";
         } else {
@@ -2424,12 +2434,75 @@
     return text;
   }
   async function generateEntryScript(fieldGroup) {
-    const source = fieldGroup.querySelector("[data-target-field]");
+    const source = fieldGroup.querySelector("[data-script-source]");
+    if (source?.getAttribute("data-script-source") === "template") {
+      return renderTemplateScript(source);
+    }
     const targetFieldHandles = source?.getAttribute("data-target-field") || "";
     const actionUrl = source?.getAttribute("data-get-element-content-action-url") || "";
     const elementId = _getInputValue('input[name="elementId"]');
     const title = _cleanTitle(_getInputValue("#title") || elementId);
     return generateScript(targetFieldHandles, title, actionUrl);
+  }
+  async function renderTemplateScript(source) {
+    const actionUrl = source.getAttribute("data-render-script-action-url") || "";
+    const fieldId = source.getAttribute("data-field-id") || "";
+    const editor = await flushDraft();
+    const url = new URL(actionUrl);
+    url.searchParams.set("fieldId", fieldId);
+    const elementId = editor?.settings?.elementId || _getInputValue('input[name="elementId"]');
+    url.searchParams.set("elementId", String(elementId));
+    if (editor?.settings?.draftId) {
+      url.searchParams.set("draftId", String(editor.settings.draftId));
+    }
+    try {
+      const result = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      if (!result.ok) {
+        throw new Error(`HTTP error! Status: ${result.status}`);
+      }
+      const data = await result.json();
+      if (!data.success) {
+        throw new Error(data.message || "The script template could not be rendered.");
+      }
+      return scriptFromRenderedTemplate(data.html || "");
+    } catch (error) {
+      console.error("Error rendering the script template:", error);
+      reportCpError(error instanceof Error ? error.message : String(error));
+      return "";
+    }
+  }
+  function elementEditor() {
+    const craft = window.Craft;
+    return craft?.cp?.$primaryForm?.data?.("elementEditor") || null;
+  }
+  var DRAFT_FLUSH_TIMEOUT_MS = 1e4;
+  async function flushDraft() {
+    const editor = elementEditor();
+    if (!editor || typeof editor.serializeForm !== "function" || typeof editor.saveDraft !== "function" || editor.settings?.revisionId) {
+      return editor;
+    }
+    try {
+      const lastSaved = editor.lastSerializedValue || editor.$container?.data("initialSerializedValue");
+      if (lastSaved === void 0 || editor.serializeForm(true) === lastSaved) {
+        return editor;
+      }
+      await Promise.race([
+        editor.saveDraft(),
+        new Promise((resolve) => setTimeout(resolve, DRAFT_FLUSH_TIMEOUT_MS))
+      ]);
+    } catch (error) {
+      console.warn("Bespoken: could not save the draft before rendering the script:", error);
+    }
+    return editor;
+  }
+  function reportCpError(message) {
+    const craft = window.Craft;
+    if (craft?.cp && typeof craft.cp.displayError === "function") {
+      craft.cp.displayError(message);
+    }
   }
   async function resolveActiveScript(fieldGroup) {
     const entryText = await generateEntryScript(fieldGroup);

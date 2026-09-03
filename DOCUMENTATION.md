@@ -95,6 +95,31 @@ title,blocks[heading,text,rows[heading,text,button]],cards[heading,text,list[ite
 
 Only the fields you list at each level are narrated. Handles can be reused across block types and levels — `heading` in `blocks` and `heading` in `rows` are matched at their own level — and a nested Matrix field that you don't list contributes nothing, so nothing is ever read twice. A nested field's blocks are narrated in their block order, in place of that field in the parent block, and disabled blocks are skipped at every level. This works whether a Matrix field is displayed as inline blocks, cards, or an element index.
 
+You don't have to type the handle list by hand either. Above the handles box, pick the entry type this field will narrate and click **Insert starter handles**: Bespoken writes out the entry type's text field handles, with each Matrix field's block fields in brackets, nested as deep as the content model goes. The handle syntax can't tell block types apart, so a Matrix field lists the text fields of all its block types together, each handle once. Fields that can't be narrated are reported in a notice. Edit from there.
+
+### Twig template mode
+
+For content models that field handles can't describe well, switch the field's **Narration script source** to **Twig template** and write the script as a Twig template. It is rendered on the server against the entry being edited, so it can reach nested Matrix blocks at any depth, related elements, and anything else Twig can:
+
+```twig
+{{ entry.title }}.
+{{ entry.authorCredit }}
+{% for block in entry.contentBlocks.all() %}
+  {{ block.heading }}. {{ block.text }}
+  {% for row in block.rows.all() %}{{ row.heading }}. {{ row.text }} {{ row.button }}.{% endfor %}
+{% endfor %}
+```
+
+You don't have to write the template from scratch. Above the template box, pick the entry type this field will narrate and click **Insert starter template**: Bespoken walks that entry type's field layout and writes out its text fields, one per line, with a `{% for %}` loop for every Matrix field, nested as deep as the content model goes, and a `{% switch %}` on block type where a Matrix field has more than one. Fields it can't narrate (assets, dates, relations…) are named in a Twig comment so you can see what was left out. Edit from there: reorder, add phrasing, or drop what shouldn't be read.
+
+How it works:
+
+- The entry is available as `entry` (and as `object`, so Craft's shortcut syntax `{title}` works too). Nested Matrix queries such as `entry.contentBlocks.all()` return only live blocks for the current site, so disabled blocks are left out automatically.
+- Write the text you want narrated. HTML from CKEditor and Redactor fields is converted to speech text the same way field handles are: figures and elements with the `bespoken-exclude` class are dropped, headings and paragraphs get sentence-ending punctuation, and paragraph breaks are kept. Each line of the template's output becomes a paragraph, so keep a heading and its text on one line if you don't want a pause between them.
+- The template is rendered against the entry's current draft. Craft autosaves your edits to a provisional draft, and Bespoken asks the editor to save pending changes before rendering, so the preview reflects what you see.
+- A handle that doesn't exist renders as empty text rather than an error. Syntax errors are reported when you save the field settings, and a template that fails while rendering (for example calling a method that doesn't exist) shows an error in the control panel instead of a script.
+- Pronunciation rules, emoji removal, and the rest of the text preparation apply after rendering, exactly as they do for field handles, and the script can still be edited in the preview dialog before generating.
+
 The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message.
 
 ### Example of a successful audio file creation

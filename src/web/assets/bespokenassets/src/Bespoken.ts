@@ -16,17 +16,13 @@ import {
     _getInputValue,
     _getFieldText,
     _cleanTitle,
-    _getMatrixViewType,
-    _getOwnMatrixBlocks,
-    _getOwnBlockFields,
-    _getFieldTextViaAPI,
+    _getMatrixFieldText,
     _getFieldType,
     _parseFieldHandles,
-    _getElementStatuses,
-    _isBlockLive,
     finalizeEditedScript,
     normalizeScriptWhitespace
 } from "./utils";
+import type { HandleSpec } from "./utils";
 import {
     scriptStorageKey,
     loadEditedScript,
@@ -723,26 +719,17 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                 const titleToAdd = title.endsWith('.') ? title : title + '.';
                 text += (titleToAdd + " ");
             } else {
-                // The handle is not "title", so it's a field handle or an object with a field handle and nested field handles
-                // first, let's check if the handle is an object
-                // and if it is, we need to get the main handle and the nested handles
-                let nestedHandles = [];
-                let currentHandle = handle;
-                if (handle instanceof Object) {
-                    // if this is an object, it will look something like this:
-                    // { "mainHandle": ["nestedHandle1", "nestedHandle2"] }
-                    // we need to get the main handle and the nested handles
-                    const mainHandle = Object.keys(handle)[0];
-                    nestedHandles = handle[mainHandle];
-                    // set handle to the main handle
-                    currentHandle = mainHandle;
+                // The handle is not "title", so it's a field handle, or a Matrix
+                // field handle mapped to the spec for its blocks' fields:
+                // { "mainHandle": ["nestedHandle1", { "innerMatrix": [...] }] }
+                let nestedHandles: HandleSpec[] = [];
+                let currentHandle: string;
+                if (typeof handle === 'string') {
+                    currentHandle = handle;
+                } else {
+                    currentHandle = Object.keys(handle)[0];
+                    nestedHandles = handle[currentHandle];
                 }
-
-                // the handle is now a string, so we can use it to get the field
-                // we may also have nested handles. we only need those
-                // if the matrix view is not set to "inline-editable-elements"
-                // in that case, we will need to use the Craft API to get that data
-                // since it is not present in the DOM
 
                 // attempt to get the field element based on the handle
                 const targetField = document.getElementById(`fields-${currentHandle}-field`) as HTMLElement | null;
@@ -767,111 +754,10 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                             text += _getFieldText(targetField)  + " ";
                             break;
                         case "matrix":
-                            const viewTypeTest = _getMatrixViewType(targetField);
-                            switch (viewTypeTest) {
-                                case 'cards': {
-                                    // Matrix fields displayed as cards are scraped via the API
-                                    let targetFieldCards = targetField.querySelector('.nested-element-cards');
-                                    if (targetFieldCards) {
-                                        const cards = Array.from(targetFieldCards.querySelectorAll('.card'));
-                                        const statuses = await _getElementStatuses(cards.map(c => c.getAttribute('data-id')), actionUrl);
-                                        for (const card of cards) {
-                                            const status = card.getAttribute('data-status');
-                                            const id = card.getAttribute('data-id');
-                                            if (_isBlockLive(id, status, statuses)) {
-                                                const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
-                                                text += newText + " ";
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                                case 'inline-editable-elements': {
-                                    // Matrix fields displayed as inline-editable-elements are scraped directly from the page
-
-                                    // look for .blocks (inline-editable-elements) in the targetField
-                                    let targetFieldInline = targetField.querySelector('.blocks');
-
-                                    // if the matrix field has nested elements then...
-                                    if (targetFieldInline) {
-                                        // Only this field's own blocks. A Matrix field nested
-                                        // inside a block renders its blocks in here too, and
-                                        // those must not be scraped as top-level blocks as
-                                        // well (issue #33).
-                                        const blocks = _getOwnMatrixBlocks(targetFieldInline);
-                                        // The DOM only marks blocks that are disabled globally
-                                        // (disabled-entry class / cleared [enabled] input). A block
-                                        // disabled for the current site only renders with no marker
-                                        // at all, so the server's per-site status is needed too.
-                                        const statuses = await _getElementStatuses(blocks.map(b => b.getAttribute('data-id')), actionUrl);
-                                        for (const block of blocks) {
-                                            const id = block.getAttribute('data-id');
-                                            // The block's own [enabled] input is a direct child of
-                                            // .matrixblock; a descendant query could pick up a
-                                            // nested block's input instead.
-                                            const enabledInput = block.querySelector(':scope > input[name$="[enabled]"]') as HTMLInputElement | null;
-                                            const domDisabled = block.classList.contains('disabled-entry')
-                                                || (enabledInput !== null && enabledInput.value === '');
-                                            const serverStatus = id !== null ? statuses[id] : undefined;
-                                            const serverDisabled = serverStatus != null && serverStatus !== 'live';
-                                            if (domDisabled || serverDisabled) {
-                                                continue;
-                                            }
-                                            // The block's own fields only — a nested Matrix
-                                            // field's blocks carry the same handles and would
-                                            // otherwise be read here as well (issue #33).
-                                            const fieldElements = _getOwnBlockFields(block);
-
-                                            // loop through the field elements
-                                            for (const field of fieldElements) {
-                                                // this field's handle is in the data-attribute
-                                                const fieldHandle = field.getAttribute('data-attribute');
-                                                // Loop through the nestedHandle one by one, in order, looking for the fieldHandle of this field
-                                                // If we find it, add the text to the script
-                                                for (const nestedHandle of nestedHandles) {
-                                                    if (fieldHandle === nestedHandle) {
-                                                        text += _getFieldText(field as HTMLElement) + " ";
-                                                    }
-                                                }
-                                                // because the handles are provided in their order of
-                                                // importance by the developer, we continue the loop getting
-                                                // the text of all the fields in the matrix block in the
-                                                // expected order of importance
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                                case 'element-index': {
-                                    // Matrix fields displayed as element-index are scraped via the API.
-                                    // A block appears here as several [data-id] elements (list item +
-                                    // chip) where only the chip carries data-status — dedupe by id,
-                                    // keeping the element that has a status.
-                                    const withDataId = Array.from(targetField.querySelectorAll('[data-id]'));
-                                    const blockStatusById = new Map<string, string | null>();
-                                    for (const el of withDataId) {
-                                        const id = el.getAttribute('data-id');
-                                        if (!id) {
-                                            continue;
-                                        }
-                                        const status = el.getAttribute('data-status');
-                                        if (!blockStatusById.has(id) || status !== null) {
-                                            blockStatusById.set(id, status);
-                                        }
-                                    }
-                                    const statuses = await _getElementStatuses([...blockStatusById.keys()], actionUrl);
-                                    for (const [id, status] of blockStatusById) {
-                                        if (_isBlockLive(id, status, statuses)) {
-                                            const newText = await _getFieldTextViaAPI(id, nestedHandles, actionUrl);
-                                            text += newText + " ";
-                                        }
-                                    }
-                                    break;
-                                }
-                                default:
-                                    // Matrix fields displayed as tables are scraped via the API
-                                    text += " There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ";
-                            }
+                            // Matrix blocks are read from the DOM or the server
+                            // depending on the field's view mode, and a nested
+                            // Matrix field is read when the spec names it.
+                            text += await _getMatrixFieldText(targetField, nestedHandles, actionUrl) + " ";
                             break;
                     }
                 }

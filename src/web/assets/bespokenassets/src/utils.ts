@@ -8,26 +8,52 @@ export function _cleanTitle(text: string): string {
   return cleanText;
 }
 
-class array {
+/*
+* HandleSpec
+* description: One item of a parsed "Field handle(s) of text" setting: a field
+* handle, or a Matrix field handle mapped to the spec for the fields inside its
+* blocks. That nested spec can itself name a Matrix field with its own list, to
+* any depth. `title,blocks[heading,text,rows[heading,text]]` parses to
+* ['title', { blocks: ['heading', 'text', { rows: ['heading', 'text'] }] }].
+ */
+export type HandleSpec = string | { [handle: string]: HandleSpec[] };
+
+/*
+* NarrationContent
+* description: What the get-element-content action returns for one element:
+* the values of the requested fields, with each Matrix field as the ordered
+* list of its live blocks in this same shape (see BespokenController).
+ */
+export interface NarrationContent {
+    id: number | null;
+    status: string | null;
+    fields: { [handle: string]: string | NarrationContent[] };
 }
 
 /*
-* _getFieldText
-* params: field: HTMLElement
-* description: This function retrieves the text content from a field element in the CMS.
+* _getFieldTextViaAPI
+* params: elementId: a matrix block's element ID, spec: the handles to read
+* from it, actionUrl: the get-element-content action URL
+* description: Fetches a block's content from the server and returns the text
+* of the fields named in `spec`, in spec order. Used for blocks that aren't in
+* the DOM (cards and element-index views). A nested Matrix field named in the
+* spec with its own list comes back as the ordered list of its live blocks,
+* each read with that list — recursively, as deep as the spec goes. Returns ''
+* on any error.
  */
-export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[], actionUrl:string): Promise<string> {
+export async function _getFieldTextViaAPI(elementId: string, spec: HandleSpec[], actionUrl: string): Promise<string> {
     try {
-        // add the elementId to the actionUrl
-        // this is a GET request
-        // since we can't be sure of the format of the actionUrl,
-        // we need to parse it as a URL and add the elementId as a search parameter
-        const actionUrlForElement = new URL(actionUrl);
-        actionUrlForElement.searchParams.set('elementId', elementId);
+        // The action URL's format isn't known in advance, so parse it and add
+        // the parameters properly rather than appending to the string.
+        const url = new URL(actionUrl);
+        url.searchParams.set('elementId', elementId);
+        // The server prunes its response to this spec, so a block with a large
+        // nested tree only sends the parts that will be narrated.
+        url.searchParams.set('spec', JSON.stringify(spec));
 
-        const result = await fetch(actionUrlForElement.toString(), {
+        const result = await fetch(url.toString(), {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Accept': 'application/json' }
         });
 
         // Check if the response is ok (status code 200-299)
@@ -37,35 +63,49 @@ export async function _getFieldTextViaAPI(elementId: string, fieldNames: string[
 
         const responseData = await result.json();
 
-        // Check if responseData.element exists
-        if (!responseData.element) {
-            throw new Error('Missing element in response data');
+        if (!responseData.content) {
+            throw new Error('Missing content in response data');
         }
 
-        let text = '';
-
-        // Look in the responseData.element for the existence of the fieldNames one by one
-        // Return the content of the found field
-        for (let i = 0; i < fieldNames.length; i++) {
-            if (responseData.element[fieldNames[i]]) {
-                const returnedText: string = responseData.element[fieldNames[i]];
-                if (_isHTML(returnedText)) {
-                    text += _processCKEditorFields(returnedText) + ' ';
-                } else {
-                    text += _processPlainTextField(returnedText) + ' ';
-                }
-
-            }
-        }
-
-        // Return '' if no field matches
-        return text;
+        return _textFromContent(responseData.content, spec);
     } catch (error) {
         console.error('Error fetching element content:', error);
         return '';
     }
 }
 
+/*
+* _textFromContent
+* description: The narration text of one element's server-provided content,
+* for the fields in `spec`, in spec order. Text fields are cleaned the same way
+* as fields read from the DOM; a nested Matrix field's blocks are read
+* recursively with its own spec.
+ */
+function _textFromContent(content: NarrationContent, spec: HandleSpec[]): string {
+    let text = '';
+    const fields = content.fields || {};
+    for (const item of spec) {
+        if (typeof item === 'string') {
+            const value = fields[item];
+            if (typeof value === 'string' && value !== '') {
+                text += (_isHTML(value) ? _processCKEditorFields(value) : _processPlainTextField(value)) + ' ';
+            }
+            continue;
+        }
+        const handle = Object.keys(item)[0];
+        const blocks = fields[handle];
+        if (Array.isArray(blocks)) {
+            for (const block of blocks) {
+                text += _textFromContent(block, item[handle]) + ' ';
+            }
+        }
+    }
+    return text;
+}
+
+
+// Must match the per-request cap in BespokenController::actionElementStatuses().
+const STATUS_BATCH_SIZE = 200;
 
 /*
 * _getElementStatuses
@@ -85,17 +125,28 @@ export async function _getElementStatuses(elementIds: (string | null)[], actionU
     try {
         // Both actions live on the same controller, so the element-statuses
         // URL is the get-element-content URL with the action path swapped.
-        const url = new URL(actionUrl.replace('get-element-content', 'element-statuses'));
-        url.searchParams.set('elementIds', ids.join(','));
-        const result = await fetch(url.toString(), {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        });
-        if (!result.ok) {
-            return {};
+        const baseUrl = actionUrl.replace('get-element-content', 'element-statuses');
+        // The action answers at most STATUS_BATCH_SIZE IDs per request, and a
+        // Matrix field with nested Matrix fields can hold more than that, so
+        // ask in parallel batches.
+        const batches: string[][] = [];
+        for (let i = 0; i < ids.length; i += STATUS_BATCH_SIZE) {
+            batches.push(ids.slice(i, i + STATUS_BATCH_SIZE));
         }
-        const data = await result.json();
-        return (data && data.statuses) || {};
+        const results = await Promise.all(batches.map(async batch => {
+            const url = new URL(baseUrl);
+            url.searchParams.set('elementIds', batch.join(','));
+            const result = await fetch(url.toString(), {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!result.ok) {
+                return {};
+            }
+            const data = await result.json();
+            return (data && data.statuses) || {};
+        }));
+        return Object.assign({}, ...results);
     } catch (error) {
         console.error('Error fetching element statuses:', error);
         return {};
@@ -472,36 +523,193 @@ export function _getOwnBlockFields(block: Element): HTMLElement[] {
         .filter(field => field.closest('.matrixblock') === block);
 }
 
+/*
+* _getMatrixFieldText
+* params: field: a Matrix field's `.field` wrapper, spec: the handles to read
+* from each block, actionUrl: the get-element-content action URL, statuses:
+* the server-reported per-site statuses of every block under the field
+* (fetched here on the first call and passed down when recursing)
+* description: The narration text of a Matrix field's live blocks, in block
+* order. How the blocks are read depends on how the field is displayed:
+*
+* - inline blocks are read from the DOM, so unsaved edits count;
+* - cards and element-index views only list the blocks, so each block's
+*   content is fetched from the server.
+*
+* A block's fields are matched against `spec`. A plain handle contributes the
+* field's text; a handle carrying its own bracketed list names a Matrix field
+* nested inside the block, which is read the same way with that list — so
+* `blocks[heading,text,rows[heading,text]]` narrates each block's heading and
+* text and then its rows' headings and texts, as deep as the spec describes.
+* A nested Matrix field the spec doesn't name is skipped (issue #33).
+ */
+export async function _getMatrixFieldText(
+    field: HTMLElement,
+    spec: HandleSpec[],
+    actionUrl: string | null,
+    statuses?: Record<string, string | null>,
+): Promise<string> {
+    if (statuses === undefined) {
+        // One request for the whole tree: every block under this field, at
+        // any depth, so nested fields don't each ask again.
+        statuses = await _getElementStatuses(_collectBlockIds(field), actionUrl);
+    }
+    let text = '';
+
+    switch (_getMatrixViewType(field)) {
+        case 'cards': {
+            const container = field.querySelector('.nested-element-cards');
+            if (!container) {
+                break;
+            }
+            for (const card of Array.from(container.querySelectorAll('.card'))) {
+                const id = card.getAttribute('data-id');
+                if (id !== null && _isBlockLive(id, card.getAttribute('data-status'), statuses)) {
+                    text += await _getFieldTextViaAPI(id, spec, actionUrl) + ' ';
+                }
+            }
+            break;
+        }
+        case 'inline-editable-elements': {
+            const container = field.querySelector('.blocks');
+            if (!container) {
+                break;
+            }
+            // Only this field's own blocks: a nested Matrix field renders its
+            // blocks in here too, and those are read through their own field
+            // below, when the spec names it (issue #33).
+            for (const block of _getOwnMatrixBlocks(container)) {
+                if (!_isInlineBlockLive(block, statuses)) {
+                    continue;
+                }
+                // The block's own fields, in layout order, each matched
+                // against the spec.
+                for (const child of _getOwnBlockFields(block)) {
+                    const handle = child.getAttribute('data-attribute');
+                    if (handle === null) {
+                        continue;
+                    }
+                    for (const item of spec) {
+                        if (typeof item === 'string') {
+                            if (item === handle) {
+                                text += _getFieldText(child) + ' ';
+                            }
+                        } else if (handle in item && _getFieldType(child) === 'matrix') {
+                            text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + ' ';
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case 'element-index': {
+            // A block appears here as several [data-id] elements (list item +
+            // chip) where only the chip carries data-status — dedupe by id,
+            // keeping the element that has a status.
+            const blockStatusById = new Map<string, string | null>();
+            for (const el of Array.from(field.querySelectorAll('[data-id]'))) {
+                const id = el.getAttribute('data-id');
+                if (!id) {
+                    continue;
+                }
+                const status = el.getAttribute('data-status');
+                if (!blockStatusById.has(id) || status !== null) {
+                    blockStatusById.set(id, status);
+                }
+            }
+            for (const [id, status] of blockStatusById) {
+                if (_isBlockLive(id, status, statuses)) {
+                    text += await _getFieldTextViaAPI(id, spec, actionUrl) + ' ';
+                }
+            }
+            break;
+        }
+        default:
+            text += ' There was an error in retrieving the matrix field data. If you continue to have this problem, please reach out to the developer for help. ';
+    }
+    return text;
+}
+
+/*
+* _isInlineBlockLive
+* description: Whether an inline-editable block should be narrated. The DOM
+* only marks blocks that are disabled globally (disabled-entry class /
+* cleared [enabled] input); a block disabled for the current site only
+* renders with no marker at all, so the server's per-site status is checked
+* too (issue #31).
+ */
+function _isInlineBlockLive(block: HTMLElement, statuses: Record<string, string | null>): boolean {
+    // The block's own [enabled] input is a direct child of .matrixblock; a
+    // descendant query could pick up a nested block's input instead.
+    const enabledInput = block.querySelector(':scope > input[name$="[enabled]"]') as HTMLInputElement | null;
+    const domDisabled = block.classList.contains('disabled-entry')
+        || (enabledInput !== null && enabledInput.value === '');
+    const id = block.getAttribute('data-id');
+    const serverStatus = id !== null ? statuses[id] : undefined;
+    const serverDisabled = serverStatus != null && serverStatus !== 'live';
+    return !domDisabled && !serverDisabled;
+}
+
+/*
+* _collectBlockIds
+* description: The element IDs of every Matrix block rendered under a field,
+* at any depth and in any view mode, for one batched status lookup.
+ */
+function _collectBlockIds(field: Element): (string | null)[] {
+    return Array.from(field.querySelectorAll('.matrixblock, .nested-element-cards .card, .element-index [data-id]'))
+        .map(el => el.getAttribute('data-id'));
+}
+
 
 
 // Define types for structured output
-type FieldHandle = string;
-type NestedFieldHandles = { [key: string]: FieldHandle[] };
-type ParsedFieldHandle = FieldHandle | NestedFieldHandles;
-
 /*
 * _parseFieldHandles
-* params: input: string
-* description: This function parses a string input containing field handles and nested field handles.
+* params: input: the field's "Field handle(s) of text" setting
+* description: Parses the comma-separated handle list into a HandleSpec[].
+* A handle followed by a bracketed list is a Matrix field whose blocks' fields
+* are the listed handles, and a listed handle can carry a bracketed list of
+* its own for a Matrix field nested inside those blocks, to any depth:
+*
+*   title,blocks[heading,text,rows[heading,text,button]]
+*
+* Whitespace is ignored. Malformed input is read leniently: an unclosed
+* bracket runs to the end of the setting, and a stray closing bracket or
+* other punctuation is skipped.
  */
-export function _parseFieldHandles(input: string): ParsedFieldHandle[] {
-    const result: ParsedFieldHandle[] = [];
-    const regex = /(\w+)(?:\[(.*?)\])?/g;
-    let match: RegExpExecArray | null;
+export function _parseFieldHandles(input: string): HandleSpec[] {
+    let pos = 0;
 
-    while ((match = regex.exec(input)) !== null) {
-        const mainHandle: FieldHandle = match[1];
-        const nestedHandles: string | undefined = match[2];
-
-        if (nestedHandles) {
-            const nestedArray: FieldHandle[] = nestedHandles.split(',').map(handle => handle.trim());
-            result.push({ [mainHandle]: nestedArray });
-        } else {
-            result.push(mainHandle);
+    const parseList = (nested: boolean): HandleSpec[] => {
+        const items: HandleSpec[] = [];
+        while (pos < input.length) {
+            const rest = input.slice(pos);
+            const match = /^\w+/.exec(rest);
+            if (match) {
+                const handle = match[0];
+                pos += handle.length;
+                // Allow whitespace between a handle and its bracket.
+                while (pos < input.length && /\s/.test(input[pos])) {
+                    pos++;
+                }
+                if (input[pos] === '[') {
+                    pos++;
+                    items.push({ [handle]: parseList(true) });
+                } else {
+                    items.push(handle);
+                }
+            } else if (rest[0] === ']' && nested) {
+                pos++;
+                return items;
+            } else {
+                // A separator, whitespace, or a stray character.
+                pos++;
+            }
         }
-    }
+        return items;
+    };
 
-    return result;
+    return parseList(false);
 }
 
 // helper

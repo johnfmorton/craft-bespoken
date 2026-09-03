@@ -1,5 +1,16 @@
 # Release Notes for Bespoken
 
+## 5.5.0 - Unreleased
+
+### Added
+
+- **Nested Matrix fields can now be narrated** ([#33](https://github.com/johnfmorton/craft-bespoken/issues/33)). The **Field handle(s) of text** setting accepts nested bracket lists: a Matrix field inside a block gets its own list, e.g. `blocks[heading,text,rows[heading,text,button]]`, as deep as your content model goes. Each level names exactly the fields to read, so handles reused across block types and levels (`heading`, `text`) are matched at the level they're listed, and a nested Matrix field you don't list still contributes nothing. This applies in all three Matrix views: inline blocks are read from the editor (unsaved edits included), while cards and element-index blocks are fetched from the server, which now returns nested blocks in their saved order with disabled blocks (including blocks disabled for the current site only) left out. 5.3.6 had stopped narrating nested Matrix content in the inline blocks view to keep it from being read twice; this brings it back, once, and under your control.
+
+### Changed
+
+- The field's status lookup for Matrix blocks now covers every block under a Matrix field, at any depth, in one round of requests (batched by 200 IDs) instead of one request per Matrix field.
+- The `get-element-content` control panel action, used internally by the field's JavaScript, now returns only the fields the narration script asks for (`content`) instead of a full serialization of the element (`element`).
+
 ## 5.4.0 - 2026-09-02
 
 ### Added

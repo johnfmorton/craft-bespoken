@@ -47,7 +47,7 @@ return [
     'Create project button' => 'Create Alias TTS project',
     'Bespoken field name' => 'Bespoken',
     'Prefix instructions' => 'An optional prefix to the audio filename.',
-    'Source field instructions' => 'The field handle of the field that will be read aloud. To include multiple handles, separate the handles with a comma. You can include `title` to have the title of your entry have it included in your audio narration.',
+    'Source field instructions' => 'The field handle of the field that will be read aloud. To include multiple handles, separate the handles with a comma. You can include `title` to have the title of your entry have it included in your audio narration. For a Matrix field, list the handles of the fields inside its blocks in brackets after its handle, e.g. `blocks[heading,text]`. A Matrix field nested inside those blocks takes its own bracketed list, e.g. `blocks[heading,text,rows[heading,text]]`.',
     'Pronunciations instructions' => '<i>(Optional)</i> Add words and alternate spellings that reflects their pronunciation to help the AI pronounce specific words.',
     'Preview window title' => 'Narration script',
     'Preview window description' => 'This is the text that will be sent to the text-to-speech service. Edit it to change what is narrated; your entry is not modified.',

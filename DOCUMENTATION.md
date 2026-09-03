@@ -85,6 +85,16 @@ This is a screenshot of the field configuration for a Bespoken field that includ
 
 ![Bespoken field setup with a Matrix field](./documentation-assets/field-setup-with-matrix.png)
 
+### Nested Matrix fields
+
+If a block contains another Matrix field, give that field its own bracketed list of handles inside the parent's list. Nesting can go as deep as your content model does:
+
+```
+title,blocks[heading,text,rows[heading,text,button]],cards[heading,text,list[items[itemTitle,itemText]]]
+```
+
+Only the fields you list at each level are narrated. Handles can be reused across block types and levels — `heading` in `blocks` and `heading` in `rows` are matched at their own level — and a nested Matrix field that you don't list contributes nothing, so nothing is ever read twice. A nested field's blocks are narrated in their block order, in place of that field in the parent block, and disabled blocks are skipped at every level. This works whether a Matrix field is displayed as inline blocks, cards, or an element index.
+
 The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message.
 
 ### Example of a successful audio file creation

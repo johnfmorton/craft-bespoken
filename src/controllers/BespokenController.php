@@ -3,7 +3,13 @@
 namespace johnfmorton\bespoken\controllers;
 
 use Craft;
+use craft\base\ElementInterface;
+use craft\base\FieldInterface;
+use craft\elements\db\EntryQuery;
+use craft\elements\ElementCollection;
+use craft\fields\Matrix;
 use craft\helpers\App;
+use craft\helpers\Json;
 use craft\web\Controller;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
 use yii\web\MethodNotAllowedHttpException;
@@ -16,6 +22,12 @@ class BespokenController extends Controller
 {
     public $defaultAction = 'index';
     protected array|int|bool $allowAnonymous = self::ALLOW_ANONYMOUS_LIVE;
+
+    /**
+     * How many levels of nested Matrix fields the narration content will
+     * descend into. Deeper specs are cut off rather than followed.
+     */
+    private const MAX_MATRIX_DEPTH = 10;
 
     /**
      * bespoken/bespoken action
@@ -246,7 +258,18 @@ class BespokenController extends Controller
     }
 
     /**
-     * Action to get the content of an Element by its ID
+     * Action to get the narration content of an element by its ID.
+     *
+     * Used by the field JS for matrix blocks that aren't in the DOM (cards and
+     * element-index views). Returns the values of the fields named in the
+     * `spec` param — JSON in the shape the field JS parses the source-field
+     * setting into: a list of handles, where a Matrix field's handle maps to
+     * the spec for its blocks' fields, recursively. A Matrix field comes back
+     * as the ordered list of its live blocks, each in the same shape, so nested
+     * Matrix content can be narrated as deep as the spec names it (issue #33).
+     * Without a spec, every text field on the element is returned and Matrix
+     * fields are skipped.
+     *
      * @return Response
      */
     public function actionGetElementContent(): Response
@@ -273,11 +296,149 @@ class BespokenController extends Controller
             ]);
         }
 
-        return $this->asJson([
+        $specParam = Craft::$app->request->get('spec');
+        $spec = is_string($specParam) && $specParam !== ''
+            ? $this->_normalizeHandleSpec(Json::decodeIfJson($specParam))
+            : null;
 
+        return $this->asJson([
             'success' => true,
-            'element' => $element,
+            'content' => $this->_narrationContent($element, $spec),
         ]);
+    }
+
+    /**
+     * Validates a handle spec from the request: a list whose items are field
+     * handles or single-key maps of a Matrix field handle to a nested spec.
+     * Anything else is dropped. Returns null when the input isn't a list at
+     * all (or nests too deep), so the caller can fall back to "all fields".
+     *
+     * @param mixed $spec
+     * @param int $depth
+     * @return array|null
+     */
+    private function _normalizeHandleSpec(mixed $spec, int $depth = 0): ?array
+    {
+        if (!is_array($spec) || $depth > self::MAX_MATRIX_DEPTH) {
+            return null;
+        }
+
+        $clean = [];
+        foreach ($spec as $item) {
+            if (is_string($item)) {
+                if (preg_match('/^\w+$/', $item)) {
+                    $clean[] = $item;
+                }
+            } elseif (is_array($item) && count($item) === 1) {
+                $handle = (string)array_key_first($item);
+                $nested = $this->_normalizeHandleSpec($item[$handle], $depth + 1);
+                if (preg_match('/^\w+$/', $handle) && $nested !== null) {
+                    $clean[] = [$handle => $nested];
+                }
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * The narration content of an element, shaped for the field JS: its ID,
+     * per-site status, and the values of the fields named in $spec — text
+     * fields as strings (serialized as the field stores them, so CKEditor and
+     * Redactor fields arrive as HTML), and Matrix fields as the ordered list
+     * of their live blocks, each shaped the same way per the nested spec.
+     * Fields whose values aren't text (assets, relations, dates…) are omitted.
+     *
+     * @param ElementInterface $element
+     * @param array|null $spec null for every text field, no Matrix descent
+     * @param int $depth
+     * @return array
+     */
+    private function _narrationContent(ElementInterface $element, ?array $spec, int $depth = 0): array
+    {
+        $fields = [];
+        $layout = $element->getFieldLayout();
+
+        if ($layout !== null) {
+            $items = $spec ?? array_map(
+                fn(FieldInterface $field) => $field->handle,
+                $layout->getCustomFields(),
+            );
+
+            foreach ($items as $item) {
+                if (is_string($item)) {
+                    $handle = $item;
+                    $nestedSpec = null;
+                } else {
+                    $handle = (string)array_key_first($item);
+                    $nestedSpec = $item[$handle];
+                }
+
+                if (isset($fields[$handle])) {
+                    continue;
+                }
+
+                $field = $layout->getFieldByHandle($handle);
+                if ($field === null) {
+                    continue;
+                }
+                $value = $element->getFieldValue($handle);
+
+                if ($field instanceof Matrix) {
+                    // Matrix content is opt-in: only descend when the spec lists
+                    // handles for the blocks, and never past a sane depth.
+                    if ($nestedSpec === null || $depth >= self::MAX_MATRIX_DEPTH) {
+                        continue;
+                    }
+                    $fields[$handle] = array_map(
+                        fn(ElementInterface $block) => $this->_narrationContent($block, $nestedSpec, $depth + 1),
+                        $this->_liveNestedEntries($value),
+                    );
+                } else {
+                    $serialized = $field->serializeValue($value, $element);
+                    if (is_string($serialized) || is_int($serialized) || is_float($serialized)) {
+                        $fields[$handle] = (string)$serialized;
+                    }
+                }
+            }
+        }
+
+        return [
+            'id' => $element->id,
+            'status' => $element->getStatus(),
+            'fields' => $fields,
+        ];
+    }
+
+    /**
+     * A Matrix field's live blocks for the element's site, in their saved
+     * order. Mirrors how the field builds its editor input (drafts allowed,
+     * canonical blocks only) with a live-status filter, so a block disabled for
+     * this site only is left out (issue #31).
+     *
+     * @param mixed $value the Matrix field's value
+     * @return ElementInterface[]
+     */
+    private function _liveNestedEntries(mixed $value): array
+    {
+        if ($value instanceof EntryQuery) {
+            return (clone $value)
+                ->drafts(null)
+                ->canonicalsOnly()
+                ->status('live')
+                ->limit(null)
+                ->all();
+        }
+
+        if ($value instanceof ElementCollection) {
+            // Eager-loaded: the blocks are already in memory.
+            return $value
+                ->filter(fn(ElementInterface $block) => $block->getStatus() === 'live')
+                ->values()
+                ->all();
+        }
+
+        return [];
     }
 
     /**

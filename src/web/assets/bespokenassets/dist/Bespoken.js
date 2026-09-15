@@ -1451,6 +1451,7 @@
     const cleanText = text.replace(/[^\w\s]/gi, "").trim();
     return cleanText;
   }
+  var PARAGRAPH_BREAK = "\n\n";
   async function _getFieldTextViaAPI(elementId, spec, actionUrl) {
     try {
       const url = new URL(actionUrl);
@@ -1480,7 +1481,7 @@
       if (typeof item === "string") {
         const value = fields[item];
         if (typeof value === "string" && value !== "") {
-          text += (_isHTML(value) ? _processCKEditorFields(value) : _processPlainTextField(value)) + " ";
+          text += (_isHTML(value) ? _processCKEditorFields(value) : _processPlainTextField(value)) + PARAGRAPH_BREAK;
         }
         continue;
       }
@@ -1488,10 +1489,10 @@
       const blocks = fields[handle];
       if (Array.isArray(blocks)) {
         for (const block of blocks) {
-          text += _textFromContent(block, item[handle]) + " ";
+          text += _textFromContent(block, item[handle]) + PARAGRAPH_BREAK;
         }
       } else if (typeof blocks === "string" && blocks !== "") {
-        text += (_isHTML(blocks) ? _processCKEditorFields(blocks) : _processPlainTextField(blocks)) + " ";
+        text += (_isHTML(blocks) ? _processCKEditorFields(blocks) : _processPlainTextField(blocks)) + PARAGRAPH_BREAK;
       }
     }
     return text;
@@ -1694,7 +1695,7 @@
         for (const card of Array.from(container.querySelectorAll(".card"))) {
           const id = card.getAttribute("data-id");
           if (id !== null && _isBlockLive(id, card.getAttribute("data-status"), statuses)) {
-            text += await _getFieldTextViaAPI(id, spec, actionUrl) + " ";
+            text += await _getFieldTextViaAPI(id, spec, actionUrl) + PARAGRAPH_BREAK;
           }
         }
         break;
@@ -1716,13 +1717,13 @@
             for (const item of spec) {
               if (typeof item === "string") {
                 if (item === handle) {
-                  text += _getFieldText(child) + " ";
+                  text += _getFieldText(child) + PARAGRAPH_BREAK;
                 }
               } else if (handle in item) {
                 if (_getFieldType(child) === "matrix") {
-                  text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + " ";
+                  text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + PARAGRAPH_BREAK;
                 } else {
-                  text += _getFieldText(child) + " ";
+                  text += _getFieldText(child) + PARAGRAPH_BREAK;
                 }
               }
             }
@@ -1744,7 +1745,7 @@
         }
         for (const [id, status] of blockStatusById) {
           if (_isBlockLive(id, status, statuses)) {
-            text += await _getFieldTextViaAPI(id, spec, actionUrl) + " ";
+            text += await _getFieldTextViaAPI(id, spec, actionUrl) + PARAGRAPH_BREAK;
           }
         }
         break;
@@ -2399,7 +2400,7 @@
       for (const handle of fieldHandlesArray) {
         if (handle === "title" || typeof handle !== "string" && "title" in handle) {
           const titleToAdd = title.endsWith(".") ? title : title + ".";
-          text += titleToAdd + " ";
+          text += titleToAdd + PARAGRAPH_BREAK;
         } else {
           let nestedHandles = [];
           let currentHandle;
@@ -2414,16 +2415,16 @@
             const fieldType = _getFieldType(targetField);
             switch (fieldType) {
               case "plain-text":
-                text += _getFieldText(targetField) + " ";
+                text += _getFieldText(targetField) + PARAGRAPH_BREAK;
                 break;
               case "ckeditor":
-                text += _getFieldText(targetField) + " ";
+                text += _getFieldText(targetField) + PARAGRAPH_BREAK;
                 break;
               case "redactor":
-                text += _getFieldText(targetField) + " ";
+                text += _getFieldText(targetField) + PARAGRAPH_BREAK;
                 break;
               case "matrix":
-                text += await _getMatrixFieldText(targetField, nestedHandles, actionUrl) + " ";
+                text += await _getMatrixFieldText(targetField, nestedHandles, actionUrl) + PARAGRAPH_BREAK;
                 break;
             }
           }

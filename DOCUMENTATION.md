@@ -81,6 +81,8 @@ title,matrixFieldExample[fieldHandleForACKEditorField,fieldHandleForPlainTextFie
 
 In other words, the block handles themselves are not important. The important part is the field handles within the blocks. Behind the scenes, each field inside a block is queried separately and the field handles are accessed in the order you provide them in the field configuration. (If this is confusing, please reach out to me for clarification.)
 
+Every field you list, and every block of a Matrix field, is narrated as its own paragraph, so the voice pauses between a block's heading and its text and between one block and the next. If you want a heading and its text read as one sentence with no pause, use [Twig template mode](#twig-template-mode) and put them on one line.
+
 This is a screenshot of the field configuration for a Bespoken field that includes a Matrix field.
 
 ![Bespoken field setup with a Matrix field](./documentation-assets/field-setup-with-matrix.png)

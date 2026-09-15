@@ -31,6 +31,17 @@ export interface NarrationContent {
 }
 
 /*
+* Every narrated field, and every Matrix block, is its own paragraph: the
+* joins below append this rather than a space, so a block's text never runs
+* into the next block's (issue #33). Runs of breaks (an empty field, a
+* CKEditor value that already ends in one) collapse to a single blank line in
+* normalizeScriptWhitespace(), and TextChunker on the server splits on the
+* same blank lines. This matches template mode, where each line of output is
+* a paragraph.
+ */
+export const PARAGRAPH_BREAK = '\n\n';
+
+/*
 * _getFieldTextViaAPI
 * params: elementId: a matrix block's element ID, spec: the handles to read
 * from it, actionUrl: the get-element-content action URL
@@ -88,7 +99,7 @@ function _textFromContent(content: NarrationContent, spec: HandleSpec[]): string
         if (typeof item === 'string') {
             const value = fields[item];
             if (typeof value === 'string' && value !== '') {
-                text += (_isHTML(value) ? _processCKEditorFields(value) : _processPlainTextField(value)) + ' ';
+                text += (_isHTML(value) ? _processCKEditorFields(value) : _processPlainTextField(value)) + PARAGRAPH_BREAK;
             }
             continue;
         }
@@ -96,12 +107,12 @@ function _textFromContent(content: NarrationContent, spec: HandleSpec[]): string
         const blocks = fields[handle];
         if (Array.isArray(blocks)) {
             for (const block of blocks) {
-                text += _textFromContent(block, item[handle]) + ' ';
+                text += _textFromContent(block, item[handle]) + PARAGRAPH_BREAK;
             }
         } else if (typeof blocks === 'string' && blocks !== '') {
             // Brackets on a non-Matrix handle: the server sent its text, so
             // read it as if the brackets weren't there.
-            text += (_isHTML(blocks) ? _processCKEditorFields(blocks) : _processPlainTextField(blocks)) + ' ';
+            text += (_isHTML(blocks) ? _processCKEditorFields(blocks) : _processPlainTextField(blocks)) + PARAGRAPH_BREAK;
         }
     }
     return text;
@@ -569,7 +580,7 @@ export async function _getMatrixFieldText(
             for (const card of Array.from(container.querySelectorAll('.card'))) {
                 const id = card.getAttribute('data-id');
                 if (id !== null && _isBlockLive(id, card.getAttribute('data-status'), statuses)) {
-                    text += await _getFieldTextViaAPI(id, spec, actionUrl) + ' ';
+                    text += await _getFieldTextViaAPI(id, spec, actionUrl) + PARAGRAPH_BREAK;
                 }
             }
             break;
@@ -596,16 +607,16 @@ export async function _getMatrixFieldText(
                     for (const item of spec) {
                         if (typeof item === 'string') {
                             if (item === handle) {
-                                text += _getFieldText(child) + ' ';
+                                text += _getFieldText(child) + PARAGRAPH_BREAK;
                             }
                         } else if (handle in item) {
                             if (_getFieldType(child) === 'matrix') {
-                                text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + ' ';
+                                text += await _getMatrixFieldText(child, item[handle], actionUrl, statuses) + PARAGRAPH_BREAK;
                             } else {
                                 // Brackets on a non-Matrix handle: read the
                                 // field as if they weren't there rather than
                                 // silently dropping it.
-                                text += _getFieldText(child) + ' ';
+                                text += _getFieldText(child) + PARAGRAPH_BREAK;
                             }
                         }
                     }
@@ -630,7 +641,7 @@ export async function _getMatrixFieldText(
             }
             for (const [id, status] of blockStatusById) {
                 if (_isBlockLive(id, status, statuses)) {
-                    text += await _getFieldTextViaAPI(id, spec, actionUrl) + ' ';
+                    text += await _getFieldTextViaAPI(id, spec, actionUrl) + PARAGRAPH_BREAK;
                 }
             }
             break;

@@ -17,6 +17,7 @@ import {
     _getFieldText,
     _cleanTitle,
     _getMatrixFieldText,
+    PARAGRAPH_BREAK,
     _getFieldType,
     _parseFieldHandles,
     finalizeEditedScript,
@@ -718,7 +719,7 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
             if (handle === 'title' || (typeof handle !== 'string' && 'title' in handle)) {
                 // if title does not end with a period, add one
                 const titleToAdd = title.endsWith('.') ? title : title + '.';
-                text += (titleToAdd + " ");
+                text += titleToAdd + PARAGRAPH_BREAK;
             } else {
                 // The handle is not "title", so it's a field handle, or a Matrix
                 // field handle mapped to the spec for its blocks' fields:
@@ -744,28 +745,30 @@ async function generateScript(targetFieldHandles: string, title: string, actionU
                     switch (fieldType) {
                         case "plain-text":
                             // PlainText fields are scraped directly from the page
-                            text += _getFieldText(targetField) + " ";
+                            text += _getFieldText(targetField) + PARAGRAPH_BREAK;
                             break;
                         case "ckeditor":
                             // CKEditor fields are scraped directly from the page
-                            text += _getFieldText(targetField) + " ";
+                            text += _getFieldText(targetField) + PARAGRAPH_BREAK;
                             break;
                         case "redactor":
                             // Redactor fields are scraped directly from the page
-                            text += _getFieldText(targetField)  + " ";
+                            text += _getFieldText(targetField) + PARAGRAPH_BREAK;
                             break;
                         case "matrix":
                             // Matrix blocks are read from the DOM or the server
                             // depending on the field's view mode, and a nested
                             // Matrix field is read when the spec names it.
-                            text += await _getMatrixFieldText(targetField, nestedHandles, actionUrl) + " ";
+                            text += await _getMatrixFieldText(targetField, nestedHandles, actionUrl) + PARAGRAPH_BREAK;
                             break;
                     }
                 }
             }
         }
-        // Same whitespace shape the server sends (single spaces, one blank line per
-        // paragraph break), so the preview is exactly what the TTS service receives.
+        // Each field above ended with a paragraph break; collapse the doubled
+        // ones (a CKEditor value already ends in one) and empty fields into the
+        // same whitespace shape the server sends, so the preview is exactly what
+        // the TTS service receives.
         text = normalizeScriptWhitespace(text);
     }
     return text;

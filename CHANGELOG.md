@@ -11,6 +11,7 @@
 
 ### Changed
 
+- **Each narrated field and each Matrix block is now its own paragraph** in field-handle mode. Previously a block's text ran straight into the next block's (and a Plain Text field into whatever followed it) with only a space between them, so the TTS voice read across block boundaries without a pause and the preview showed the whole Matrix field as one run of text. A paragraph break now follows every field and every block, at every nesting level and in all three Matrix views, and the script is chunked on those breaks as before. This gives field-handle mode the same paragraph structure as a starter template in Twig template mode, where each field is on its own line ([#33](https://github.com/johnfmorton/craft-bespoken/issues/33)).
 - The field's status lookup for Matrix blocks now covers every block under a Matrix field, at any depth, in one round of requests (batched by 200 IDs) instead of one request per Matrix field.
 - The `get-element-content` control panel action, used internally by the field's JavaScript, now returns only the fields the narration script asks for (`content`) instead of a full serialization of the element (`element`).
 

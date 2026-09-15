@@ -7,7 +7,7 @@ use Monolog\LogRecord;
 
 class CustomLineFormatter extends LineFormatter
 {
-public function format(array|LogRecord $record): string
+    public function format(array|LogRecord $record): string
     {
         // Get the formatted output from the parent formatter
         $output = parent::format($record);

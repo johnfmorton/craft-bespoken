@@ -2,7 +2,6 @@
 
 namespace johnfmorton\bespoken\web\assets\bespokenassets;
 
-use Craft;
 use craft\web\AssetBundle;
 use craft\web\assets\cp\CpAsset;
 

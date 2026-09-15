@@ -5,11 +5,11 @@ namespace johnfmorton\bespoken\services;
 use Craft;
 use craft\helpers\App;
 use DateTime;
+use johnfmorton\bespoken\Bespoken as BespokenPlugin;
 use johnfmorton\bespoken\jobs\GenerateAudio;
 use johnfmorton\bespoken\records\AudioGenerationRecord;
 use Ramsey\Uuid\Uuid;
 use yii\base\Component;
-use johnfmorton\bespoken\Bespoken as BespokenPlugin;
 
 /**
  * Bespoken Service service
@@ -405,7 +405,7 @@ class BespokenService extends Component
 
         $records = $query->all();
 
-        return array_map(function ($record) {
+        return array_map(function($record) {
             return [
                 'id' => $record->id,
                 'bespokenJobId' => $record->bespokenJobId,

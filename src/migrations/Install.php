@@ -2,7 +2,6 @@
 
 namespace johnfmorton\bespoken\migrations;
 
-use Craft;
 use craft\db\Migration;
 use johnfmorton\bespoken\records\AudioGenerationRecord;
 

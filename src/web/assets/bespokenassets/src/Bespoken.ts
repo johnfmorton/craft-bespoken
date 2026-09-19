@@ -800,7 +800,10 @@ async function generateEntryScript(fieldGroup: HTMLElement): Promise<string> {
     // Every action button on the field carries the script source, the source
     // handles, and the action URLs.
     const source = fieldGroup.querySelector('[data-script-source]') as HTMLElement | null;
-    if (source?.getAttribute('data-script-source') === 'template') {
+    const scriptSource = source?.getAttribute('data-script-source');
+    // Both template sources (inline, or a file in the project's templates
+    // folder) are rendered on the server; only field handles are read here.
+    if (source && (scriptSource === 'template' || scriptSource === 'templateFile')) {
         return renderTemplateScript(source);
     }
     const targetFieldHandles: string = source?.getAttribute('data-target-field') || '';
@@ -811,8 +814,8 @@ async function generateEntryScript(fieldGroup: HTMLElement): Promise<string> {
 }
 
 /**
- * Template mode: the server renders the field's Twig script template against
- * the entry's current draft, and the output gets the same cleanup as field
+ * Template mode: the server renders the field's Twig script template (inline
+ * or a site template file) against the entry's current draft, and the output gets the same cleanup as field
  * HTML. Craft's element editor is asked to save pending changes to the draft
  * first, so unsaved edits are reflected. Returns '' (and reports the error in
  * the control panel) when the template can't be rendered, so nothing

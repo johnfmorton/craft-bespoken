@@ -12,6 +12,7 @@ use craft\fields\Matrix;
 use craft\helpers\App;
 use craft\helpers\Json;
 use craft\web\Controller;
+use craft\web\View;
 use johnfmorton\bespoken\Bespoken as BespokenPlugin;
 use johnfmorton\bespoken\fields\BespokenField;
 use johnfmorton\bespoken\helpers\StarterTemplate;
@@ -493,10 +494,22 @@ class BespokenController extends Controller
         }
 
         try {
-            $html = Craft::$app->view->renderObjectTemplate($field->scriptTemplate, $element, [
-                'entry' => $element,
-                'element' => $element,
-            ]);
+            if ($field->usesTemplateFile()) {
+                // A site template file, resolved from the project's templates
+                // folder like a section's entry template. Plain templates
+                // don't get the object-template `{title}` shortcut, so pass
+                // `object` explicitly to keep the variables the same.
+                $html = Craft::$app->view->renderTemplate($field->scriptTemplatePath, [
+                    'entry' => $element,
+                    'element' => $element,
+                    'object' => $element,
+                ], View::TEMPLATE_MODE_SITE);
+            } else {
+                $html = Craft::$app->view->renderObjectTemplate($field->scriptTemplate, $element, [
+                    'entry' => $element,
+                    'element' => $element,
+                ]);
+            }
         } catch (\Throwable $e) {
             Craft::warning("Bespoken script template for field \"{$field->handle}\" failed to render: {$e->getMessage()}", __METHOD__);
             return $this->asJson([

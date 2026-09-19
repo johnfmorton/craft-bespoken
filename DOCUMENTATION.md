@@ -122,6 +122,14 @@ How it works:
 - A handle that doesn't exist renders as empty text rather than an error. Syntax errors are reported when you save the field settings, and a template that fails while rendering (for example calling a method that doesn't exist) shows an error in the control panel instead of a script.
 - Pronunciation rules, emoji removal, and the rest of the text preparation apply after rendering, exactly as they do for field handles, and the script can still be edited in the preview dialog before generating.
 
+#### Keeping the template in a file
+
+An inline template is saved with the field's settings, which means it also lands in project config (`config/project/fields/….yaml`). For a long template that's awkward to review and version, choose **Twig template file** instead and enter the path of a template in your project's `templates/` folder, written the way you'd enter a section's entry template: `_narration/article` renders `templates/_narration/article.twig`. The path field autocompletes from your templates folder, and saving the field settings checks that the file exists.
+
+The file is rendered exactly like an inline template: `entry` (and `object`) is the entry being edited, HTML is converted to speech text, each line of output is a paragraph, and render errors are reported in the control panel. Only the path is stored in project config, so the template lives in version control alongside the rest of your site's Twig, can `{% include %}` shared partials, and can be edited without touching the control panel. The one difference is that Craft's object-template shortcut syntax (`{title}`) isn't available in a file; use `{{ entry.title }}`, which is what the starter template generator writes anyway.
+
+To start from a generated template, switch the field to **Twig template**, use **Insert starter template**, copy the result into your file, then switch back to **Twig template file**.
+
 The Bespoken field has a status field that will show the status of the audio file creation. It will display the name of the audio file when the file is created. If there is an error, the status field will display the error message.
 
 ### Example of a successful audio file creation

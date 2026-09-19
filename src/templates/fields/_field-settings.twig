@@ -34,6 +34,7 @@
     options: [
         { value: 'handles', label: 'Field handles' | t('bespoken') },
         { value: 'template', label: 'Twig template' | t('bespoken') },
+        { value: 'templateFile', label: 'Twig template file' | t('bespoken') },
     ],
     value: field.scriptSource,
     toggle: true,
@@ -130,6 +131,20 @@
     placeholder: "{{ entry.title }}.\n{{ entry.body }}",
     value: field.scriptTemplate,
     errors: field.getErrors('scriptTemplate'),
+}) }}
+</div>
+
+<div id="script-source-templateFile"{% if field.scriptSource != 'templateFile' %} class="hidden"{% endif %}>
+{{ forms.autosuggestField({
+    label: 'Script template path' | t('bespoken'),
+    instructions: 'Script template path instructions' | t('bespoken'),
+    id: 'scriptTemplatePath',
+    name: 'scriptTemplatePath',
+    class: 'code',
+    placeholder: '_narration/article',
+    value: field.scriptTemplatePath,
+    errors: field.getErrors('scriptTemplatePath'),
+    suggestions: craft.cp.getTemplateSuggestions(),
 }) }}
 </div>
 

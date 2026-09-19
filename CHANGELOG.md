@@ -1,5 +1,11 @@
 # Release Notes for Bespoken
 
+## 5.6.0 - Unreleased
+
+### Added
+
+- **Twig template file as a narration script source** ([#33](https://github.com/johnfmorton/craft-bespoken/issues/33)). Alongside **Field handles** and **Twig template**, a Bespoken field's **Narration script source** can now be **Twig template file**: enter the path of a template in your project's `templates/` folder, written like a section's entry template (`_narration/article` for `templates/_narration/article.twig`). The file is rendered against the entry exactly as an inline template is, with the same `entry` variable, HTML-to-speech conversion, paragraph handling, preview, edit, and generate flow. Only the path is stored in the field settings, so a long narration template no longer has to live in project config: it stays in version control with the rest of your site's Twig, can `{% include %}` shared partials, and is edited like any other template. The path field autocompletes from your templates folder, and saving the field settings reports a path that doesn't resolve to a file.
+
 ## 5.5.0 - 2026-09-14
 
 ### Added

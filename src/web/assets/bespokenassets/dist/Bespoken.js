@@ -2436,7 +2436,8 @@
   }
   async function generateEntryScript(fieldGroup) {
     const source = fieldGroup.querySelector("[data-script-source]");
-    if (source?.getAttribute("data-script-source") === "template") {
+    const scriptSource = source?.getAttribute("data-script-source");
+    if (source && (scriptSource === "template" || scriptSource === "templateFile")) {
       return renderTemplateScript(source);
     }
     const targetFieldHandles = source?.getAttribute("data-target-field") || "";

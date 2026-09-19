@@ -6,6 +6,7 @@ use Craft;
 use craft\base\ElementInterface;
 use craft\base\Field;
 use craft\helpers\StringHelper;
+use craft\web\View;
 use Twig\Error\LoaderError;
 use Twig\Error\RuntimeError;
 use Twig\Error\SyntaxError;
@@ -21,10 +22,12 @@ class BespokenField extends Field
 {
     public const SOURCE_HANDLES = 'handles';
     public const SOURCE_TEMPLATE = 'template';
+    public const SOURCE_TEMPLATE_FILE = 'templateFile';
 
     /**
      * Where the narration script comes from: the field handles in
-     * $sourceField (the default), or the Twig template in $scriptTemplate.
+     * $sourceField (the default), the Twig template in $scriptTemplate, or
+     * the site template file at $scriptTemplatePath.
      */
     public string $scriptSource = self::SOURCE_HANDLES;
 
@@ -42,6 +45,17 @@ class BespokenField extends Field
      * 'template'.
      */
     public string $scriptTemplate = '';
+
+    /**
+     * The path of a site template that produces the narration script, relative
+     * to the project's templates folder and resolved like a section's entry
+     * template (e.g. `_narration/article` or `_narration/article.twig`). It is
+     * rendered against the element being edited (available as `entry` and
+     * `object`), so only the path is stored in project config and the template
+     * itself lives in version control. Used when $scriptSource is
+     * 'templateFile'.
+     */
+    public string $scriptTemplatePath = '';
 
     /**
      * File Name Prefix
@@ -86,24 +100,57 @@ class BespokenField extends Field
     protected function defineRules(): array
     {
         return array_merge(parent::defineRules(), [
-            [['scriptSource'], 'in', 'range' => [self::SOURCE_HANDLES, self::SOURCE_TEMPLATE]],
+            [['scriptSource'], 'in', 'range' => [self::SOURCE_HANDLES, self::SOURCE_TEMPLATE, self::SOURCE_TEMPLATE_FILE]],
             [
                 ['scriptTemplate'],
                 'required',
-                'when' => fn(self $field) => $field->usesTemplate(),
+                'when' => fn(self $field) => $field->scriptSource === self::SOURCE_TEMPLATE,
                 'message' => Craft::t('bespoken', 'Enter a Twig template, or switch the script source to field handles.'),
             ],
             [['scriptTemplate'], 'validateScriptTemplate'],
+            [['scriptTemplatePath'], 'trim'],
+            [
+                ['scriptTemplatePath'],
+                'required',
+                'when' => fn(self $field) => $field->usesTemplateFile(),
+                'message' => Craft::t('bespoken', 'Enter a template path, or switch the script source to field handles.'),
+            ],
+            [['scriptTemplatePath'], 'validateScriptTemplatePath'],
         ]);
     }
 
     /**
-     * Whether the narration script is rendered from the Twig template rather
-     * than read from the field handles.
+     * Whether the narration script is rendered on the server from a Twig
+     * template (inline or a site template file) rather than read from the
+     * field handles in the entry editor.
      */
     public function usesTemplate(): bool
     {
-        return $this->scriptSource === self::SOURCE_TEMPLATE;
+        return $this->scriptSource === self::SOURCE_TEMPLATE
+            || $this->scriptSource === self::SOURCE_TEMPLATE_FILE;
+    }
+
+    /**
+     * Whether the narration script is rendered from the site template file at
+     * $scriptTemplatePath.
+     */
+    public function usesTemplateFile(): bool
+    {
+        return $this->scriptSource === self::SOURCE_TEMPLATE_FILE;
+    }
+
+    /**
+     * Whether the selected script source has something to read from: handles,
+     * an inline template, or a template path. The field input shows a
+     * "no source" notice when this is false.
+     */
+    public function hasScriptSource(): bool
+    {
+        return match ($this->scriptSource) {
+            self::SOURCE_TEMPLATE => $this->scriptTemplate !== '',
+            self::SOURCE_TEMPLATE_FILE => $this->scriptTemplatePath !== '',
+            default => $this->sourceField !== '',
+        };
     }
 
     /**
@@ -114,7 +161,7 @@ class BespokenField extends Field
      */
     public function validateScriptTemplate(string $attribute): void
     {
-        if (!$this->usesTemplate() || $this->scriptTemplate === '') {
+        if ($this->scriptSource !== self::SOURCE_TEMPLATE || $this->scriptTemplate === '') {
             return;
         }
 
@@ -129,6 +176,25 @@ class BespokenField extends Field
         } catch (SyntaxError $e) {
             $this->addError($attribute, Craft::t('bespoken', 'The template has a syntax error: {message}', [
                 'message' => $e->getMessage(),
+            ]));
+        }
+    }
+
+    /**
+     * Rejects a template path that doesn't resolve to a file in the project's
+     * templates folder, so a typo is caught when the field is saved. The path
+     * is resolved in site template mode, the same way a section's entry
+     * template is, so `_narration/article` finds `_narration/article.twig`.
+     */
+    public function validateScriptTemplatePath(string $attribute): void
+    {
+        if (!$this->usesTemplateFile() || $this->scriptTemplatePath === '') {
+            return;
+        }
+
+        if (!Craft::$app->getView()->doesTemplateExist($this->scriptTemplatePath, View::TEMPLATE_MODE_SITE)) {
+            $this->addError($attribute, Craft::t('bespoken', 'No template exists at "{path}" in the project\'s templates folder.', [
+                'path' => $this->scriptTemplatePath,
             ]));
         }
     }
